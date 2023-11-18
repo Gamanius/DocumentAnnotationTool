@@ -152,6 +152,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\helper\Logger.cpp" />
+    <ClCompile Include="src\helper\MemoryWatch.cpp" />
+    <ClCompile Include="src\helper\Window.cpp" />
     <ClCompile Include="src\main.cpp" />
   </ItemGroup>
   <ItemGroup>

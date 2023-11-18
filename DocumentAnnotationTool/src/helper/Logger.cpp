@@ -1,3 +1,5 @@
+#pragma once
+
 #include "include.h"
 #include <locale>
 #include <codecvt>
@@ -15,8 +17,36 @@ namespace Logger {
 		log(wide, lvl);
 	}
 
+	void log(const unsigned long msg, MsgLevel lvl) {
+		log(std::to_string(msg), lvl);
+	}
+
+	void warn(const std::string& msg) {
+		log(msg, Logger::MsgLevel::WARNING);
+	}
+
 	void assert_msg(const std::string& msg, const std::string& file, long line) {
-		log("Assert failed in File: " + file + "on line " + std::to_string(line) + " with message: \"" + msg + "\" ", Logger::MsgLevel::FATAL);
+		log("Assert failed in File: " + file + " on line " + std::to_string(line) + " with message: \"" + msg + "\" ", Logger::MsgLevel::FATAL);
+	}
+
+	void assert_msg_win(const std::string& msg, const std::string& file, long line) {
+		// Get the last error code
+		DWORD error = GetLastError();
+
+		// Use FormatMessage to get a human-readable error message
+		LPVOID errorMsg;
+		FormatMessage(
+			FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
+			NULL,
+			error,
+			0, // Default language
+			(LPWSTR)&errorMsg,
+			0,
+			NULL
+		);
+
+		log(L"Windows Error (" + std::to_wstring(error) + L"): " + std::wstring((wchar_t*)errorMsg));
+		assert_msg(msg, file, line);
 	}
 
 	void print_to_console(HANDLE handle) {
@@ -30,9 +60,11 @@ namespace Logger {
 		}
 	}
 
+	void clear() {
+		all_messages.clear();
+	}
+
 	const std::vector<std::wstring>* get_all_msg() {
 		return &all_messages;
 	}
-
-
 }
