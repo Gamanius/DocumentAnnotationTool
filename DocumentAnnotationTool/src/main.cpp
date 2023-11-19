@@ -19,12 +19,16 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 	init();
 	auto b = AllocConsole();
 	auto handle = GetStdHandle(STD_OUTPUT_HANDLE);
-	
+
 	auto window = WindowHandler(APPLICATION_NAME, hInstance);
 	window.set_state(WindowHandler::WINDOW_STATE::NORMAL);
+
+	auto render = Direct2DRenderer(&window);
+	window.set_renderer((Renderer::RenderHandler*)&render);
 	
 	while (!window.close_request()) { 
 		WindowHandler::get_window_messages(true);
+		render.draw_text(L"Hello ma man", { 0.0f, 0.0f }, L"Arial", 50);
 	}
 	
 	Logger::print_to_console(handle);

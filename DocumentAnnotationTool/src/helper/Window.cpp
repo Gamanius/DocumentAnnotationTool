@@ -10,7 +10,7 @@ void WindowHandler::cleanup() {
 	delete m_allWindowInstances;
 }
 
-LRESULT WindowHandler::parseWindowMessages(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+LRESULT WindowHandler::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 	WindowHandler* currentInstance = m_allWindowInstances->operator[](hWnd);
 	if (currentInstance == nullptr) {
 		return DefWindowProc(hWnd, uMsg, wParam, lParam);
@@ -21,6 +21,12 @@ LRESULT WindowHandler::parseWindowMessages(HWND hWnd, UINT uMsg, WPARAM wParam, 
 	{
 		currentInstance->m_closeRequest = true;
 		return NULL;
+	}
+	case WM_PAINT:
+	{
+		if (currentInstance->m_renderer != nullptr) {
+			currentInstance->m_renderer->clear({50, 50, 50});
+		}
 	}
 	}
 	return DefWindowProc(hWnd, uMsg, wParam, lParam);
@@ -35,6 +41,28 @@ void WindowHandler::set_state(WINDOW_STATE state) {
 	case WINDOW_STATE::MINIMIZED: nCmdShow = SW_MINIMIZE; break;
 	}
 	ShowWindow(m_hwnd, nCmdShow);
+}
+
+HWND WindowHandler::get_hwnd() {
+	return m_hwnd;
+}
+
+void WindowHandler::set_renderer(Renderer::RenderHandler* renderer) {
+	m_renderer = renderer;
+}
+
+HDC WindowHandler::get_hdc() {
+	return m_hdc;
+}
+
+UINT WindowHandler::get_dpi() {
+	return m_dpi;
+}
+
+Renderer::Rectangle<long> WindowHandler::get_size() {
+	RECT r;
+	GetClientRect(m_hwnd, &r);
+	return Renderer::Rectangle<long>(r.left, r.top, r.right - r.left, r.bottom - r.top);
 }
 
 bool WindowHandler::close_request() {
@@ -69,7 +97,7 @@ bool WindowHandler::init(std::wstring windowName, HINSTANCE instance) {
 
 	WNDCLASS wc = {};
 	wc.style = CS_HREDRAW | CS_VREDRAW;
-	wc.lpfnWndProc = reinterpret_cast<WNDPROC>(this->parseWindowMessages); 
+	wc.lpfnWndProc = reinterpret_cast<WNDPROC>(this->parse_window_messages); 
 	wc.hInstance = instance;
 	wc.hCursor = LoadCursor(NULL, IDC_ARROW);
 	wc.hbrBackground = CreateSolidBrush(3289650);
