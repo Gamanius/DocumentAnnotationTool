@@ -30,6 +30,8 @@ namespace Logger {
 		FATAL = 2
 	};
 
+	void init();
+
 	void log(const std::wstring& msg, MsgLevel lvl = MsgLevel::INFO);
 	void log(const std::string& msg, MsgLevel lvl = MsgLevel::INFO);
 	void log(const unsigned long msg, MsgLevel lvl = MsgLevel::INFO);
@@ -53,7 +55,9 @@ class WindowHandler {
 
 	bool m_closeRequest = false;
 
-	static std::map<HWND, WindowHandler*> m_allWindowInstances;
+	static std::map<HWND, WindowHandler*>* m_allWindowInstances;
+
+	static void cleanup();
 
 public:
 

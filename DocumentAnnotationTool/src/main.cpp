@@ -4,13 +4,19 @@
 
 #define APPLICATION_NAME L"Docanto"		
 
-void test() {
-	auto pls = MemoryWatcher::get_allocated_bytes();
+void memory_leak_check() {
+	auto allocated_bytes = MemoryWatcher::get_allocated_bytes();
+	// check if all bytes have been deallocated
+	ASSERT(!allocated_bytes, "Not all bytes have been deallocated :/");
+}
+
+void init() {
+	std::atexit(memory_leak_check);
+	Logger::init();
 }
 
 int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nCmdShow) {
-	std::atexit(test);
-	MemoryWatcher::set_calibration();
+	init();
 	auto b = AllocConsole();
 	auto handle = GetStdHandle(STD_OUTPUT_HANDLE);
 	

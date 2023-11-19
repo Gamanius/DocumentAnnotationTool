@@ -3,11 +3,15 @@
 #include "include.h"
 #define CHECK_BIT(var,pos) ((var) & (1<<(pos)))
 
-std::map<HWND, WindowHandler*> WindowHandler::m_allWindowInstances;
+std::map<HWND, WindowHandler*>* WindowHandler::m_allWindowInstances;
 
+
+void WindowHandler::cleanup() {
+	delete m_allWindowInstances;
+}
 
 LRESULT WindowHandler::parseWindowMessages(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-	WindowHandler* currentInstance = m_allWindowInstances[hWnd];
+	WindowHandler* currentInstance = m_allWindowInstances->operator[](hWnd);
 	if (currentInstance == nullptr) {
 		return DefWindowProc(hWnd, uMsg, wParam, lParam);
 	}
@@ -56,6 +60,11 @@ void WindowHandler::get_window_messages(bool blocking) {
 }
 
 bool WindowHandler::init(std::wstring windowName, HINSTANCE instance) {
+	if (m_allWindowInstances == nullptr) {
+		m_allWindowInstances = new std::map<HWND, WindowHandler*>();
+		std::atexit(WindowHandler::cleanup);
+	}
+
 	SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
 	WNDCLASS wc = {};
@@ -85,7 +94,7 @@ bool WindowHandler::init(std::wstring windowName, HINSTANCE instance) {
 	Logger::log("Retrieved DPI: " + std::to_string(m_dpi));
 
 	// add this windows to the window stack
-	m_allWindowInstances[m_hwnd] = this;
+	m_allWindowInstances->operator[](m_hwnd) = this;
 
 	return true;
 }
@@ -95,6 +104,6 @@ WindowHandler::WindowHandler(std::wstring windowname, HINSTANCE instance) {
 }
 
 WindowHandler::~WindowHandler() {
-	m_allWindowInstances.erase(m_hwnd);
+	m_allWindowInstances->erase(m_hwnd);
 	ASSERT_WIN(DestroyWindow(m_hwnd), "Error when destroying window");
 }

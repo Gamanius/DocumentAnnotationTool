@@ -4,11 +4,17 @@
 #include <locale>
 #include <codecvt>
 
+void cleanup();
+std::vector<std::wstring>* all_messages = nullptr;
+
 namespace Logger {
-	std::vector<std::wstring> all_messages;
+	void init() {
+		all_messages = new std::vector<std::wstring>();
+		std::atexit(cleanup);
+	}
 
 	void log(const std::wstring& msg, MsgLevel lvl) {
-		all_messages.push_back(msg);
+		all_messages->push_back(msg);
 	}
 
 	void log(const std::string& msg, MsgLevel lvl) {
@@ -53,18 +59,22 @@ namespace Logger {
 		// TODO actually awfully slow 
 		const wchar_t* new_line = L"\n";
 
-		for (size_t i = 0; i < all_messages.size(); i++) {
-			std::wstring& temp = all_messages.at(i);
+		for (size_t i = 0; i < all_messages->size(); i++) {
+			std::wstring& temp = all_messages->at(i);
 			WriteConsoleW(handle, (void*)temp.c_str(), temp.length(), nullptr, nullptr);
 			WriteConsoleW(handle, (void*)new_line, 1, nullptr, nullptr);
 		}
 	}
 
 	void clear() {
-		all_messages.clear();
+		all_messages->clear();
 	}
 
 	const std::vector<std::wstring>* get_all_msg() {
-		return &all_messages;
+		return all_messages;
 	}
+}
+
+void cleanup() {
+	delete all_messages;
 }
