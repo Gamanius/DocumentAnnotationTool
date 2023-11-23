@@ -4,14 +4,9 @@
 #include <locale>
 #include <codecvt>
 
-void cleanup();
-std::vector<std::wstring>* all_messages = nullptr;
+std::shared_ptr<std::vector<std::wstring>> all_messages = std::make_shared<std::vector<std::wstring>>();
 
 namespace Logger {
-	void init() {
-		all_messages = new std::vector<std::wstring>();
-		std::atexit(cleanup);
-	}
 
 	void log(const std::wstring& msg, MsgLevel lvl) {
 		all_messages->push_back(msg);
@@ -32,7 +27,10 @@ namespace Logger {
 	}
 
 	void assert_msg(const std::string& msg, const std::string& file, long line) {
-		log("Assert failed in File: " + file + " on line " + std::to_string(line) + " with message: \"" + msg + "\" ", Logger::MsgLevel::FATAL);
+		log("Assert failed in File: " + file + " on line " + std::to_string(line) + 
+			" with message: \"" + msg + "\" ", Logger::MsgLevel::FATAL);
+
+		print_to_debug(); 
 	}
 
 	void assert_msg_win(const std::string& msg, const std::string& file, long line) {
@@ -66,15 +64,19 @@ namespace Logger {
 		}
 	}
 
+	void print_to_debug() {
+		for (size_t i = 0; i < all_messages->size(); i++) {
+			OutputDebugString(L"\n");
+			OutputDebugString(all_messages->at(i).c_str());
+		}
+		OutputDebugString(L"\n\n");
+	}
+
 	void clear() {
 		all_messages->clear();
 	}
 
-	const std::vector<std::wstring>* get_all_msg() {
+	const std::weak_ptr<std::vector<std::wstring>> get_all_msg() {
 		return all_messages;
 	}
-}
-
-void cleanup() {
-	delete all_messages;
 }

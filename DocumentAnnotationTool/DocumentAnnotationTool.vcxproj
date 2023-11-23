@@ -165,12 +165,13 @@
   <ItemGroup>
     <ClCompile Include="src\helper\Direct2D.cpp" />
     <ClCompile Include="src\helper\Logger.cpp" />
-    <ClCompile Include="src\helper\MemoryWatch.cpp" />
     <ClCompile Include="src\helper\Window.cpp" />
     <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\MainWindow.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\helper\include.h" />
+    <ClInclude Include="src\MainWindow.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

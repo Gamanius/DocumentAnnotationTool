@@ -4,25 +4,14 @@
 #include <string>
 #include <map>
 #include <vector>
+#include <memory>
+#include <functional>
 #include <iostream>
 #include <d2d1.h>
 #include <dwrite_3.h>
+#include <crtdbg.h>
 
-_NODISCARD _Ret_notnull_ _Post_writable_byte_size_(_Size) _VCRT_ALLOCATOR
-void* __cdecl operator new(size_t _Size);
-
-_NODISCARD _Ret_notnull_ _Post_writable_byte_size_(_Size) _VCRT_ALLOCATOR
-void* __cdecl operator new[](size_t _Size);
-
-void operator delete(void* ptr) noexcept;
-
-void operator delete[](void* ptr) noexcept;
-
-namespace MemoryWatcher {
-	size_t get_allocated_bytes();
-	size_t get_all_allocated_bytes();
-	void set_calibration();
-}
+#define APPLICATION_NAME L"Docanto"
 
 inline void SafeRelease(IUnknown* ptr) {
 	if (ptr) {
@@ -38,7 +27,6 @@ namespace Logger {
 		FATAL = 2
 	};
 
-	void init();
 
 	void log(const std::wstring& msg, MsgLevel lvl = MsgLevel::INFO);
 	void log(const std::string& msg, MsgLevel lvl = MsgLevel::INFO);
@@ -50,24 +38,30 @@ namespace Logger {
 	
 	void print_to_console(HANDLE handle);
 
+	void print_to_debug();
+
 	void clear();
 
-	const std::vector<std::wstring>* get_all_msg();
+	const std::weak_ptr<std::vector<std::wstring>> get_all_msg();
 }
 
 namespace Renderer {
 	template <typename T>
 	struct Point {
-		T x, y = 0;
+		T x= 0, y = 0;
 
 		Point() = default;
 		Point(T x, T y) : x(x), y(y) {}
+
+		operator D2D1_POINT_2F() const {
+			return D2D1::Point2F(x, y);
+		}
 	};
 
 	template <typename T>
 	struct Rectangle {
-		T x, y = 0;
-		T width, height = 0;
+		T x = 0, y = 0;
+		T width = 0, height = 0;
 
 		Rectangle() = default;
 		Rectangle(T x, T y, T width, T height) : x(x), y(y), width(width), height(height) {}
@@ -90,13 +84,22 @@ namespace Renderer {
 		}
 	};
 
+	struct AlphaColor : public Color {
+		byte alpha = 0;
+		AlphaColor() = default;
+		AlphaColor(byte r, byte g, byte b, byte alpha) : Color(r, g, b), alpha(alpha) {}
+
+		operator D2D1_COLOR_F() const {
+			return D2D1::ColorF(r / 255.0f, g / 255.0f, b / 255.0f, alpha / 255.0f);
+		}
+	};
+
 
 	struct RenderHandler {
 		RenderHandler() = default;
 
 		virtual void clear(Color c) {}
 
-		virtual void draw_text(std::wstring text, Point<float> topleft, std::wstring font, float size) {}
 	};
 }
 
@@ -105,7 +108,11 @@ class WindowHandler;
 class Direct2DRenderer : public Renderer::RenderHandler {
 	static ID2D1Factory* m_factory; 
 	static IDWriteFactory3* m_writeFactory;
-	WindowHandler* m_attachedWindow = nullptr;
+
+	HDC m_hdc = nullptr;
+	HWND m_hwnd = nullptr;
+	Renderer::Rectangle<long> m_window_size;
+
 	ID2D1HwndRenderTarget* m_renderTarget = nullptr;
 
 	UINT32 m_isRenderinProgress = 0;
@@ -115,72 +122,55 @@ class Direct2DRenderer : public Renderer::RenderHandler {
 
 
 public:
+	template <typename T>
 	struct RenderObject {
-		//TODO
-	};
-	struct TextFormat {
-		IDWriteTextFormat* m_format = nullptr;
-		ID2D1SolidColorBrush* m_brush = nullptr;
+		T* m_object = nullptr;
 
-		TextFormat() = default;
-		TextFormat(TextFormat&& t) noexcept {
-			m_format = t.m_format;
-			m_brush = t.m_brush;
-			t.m_format = nullptr;
-			t.m_brush = nullptr;
+		RenderObject() = default;
+		RenderObject(T* object) : m_object(object) {}
+		RenderObject(RenderObject&& t) noexcept {
+			m_object = t.m_object;
+			t.m_object = nullptr;
 		}
-		TextFormat(const TextFormat& t) {
-			m_format = t.m_format;
-			m_brush = t.m_brush;
+		RenderObject(const RenderObject& t) {
+			m_object = t.m_object;
+			m_object->AddRef();
+		}
 
-			if (m_format != nullptr)
-				m_format->AddRef();
-			if (m_brush != nullptr)
-				m_brush->AddRef();
-		}
-		TextFormat& operator=(const TextFormat& t) {
+		RenderObject& operator=(const RenderObject& t) {
 			if (this != &t) {
-				SafeRelease(m_format);
-				SafeRelease(m_brush);
-
-				m_format = t.m_format;
-				m_brush = t.m_brush;
-
-				if (m_format != nullptr)
-					m_format->AddRef();
-				if (m_brush != nullptr)
-					m_brush->AddRef();
-			}
-			return *this;
-		}
-		TextFormat& operator=(TextFormat&& t) noexcept {
-			if (this != &t) {
-				SafeRelease(m_format);
-				SafeRelease(m_brush);
-
-				m_format = t.m_format;
-				m_brush = t.m_brush;
-
-				t.m_format = nullptr;
-				t.m_brush = nullptr;
+				m_object = t.m_object;
+				m_object->AddRef();
 			}
 			return *this;
 		}
 
-		~TextFormat() {
-			SafeRelease(m_format);
-			SafeRelease(m_brush);
+		RenderObject& operator=(RenderObject&& t) noexcept {
+			if (this != &t) {
+				m_object = t.m_object;
+				t.m_object = nullptr;
+			}
+			return *this;
+		} 
+
+		~RenderObject() {
+			SafeRelease(m_object);
 		}
 	};
 
-	Direct2DRenderer(WindowHandler* const window);
+	typedef RenderObject<ID2D1SolidColorBrush> BrushObject;
+	typedef RenderObject<ID2D1Bitmap> BitmapObject;
+	typedef RenderObject<IDWriteTextFormat> TextFormatObject;
+
+	Direct2DRenderer(const WindowHandler& window);
 	~Direct2DRenderer();
 
 	void clear(Renderer::Color c) override;
+	void resize(Renderer::Rectangle<long> r);
+	void draw_text(const std::wstring& text, Renderer::Point<float> pos, TextFormatObject& format, BrushObject& brush);
 
-	void draw_text(std::wstring text, Renderer::Point<float> topleft, std::wstring font, float size) override;
-
-	TextFormat create_text_format(std::wstring font, float size);
+	TextFormatObject create_text_format(std::wstring font, float size);
+	BrushObject create_brush(Renderer::Color c);
 };
 
 
@@ -189,13 +179,12 @@ class WindowHandler {
 	HDC m_hdc = NULL;
 	UINT m_dpi = 96;
 
-    Renderer::RenderHandler* m_renderer = nullptr;
-
 	bool m_closeRequest = false;
 
-	static std::map<HWND, WindowHandler*>* m_allWindowInstances;
+	static std::unique_ptr<std::map<HWND, WindowHandler*>> m_allWindowInstances;
 
-	static void cleanup();
+	std::function<void()> m_callback_paint;
+	std::function<void(Renderer::Rectangle<long>)> m_callback_size;
 
 public:
 
@@ -219,22 +208,23 @@ public:
 
 	void set_state(WINDOW_STATE state);
 
-	void set_renderer(Renderer::RenderHandler* renderer);
+	void set_callback_paint(std::function<void()> callback);
+	void set_callback_size(std::function<void(Renderer::Rectangle<long>)> callback);
 
 	// Returns the window handle
-	HWND get_hwnd();
+	HWND get_hwnd() const;
 
 	// Returns the device context
-	HDC get_hdc();
+	HDC get_hdc() const;
 
 	// Returns the DPI of the window
-	UINT get_dpi();
+	UINT get_dpi() const;
 
 	// Returns the window size
-	Renderer::Rectangle<long> get_size();
+	Renderer::Rectangle<long> get_size() const;
 
 	// Returns true if a close request has been sent to the window
-	bool close_request();
+	bool close_request() const;
 };
 
 #ifndef NDEBUG

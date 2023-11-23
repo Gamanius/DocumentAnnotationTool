@@ -5,10 +5,12 @@ ID2D1Factory* Direct2DRenderer::m_factory = nullptr;
 IDWriteFactory3* Direct2DRenderer::m_writeFactory = nullptr;
 
 
-Direct2DRenderer::Direct2DRenderer(WindowHandler* const w) {
-	m_attachedWindow = w;
+Direct2DRenderer::Direct2DRenderer(const WindowHandler& w) {
+	m_hdc = w.get_hdc();
+	m_hwnd = w.get_hwnd();
+	m_window_size = w.get_size();
 
-	D2D1_FACTORY_OPTIONS option; 
+	D2D1_FACTORY_OPTIONS option{};
 
 #ifdef _DEBUG
 		option.debugLevel = D2D1_DEBUG_LEVEL_INFORMATION;
@@ -36,7 +38,7 @@ Direct2DRenderer::Direct2DRenderer(WindowHandler* const w) {
 
 	result = m_factory->CreateHwndRenderTarget(
 		D2D1::RenderTargetProperties(),
-		D2D1::HwndRenderTargetProperties(m_attachedWindow->get_hwnd(), w->get_size()),
+		D2D1::HwndRenderTargetProperties(m_hwnd, m_window_size),
 		&m_renderTarget
 	);
 }
@@ -53,6 +55,36 @@ void Direct2DRenderer::clear(Renderer::Color c) {
 	end_draw();
 }
 
+void Direct2DRenderer::resize(Renderer::Rectangle<long> r) {
+	m_renderTarget->Resize(r);
+}
+
+void Direct2DRenderer::draw_text(const std::wstring& text, Renderer::Point<float> pos, TextFormatObject& format, BrushObject& brush) {
+	IDWriteTextLayout* textLayout;
+	auto result = m_writeFactory->CreateTextLayout(
+		text.c_str(),
+		(uint32_t)text.length(),
+		format.m_object,
+		FLT_MAX,
+		FLT_MAX,
+		&textLayout
+	);
+	ASSERT(result == S_OK, "Could not create text layout!");
+
+	begin_draw();
+
+	m_renderTarget->DrawTextLayout(
+		pos,
+		textLayout,
+		brush.m_object,
+		D2D1_DRAW_TEXT_OPTIONS_NONE);
+
+	end_draw();
+
+	SafeRelease(textLayout);
+
+}
+
 void Direct2DRenderer::begin_draw() {
 	if (m_isRenderinProgress == 0)
 		m_renderTarget->BeginDraw();
@@ -65,8 +97,8 @@ void Direct2DRenderer::end_draw() {
 		m_renderTarget->EndDraw();
 }
 
-Direct2DRenderer::TextFormat Direct2DRenderer::create_text_format(std::wstring font, float size) {
-	TextFormat text;
+Direct2DRenderer::TextFormatObject Direct2DRenderer::create_text_format(std::wstring font, float size) {
+	TextFormatObject text;
 	IDWriteTextFormat* textformat = nullptr;
 
 	HRESULT result = m_writeFactory->CreateTextFormat(
@@ -82,54 +114,19 @@ Direct2DRenderer::TextFormat Direct2DRenderer::create_text_format(std::wstring f
 
 	ASSERT(result == S_OK, "Could not create text format!");
 
-	text.m_format = textformat;
+	text.m_object = textformat;
 
 	return std::move(text);
 }
 
-void Direct2DRenderer::draw_text(std::wstring text, Renderer::Point<float> topleft, std::wstring font, float size) {
-	IDWriteTextFormat* textformat = nullptr;
 
-	HRESULT result = m_writeFactory->CreateTextFormat(
-		font.c_str(),
-		nullptr,
-		DWRITE_FONT_WEIGHT_NORMAL,
-		DWRITE_FONT_STYLE_NORMAL,
-		DWRITE_FONT_STRETCH_NORMAL,
-		size,
-		L"en-us",
-		&textformat
-	);
+Direct2DRenderer::BrushObject Direct2DRenderer::create_brush(Renderer::Color c) {
+	BrushObject obj;
+	ID2D1SolidColorBrush* brush = nullptr; 
+	auto result = m_renderTarget->CreateSolidColorBrush(c, &brush);
 
-	ASSERT(result == S_OK, "Could not create text format!");
-	
-	IDWriteTextLayout* textLayout;
-	result = m_writeFactory->CreateTextLayout(
-		text.c_str(),
-		text.length(),
-		textformat,
-		FLT_MAX,
-		FLT_MAX,
-		&textLayout
-	);
-	ASSERT(result == S_OK, "Could not create text layout!");
-
-	ID2D1SolidColorBrush* brush = nullptr;
-	result = m_renderTarget->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::Black), &brush);
-	
 	ASSERT(result == S_OK, "Could not create brush!");
+	obj.m_object = brush;
 
-	begin_draw(); 
-
-	m_renderTarget->DrawTextLayout(
-		D2D1::Point2F(topleft.x, topleft.y),
-		textLayout,
-		brush,
-		D2D1_DRAW_TEXT_OPTIONS_NONE);
-
-	end_draw();
-
-	SafeRelease(textformat);
-	SafeRelease(textLayout);
-	SafeRelease(brush);
+	return std::move(obj);
 }

@@ -3,12 +3,7 @@
 #include "include.h"
 #define CHECK_BIT(var,pos) ((var) & (1<<(pos)))
 
-std::map<HWND, WindowHandler*>* WindowHandler::m_allWindowInstances;
-
-
-void WindowHandler::cleanup() {
-	delete m_allWindowInstances;
-}
+std::unique_ptr<std::map<HWND, WindowHandler*>> WindowHandler::m_allWindowInstances;
 
 LRESULT WindowHandler::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 	WindowHandler* currentInstance = m_allWindowInstances->operator[](hWnd);
@@ -22,11 +17,25 @@ LRESULT WindowHandler::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam
 		currentInstance->m_closeRequest = true;
 		return NULL;
 	}
+	case WM_POINTERDOWN:
+	{
+	}
+	case WM_SIZE:
+	case WM_SIZING:
+	{
+		if (currentInstance->m_callback_size) {
+			currentInstance->m_callback_size(currentInstance->get_size());
+		}
+		return DefWindowProc(hWnd, uMsg, wParam, lParam);
+	}
 	case WM_PAINT:
 	{
-		if (currentInstance->m_renderer != nullptr) {
-			currentInstance->m_renderer->clear({50, 50, 50});
+		if (currentInstance->m_callback_paint) {
+			currentInstance->m_callback_paint();
 		}
+
+		ValidateRect(currentInstance->m_hwnd, NULL);
+		return NULL;
 	}
 	}
 	return DefWindowProc(hWnd, uMsg, wParam, lParam);
@@ -43,30 +52,34 @@ void WindowHandler::set_state(WINDOW_STATE state) {
 	ShowWindow(m_hwnd, nCmdShow);
 }
 
-HWND WindowHandler::get_hwnd() {
+HWND WindowHandler::get_hwnd() const {
 	return m_hwnd;
 }
 
-void WindowHandler::set_renderer(Renderer::RenderHandler* renderer) {
-	m_renderer = renderer;
-}
-
-HDC WindowHandler::get_hdc() {
+HDC WindowHandler::get_hdc() const {
 	return m_hdc;
 }
 
-UINT WindowHandler::get_dpi() {
+UINT WindowHandler::get_dpi() const {
 	return m_dpi;
 }
 
-Renderer::Rectangle<long> WindowHandler::get_size() {
+Renderer::Rectangle<long> WindowHandler::get_size() const {
 	RECT r;
 	GetClientRect(m_hwnd, &r);
 	return Renderer::Rectangle<long>(r.left, r.top, r.right - r.left, r.bottom - r.top);
 }
 
-bool WindowHandler::close_request() {
+bool WindowHandler::close_request() const {
 	return m_closeRequest;
+}
+
+void WindowHandler::set_callback_paint(std::function<void()> callback) {
+	m_callback_paint = callback;
+}
+
+void WindowHandler::set_callback_size(std::function<void(Renderer::Rectangle<long>)> callback) {
+	m_callback_size = callback;
 }
 
 void WindowHandler::get_window_messages(bool blocking) {
@@ -89,11 +102,11 @@ void WindowHandler::get_window_messages(bool blocking) {
 
 bool WindowHandler::init(std::wstring windowName, HINSTANCE instance) {
 	if (m_allWindowInstances == nullptr) {
-		m_allWindowInstances = new std::map<HWND, WindowHandler*>();
-		std::atexit(WindowHandler::cleanup);
+		m_allWindowInstances = std::make_unique<std::map<HWND, WindowHandler*>>();
+		ASSERT(SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2), "Could not set DPI awereness");
+		//std::atexit(WindowHandler::cleanup);
 	}
 
-	SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
 	WNDCLASS wc = {};
 	wc.style = CS_HREDRAW | CS_VREDRAW;
