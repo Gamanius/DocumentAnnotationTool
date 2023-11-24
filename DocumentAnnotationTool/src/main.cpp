@@ -17,6 +17,7 @@ void init() {
 }
 
 int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nCmdShow) {
+	Logger::set_console_handle(create_console());
 	init();
 
 	main_window_loop_run(hInstance);

@@ -5,6 +5,7 @@
 #include <codecvt>
 
 std::shared_ptr<std::vector<std::wstring>> all_messages = std::make_shared<std::vector<std::wstring>>();
+HANDLE consoleHandle = nullptr;
 
 namespace Logger {
 
@@ -53,23 +54,34 @@ namespace Logger {
 		assert_msg(msg, file, line);
 	}
 
-	void print_to_console(HANDLE handle) {
+	void set_console_handle(HANDLE handle) {
+		consoleHandle = handle;
+	}
+
+	void print_to_console(bool clear) {
+		if (consoleHandle == nullptr)
+			return;
+
 		// TODO actually awfully slow 
 		const wchar_t* new_line = L"\n";
 
 		for (size_t i = 0; i < all_messages->size(); i++) {
 			std::wstring& temp = all_messages->at(i);
-			WriteConsoleW(handle, (void*)temp.c_str(), temp.length(), nullptr, nullptr);
-			WriteConsoleW(handle, (void*)new_line, 1, nullptr, nullptr);
+			WriteConsoleW(consoleHandle, (void*)temp.c_str(), temp.length(), nullptr, nullptr);
+			WriteConsoleW(consoleHandle, (void*)new_line, 1, nullptr, nullptr);
 		}
+		if (clear)
+			all_messages->clear();
 	}
 
-	void print_to_debug() {
+	void print_to_debug(bool clear) {
 		for (size_t i = 0; i < all_messages->size(); i++) {
 			OutputDebugString(L"\n");
 			OutputDebugString(all_messages->at(i).c_str());
 		}
 		OutputDebugString(L"\n\n");
+		if (clear)
+			all_messages->clear();
 	}
 
 	void clear() {

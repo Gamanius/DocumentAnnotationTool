@@ -17,6 +17,15 @@ void callback_size(Renderer::Rectangle<long> r) {
 	g_main_renderer->resize(r);
 }
 
+void callback_pointer_down(WindowHandler::PointerInfo p) {
+	Logger::log("Pointer at " + std::to_string(p.pos.x) + ", " + std::to_string(p.pos.y));
+	Logger::log("Buttons " + std::to_string(p.button1pressed) +
+		", " + std::to_string(p.button2pressed) + ", " + std::to_string(p.button3pressed) +
+		", " + std::to_string(p.button4pressed) + ", " + std::to_string(p.button5pressed));
+	Logger::log("Pressure " + std::to_string(p.pressure)); 
+	Logger::print_to_console(); 
+}
+
 void main_window_loop_run(HINSTANCE h) {
 	g_main_window = std::make_unique<WindowHandler>(APPLICATION_NAME, h);
 
@@ -30,6 +39,8 @@ void main_window_loop_run(HINSTANCE h) {
 	// do the callbacks
 	g_main_window->set_callback_paint(callback_draw);
 	g_main_window->set_callback_size(callback_size);
+	g_main_window->set_callback_pointer_down(callback_pointer_down);
+	g_main_window->set_callback_pointer_update(callback_pointer_down);
 
 	g_main_window->set_state(WindowHandler::WINDOW_STATE::NORMAL);
 

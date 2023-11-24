@@ -36,9 +36,10 @@ namespace Logger {
 	void assert_msg(const std::string& msg, const std::string& file, long line);
 	void assert_msg_win(const std::string& msg, const std::string& file, long line);
 	
-	void print_to_console(HANDLE handle);
+	void set_console_handle(HANDLE handle);
+	void print_to_console(bool clear = true);
 
-	void print_to_debug();
+	void print_to_debug(bool clear = true);
 
 	void clear();
 
@@ -183,8 +184,6 @@ class WindowHandler {
 
 	static std::unique_ptr<std::map<HWND, WindowHandler*>> m_allWindowInstances;
 
-	std::function<void()> m_callback_paint;
-	std::function<void(Renderer::Rectangle<long>)> m_callback_size;
 
 public:
 
@@ -195,6 +194,33 @@ public:
 		MINIMIZED
 	};
 
+	enum POINTER_TYPE {
+		UNKNOWN,
+		MOUSE,
+		STYLUS,
+		TOUCH
+	};
+
+	struct PointerInfo {
+		UINT id = 0;
+		POINTER_TYPE type = POINTER_TYPE::UNKNOWN;
+		Renderer::Point<float> pos = { 0, 0 };
+		UINT32 pressure = 0;
+		bool button1pressed = false; /* Left mouse button or barrel button */
+		bool button2pressed = false; /* Right mouse button eareser button */
+		bool button3pressed = false; /* Middle mouse button */
+		bool button4pressed = false; /* X1 Button */
+		bool button5pressed = false; /* X2 Button */
+	};
+
+private:
+	std::function<void()> m_callback_paint;
+	std::function<void(Renderer::Rectangle<long>)> m_callback_size;
+	std::function<void(PointerInfo)> m_callback_pointer_down;
+	std::function<void(PointerInfo)> m_callback_pointer_up;
+	std::function<void(PointerInfo)> m_callback_pointer_update;
+
+public:
 
 	static LRESULT parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
@@ -210,6 +236,9 @@ public:
 
 	void set_callback_paint(std::function<void()> callback);
 	void set_callback_size(std::function<void(Renderer::Rectangle<long>)> callback);
+	void set_callback_pointer_down(std::function<void(PointerInfo)> callback);
+	void set_callback_pointer_up(std::function<void(PointerInfo)> callback);
+	void set_callback_pointer_update(std::function<void(PointerInfo)> callback);
 
 	// Returns the window handle
 	HWND get_hwnd() const;

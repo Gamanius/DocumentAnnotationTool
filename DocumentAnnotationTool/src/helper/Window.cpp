@@ -5,6 +5,57 @@
 
 std::unique_ptr<std::map<HWND, WindowHandler*>> WindowHandler::m_allWindowInstances;
 
+static WindowHandler::PointerInfo parse_pointer_info(const WindowHandler& w, WPARAM wParam, LPARAM lParam) {
+	WindowHandler::PointerInfo info;
+
+	info.id = GET_POINTERID_WPARAM(wParam);
+	POINTER_INPUT_TYPE pointerType = PT_POINTER;
+	GetPointerType(info.id, &pointerType);
+
+	POINT p = { 0, 0 };
+	ClientToScreen(w.get_hwnd(), &p);
+
+	tagPOINTER_INFO pointerinfo;
+	switch (pointerType) {
+	case PT_TOUCH:
+		POINTER_TOUCH_INFO touchinfo;
+		info.type = WindowHandler::POINTER_TYPE::TOUCH;
+		if (!GetPointerTouchInfo(info.id, &touchinfo)) {
+			return info;
+		}
+		pointerinfo = touchinfo.pointerInfo;
+		break;
+	case PT_PEN:
+		POINTER_PEN_INFO peninfo;
+		info.type = WindowHandler::POINTER_TYPE::STYLUS;
+		if (!GetPointerPenInfo(info.id, &peninfo)) {
+			return info;
+		}
+		info.pressure = peninfo.pressure;
+		info.button1pressed = CHECK_BIT(peninfo.penFlags, 0) != 0;
+		info.button2pressed = CHECK_BIT(peninfo.penFlags, 1) != 0 || CHECK_BIT(peninfo.penFlags, 2) != 0;
+		pointerinfo = peninfo.pointerInfo;
+		break;
+	default:
+		info.type = WindowHandler::POINTER_TYPE::MOUSE;
+		if (!GetPointerInfo(info.id, &pointerinfo)) {
+			return info;
+		}
+		info.button1pressed = CHECK_BIT(pointerinfo.pointerFlags, 4) != 0;
+		info.button2pressed = CHECK_BIT(pointerinfo.pointerFlags, 5) != 0;
+		info.button3pressed = CHECK_BIT(pointerinfo.pointerFlags, 6) != 0;
+		info.button4pressed = CHECK_BIT(pointerinfo.pointerFlags, 7) != 0;
+		info.button5pressed = CHECK_BIT(pointerinfo.pointerFlags, 8) != 0;
+		break;
+	}
+	//ScreenToClient(w->m_hwnd, &pointerinfo.ptPixelLocation);
+	info.pos.x = pointerinfo.ptPixelLocation.x - p.x;
+	info.pos.y = pointerinfo.ptPixelLocation.y - p.y;
+	//info.pos = Point2D<float>(pointerinfo.ptPixelLocation);
+
+	return info;
+}
+
 LRESULT WindowHandler::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 	WindowHandler* currentInstance = m_allWindowInstances->operator[](hWnd);
 	if (currentInstance == nullptr) {
@@ -19,6 +70,24 @@ LRESULT WindowHandler::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam
 	}
 	case WM_POINTERDOWN:
 	{
+		if (currentInstance->m_callback_pointer_down == nullptr)
+			break;
+		currentInstance->m_callback_pointer_down(parse_pointer_info(*currentInstance, wParam, lParam));
+		return 0;
+	}
+	case WM_POINTERUPDATE:
+	{
+		if (currentInstance->m_callback_pointer_update == nullptr)
+			break;
+		currentInstance->m_callback_pointer_update(parse_pointer_info(*currentInstance, wParam, lParam));
+		return 0;
+	}
+	case WM_POINTERUP:
+	{
+		if (currentInstance->m_callback_pointer_up == nullptr)
+			break;
+		currentInstance->m_callback_pointer_up(parse_pointer_info(*currentInstance, wParam, lParam));
+		return 0;
 	}
 	case WM_SIZE:
 	case WM_SIZING:
@@ -80,6 +149,18 @@ void WindowHandler::set_callback_paint(std::function<void()> callback) {
 
 void WindowHandler::set_callback_size(std::function<void(Renderer::Rectangle<long>)> callback) {
 	m_callback_size = callback;
+}
+
+void WindowHandler::set_callback_pointer_down(std::function<void(PointerInfo)> callback) {
+	m_callback_pointer_down = callback;
+}
+
+void WindowHandler::set_callback_pointer_up(std::function<void(PointerInfo)> callback) {
+	m_callback_pointer_up = callback;
+}
+
+void WindowHandler::set_callback_pointer_update(std::function<void(PointerInfo)> callback) {
+	m_callback_pointer_update = callback;
 }
 
 void WindowHandler::get_window_messages(bool blocking) {
