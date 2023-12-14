@@ -9,6 +9,7 @@
 #include <iostream>
 #include <d2d1.h>
 #include <dwrite_3.h>
+#include <optional>
 #include <crtdbg.h>
 
 #define APPLICATION_NAME L"Docanto"
@@ -46,7 +47,7 @@ namespace Logger {
 	const std::weak_ptr<std::vector<std::wstring>> get_all_msg();
 }
 
-namespace Renderer {
+namespace Renderer { 
 	template <typename T>
 	struct Point {
 		T x= 0, y = 0;
@@ -174,6 +175,51 @@ public:
 	BrushObject create_brush(Renderer::Color c);
 };
 
+namespace FileHandler {
+	struct File {
+		byte* data = nullptr;
+		size_t size = 0;
+
+		File() = default;
+		File(byte* data, size_t size) : data(data), size(size) {}
+		File(File&& t) noexcept {
+			data = t.data;
+			t.data = nullptr;
+		}
+		
+		// Dont copy data as it could be very expensive
+		File(const File& t) = delete;
+		File& operator=(const File& t) = delete;
+
+		File& operator=(File&& t) noexcept {
+			if (this != &t) {
+				data = t.data;
+				t.data = nullptr;
+			}
+			return *this;
+		}
+
+		~File() {
+			delete data;
+		}
+	};
+
+	/// <summary>
+	/// Will create an open file dialog where only *one* file can be selected
+	/// </summary>
+	/// <param name="filter">A file extension filter. Example "Bitmaps (*.bmp)\0*.bmp\0All files (*.*)\0*.*\0\0"</param>
+	/// <param name="windowhandle">Optional windowhandle</param>
+	/// <returns>If succeful it will return the path of the file that was selected</returns>
+	std::optional<std::wstring> open_file_dialog(const wchar_t* filter, HWND windowhandle = NULL);
+	/// <summary>
+	/// Will read the contents of the file specified by the path
+	/// </summary>
+	/// <param name="path">Filepath of the file</param>
+	/// <returns>If succefull it will return a file struct with the data</returns>
+	std::optional<File> open_file(const std::wstring& path);
+
+}
+
 
 class WindowHandler {
 	HWND m_hwnd = NULL;
@@ -252,15 +298,26 @@ public:
 	// Returns the window size
 	Renderer::Rectangle<long> get_size() const;
 
-	// Returns true if a close request has been sent to the window
+	/// <summary>
+	/// Returns true if a close request has been sent to the window
+	/// </summary>
+	/// <returns>true if there has been a close request</returns>
 	bool close_request() const;
+
+	/// <summary>
+	///  returns the window handle
+	/// </summary>
+	operator HWND() const { return m_hwnd; }
 };
 
 #ifndef NDEBUG
 #define ASSERT(x, y) if (!(x)) { Logger::assert_msg(y, __FILE__, __LINE__); __debugbreak(); }
 #define ASSERT_WIN(x,y) if (!(x)) { Logger::assert_msg_win(y, __FILE__, __LINE__); __debugbreak(); }
-#define ASSERT_RETURN_FALSE(x,y) if (!(x)) { Logger::assert_msg(y, __FILE__, __LINE__); __debugbreak(); return false; }
+#define ASSERT_WITH_STATEMENT(x, y, z) if (!(x)) { Logger::assert_msg(y, __FILE__, __LINE__); __debugbreak(); z; }
+#define ASSERT_WIN_WITH_STATEMENT(x, y, z) if (!(x)) { Logger::assert_msg_win(y, __FILE__, __LINE__); __debugbreak(); z; }
 #define ASSERT_WIN_RETURN_FALSE(x,y)  if (!(x)) { Logger::assert_msg_win(y, __FILE__, __LINE__); __debugbreak(); return false; }
+#define ASSERT_RETURN_NULLOPT(x,y) if (!(x)) { Logger::assert_msg(y, __FILE__, __LINE__); __debugbreak(); return std::nullopt; }
+#define ASSERT_WIN_RETURN_NULLOPT(x,y)  if (!(x)) { Logger::assert_msg_win(y, __FILE__, __LINE__); __debugbreak(); return std::nullopt; }
 #else
 #define ASSERT(x, y)
 #endif // !NDEBUG

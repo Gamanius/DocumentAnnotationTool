@@ -17,11 +17,15 @@ void init() {
 }
 
 int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nCmdShow) {
-	Logger::set_console_handle(create_console());
+	//Logger::set_console_handle(create_console());
 	init();
-
-	main_window_loop_run(hInstance);
+	Logger::log("");
+	auto out = FileHandler::open_file_dialog(L"Bitmaps (*.bmp)\0*.bmp\0\0");
+	if (out.has_value()) {
+		auto file = FileHandler::open_file(out.value());
+	}
+	//main_window_loop_run(hInstance);
 	
 	Logger::print_to_debug();
-	Logger::clear();	
+	Logger::clear();
 }

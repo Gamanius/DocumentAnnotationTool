@@ -97,6 +97,7 @@ LRESULT WindowHandler::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam
 		}
 		return DefWindowProc(hWnd, uMsg, wParam, lParam);
 	}
+	// TODO add wm_ncpaint
 	case WM_PAINT:
 	{
 		if (currentInstance->m_callback_paint) {

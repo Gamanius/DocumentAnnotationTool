@@ -14,9 +14,11 @@ namespace Logger {
 	}
 
 	void log(const std::string& msg, MsgLevel lvl) {
-		std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
-		std::wstring wide = converter.from_bytes(msg);
-		log(wide, lvl);
+		// could be unsecure
+		auto size = MultiByteToWideChar(CP_UTF8, 0, msg.c_str(), -1, NULL, 0);
+		std::wstring wide(size, 0); 
+		MultiByteToWideChar(CP_UTF8, 0, msg.c_str(), -1, &wide[0], size);
+		log(wide, lvl); 
 	}
 
 	void log(const unsigned long msg, MsgLevel lvl) {

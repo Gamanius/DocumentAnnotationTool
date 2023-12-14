@@ -20,7 +20,7 @@ Direct2DRenderer::Direct2DRenderer(const WindowHandler& w) {
 
 	HRESULT result = S_OK;
 	if (m_factory == nullptr) {
-		result = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, option, &m_factory);
+		result = D2D1CreateFactory(D2D1_FACTORY_TYPE_MULTI_THREADED, option, &m_factory);
 		ASSERT(result == S_OK, "Could not create Direct2D factory!");
 	}
 	else {
