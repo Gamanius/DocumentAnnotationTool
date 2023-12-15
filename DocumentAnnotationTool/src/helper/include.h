@@ -11,6 +11,10 @@
 #include <dwrite_3.h>
 #include <optional>
 #include <crtdbg.h>
+#include "mupdf/fitz.h"
+#include <mutex>
+#include <thread>
+
 
 #define APPLICATION_NAME L"Docanto"
 
@@ -36,6 +40,8 @@ namespace Logger {
 
 	void assert_msg(const std::string& msg, const std::string& file, long line);
 	void assert_msg_win(const std::string& msg, const std::string& file, long line);
+	void assert_msg(const std::wstring& msg, const std::string& file, long line);
+	void assert_msg_win(const std::wstring& msg, const std::string& file, long line);
 	
 	void set_console_handle(HANDLE handle);
 	void print_to_console(bool clear = true);
@@ -192,8 +198,11 @@ namespace FileHandler {
 		File(File&& t) noexcept {
 			data = t.data;
 			t.data = nullptr;
+
+			size = t.size;
+			t.size = 0;
 		}
-		
+
 		// Dont copy data as it could be very expensive
 		File(const File& t) = delete;
 		File& operator=(const File& t) = delete;
@@ -202,6 +211,9 @@ namespace FileHandler {
 			if (this != &t) {
 				data = t.data;
 				t.data = nullptr;
+
+				size = t.size;
+				t.size = 0;
 			}
 			return *this;
 		}
@@ -235,6 +247,47 @@ namespace FileHandler {
 
 }
 
+class PDFHandler {
+	fz_context* m_ctx = nullptr;
+	std::mutex m_mutex[FZ_LOCK_MAX];
+	fz_locks_context m_locks;
+
+	static void lock_mutex(void* user, int lock);
+	static void unlock_mutex(void* user, int lock);
+	static void error_callback(void* user, const char* message);
+public:
+	struct PDF : public FileHandler::File {
+		fz_document* m_doc = nullptr;
+		fz_context* m_ctx = nullptr;
+
+		PDF() = default;
+		PDF(fz_context* ctx);
+
+		// move constructor
+		PDF(PDF&& t) noexcept;
+		// move assignment
+		PDF& operator=(PDF&& t) noexcept;
+
+		// again dont copy
+		PDF(const PDF& t) = delete;
+		PDF& operator=(const PDF& t) = delete;
+
+		// the fz_context is not allowed to be droped here
+		~PDF();
+
+		/// <summary>
+		/// Retrieves the number of pdf pages
+		/// </summary>
+		/// <returns>Number of pages</returns>
+		size_t get_page_count() const;
+	};
+
+	PDFHandler();
+
+	std::optional<PDF> load_pdf(const std::wstring& path);
+
+	~PDFHandler();
+};
 
 class WindowHandler {
 	HWND m_hwnd = NULL;

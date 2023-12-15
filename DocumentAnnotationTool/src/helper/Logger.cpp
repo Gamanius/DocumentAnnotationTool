@@ -56,6 +56,37 @@ namespace Logger {
 		assert_msg(msg, file, line);
 	}
 
+	void assert_msg(const std::wstring& msg, const std::string& file, long line) {
+		// could be unsecure
+		auto size = MultiByteToWideChar(CP_UTF8, 0, file.c_str(), -1, NULL, 0);
+		std::wstring wide(size, 0);
+		MultiByteToWideChar(CP_UTF8, 0, file.c_str(), -1, &wide[0], size);
+
+		log(L"Assert failed in File: " + wide + L" on line " + std::to_wstring(line) +  
+			L" with message: \"" + msg + L"\" ", Logger::MsgLevel::FATAL); 
+	}
+
+	void assert_msg_win(const std::wstring& msg, const std::string& file, long line) {
+		// Get the last error code
+		DWORD error = GetLastError();
+
+		// Use FormatMessage to get a human-readable error message
+		LPVOID errorMsg;
+		FormatMessage(
+			FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
+			NULL,
+			error,
+			0, // Default language
+			(LPWSTR)&errorMsg,
+			0,
+			NULL
+		);
+
+		log(L"Windows Error (" + std::to_wstring(error) + L"): " + std::wstring((wchar_t*)errorMsg));
+
+		assert_msg(msg, file, line);
+	}
+
 	void set_console_handle(HANDLE handle) {
 		consoleHandle = handle;
 	}
@@ -69,7 +100,7 @@ namespace Logger {
 
 		for (size_t i = 0; i < all_messages->size(); i++) {
 			std::wstring& temp = all_messages->at(i);
-			WriteConsoleW(consoleHandle, (void*)temp.c_str(), temp.length(), nullptr, nullptr);
+			WriteConsoleW(consoleHandle, (void*)temp.c_str(), (DWORD)temp.length(), nullptr, nullptr);
 			WriteConsoleW(consoleHandle, (void*)new_line, 1, nullptr, nullptr);
 		}
 		if (clear)

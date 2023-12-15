@@ -49,8 +49,8 @@ static WindowHandler::PointerInfo parse_pointer_info(const WindowHandler& w, WPA
 		break;
 	}
 	//ScreenToClient(w->m_hwnd, &pointerinfo.ptPixelLocation);
-	info.pos.x = pointerinfo.ptPixelLocation.x - p.x;
-	info.pos.y = pointerinfo.ptPixelLocation.y - p.y;
+	info.pos.x = pointerinfo.ptPixelLocation.x - (float)p.x;
+	info.pos.y = pointerinfo.ptPixelLocation.y - (float)p.y;
 	//info.pos = Point2D<float>(pointerinfo.ptPixelLocation);
 
 	return info;

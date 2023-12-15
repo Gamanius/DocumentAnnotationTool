@@ -10,9 +10,11 @@ Direct2DRenderer::BrushObject* g_brush;
 
 Direct2DRenderer::BitmapObject* g_bitmap;
 
+PDFHandler* g_pdf_handler;
+
 void callback_draw() {
 	g_main_renderer->clear(Renderer::Color(50, 50, 50));
-	g_main_renderer->draw_bitmap(*g_bitmap, {0, 0});
+	//g_main_renderer->draw_bitmap(*g_bitmap, {0, 0});
 	g_main_renderer->draw_text(L"Hello World", Renderer::Point<float>(100, 500), *g_text_format, *g_brush);
 }
 
@@ -26,7 +28,7 @@ void callback_pointer_down(WindowHandler::PointerInfo p) {
 		", " + std::to_string(p.button2pressed) + ", " + std::to_string(p.button3pressed) +
 		", " + std::to_string(p.button4pressed) + ", " + std::to_string(p.button5pressed));
 	Logger::log("Pressure " + std::to_string(p.pressure)); 
-	Logger::print_to_console(); 
+	Logger::print_to_console(false); 
 }
 
 void main_window_loop_run(HINSTANCE h) {
@@ -38,9 +40,14 @@ void main_window_loop_run(HINSTANCE h) {
 	auto default_text_format = g_main_renderer->create_text_format(L"Consolas", 500);
 	g_text_format = &default_text_format;
 
-	auto path = FileHandler::open_file_dialog(L"BMP\0*.bmp\0\0", *g_main_window);
-	auto butmap = g_main_renderer->create_bitmap(path.value_or(L""));
-	g_bitmap = &butmap;
+
+	PDFHandler pdf_handler;
+	g_pdf_handler = &pdf_handler;
+	auto path = FileHandler::open_file_dialog(L"PDF\0*.pdf\0\0", *g_main_window);
+	if (path.has_value()) {
+		auto pdf = pdf_handler.load_pdf(path.value());
+		Logger::log(pdf.value().get_page_count());
+	}
 
 	// do the callbacks
 	g_main_window->set_callback_paint(callback_draw);
