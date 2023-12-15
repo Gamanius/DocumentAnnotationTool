@@ -13,9 +13,12 @@ Direct2DRenderer::BitmapObject* g_bitmap;
 PDFHandler* g_pdf_handler;
 
 void callback_draw() {
+	g_main_renderer->set_current_transform_active();
+	g_main_renderer->begin_draw();
 	g_main_renderer->clear(Renderer::Color(50, 50, 50));
 	//g_main_renderer->draw_bitmap(*g_bitmap, {0, 0});
 	g_main_renderer->draw_text(L"Hello World", Renderer::Point<float>(100, 500), *g_text_format, *g_brush);
+	g_main_renderer->end_draw();
 }
 
 void callback_size(Renderer::Rectangle<long> r) {
@@ -23,12 +26,22 @@ void callback_size(Renderer::Rectangle<long> r) {
 }
 
 void callback_pointer_down(WindowHandler::PointerInfo p) {
-	Logger::log("Pointer at " + std::to_string(p.pos.x) + ", " + std::to_string(p.pos.y));
+/*	Logger::log("Pointer at " + std::to_string(p.pos.x) + ", " + std::to_string(p.pos.y));
 	Logger::log("Buttons " + std::to_string(p.button1pressed) +
 		", " + std::to_string(p.button2pressed) + ", " + std::to_string(p.button3pressed) +
 		", " + std::to_string(p.button4pressed) + ", " + std::to_string(p.button5pressed));
 	Logger::log("Pressure " + std::to_string(p.pressure)); 
-	Logger::print_to_console(false); 
+	Logger::print_to_console(false); */
+}
+
+void callback_mousewheel(short delta, bool hwheel, Renderer::Point<int> center) {
+	if (WindowHandler::is_key_pressed(WindowHandler::LEFT_CONTROL))
+		g_main_renderer->add_scale_matrix(delta > 0 ? 1.5 : -0.75, g_main_window->get_mouse_pos());
+	else if (WindowHandler::is_key_pressed(WindowHandler::LEFT_SHIFT))
+		g_main_renderer->add_transform_matrix({ (float)delta, 0});
+	else
+		g_main_renderer->add_transform_matrix({ 0, (float)delta }); 
+	g_main_window->invalidate_drawing_area();
 }
 
 void main_window_loop_run(HINSTANCE h) {
@@ -54,6 +67,7 @@ void main_window_loop_run(HINSTANCE h) {
 	g_main_window->set_callback_size(callback_size);
 	g_main_window->set_callback_pointer_down(callback_pointer_down);
 	g_main_window->set_callback_pointer_update(callback_pointer_down);
+	g_main_window->set_callback_mousewheel(callback_mousewheel);
 
 	g_main_window->set_state(WindowHandler::WINDOW_STATE::NORMAL);
 

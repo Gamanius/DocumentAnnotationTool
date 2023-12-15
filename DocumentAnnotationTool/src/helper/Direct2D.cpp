@@ -92,6 +92,43 @@ void Direct2DRenderer::draw_text(const std::wstring& text, Renderer::Point<float
 
 }
 
+void Direct2DRenderer::set_current_transform_active() {
+	m_renderTarget->SetTransform(m_transformPosMatrix * m_transformScaleMatrix);
+}
+
+void Direct2DRenderer::set_identity_transform_active() {
+	m_renderTarget->SetTransform(D2D1::Matrix3x2F::Identity());
+}
+
+void Direct2DRenderer::set_transform_matrix(Renderer::Point<float> p) {
+	m_transformPos = p;
+	m_transformPosMatrix = D2D1::Matrix3x2F::Translation(p.x, p.y);
+}
+
+void Direct2DRenderer::add_transform_matrix(Renderer::Point<float> p) {
+	m_transformPos += p;
+	m_transformPosMatrix = D2D1::Matrix3x2F::Translation(p.x, p.y) * m_transformPosMatrix;
+}
+
+void Direct2DRenderer::set_scale_matrix(float scale, Renderer::Point<float> center) {
+	m_transformScale = scale;
+	m_transformScaleCenter = center;
+
+	m_transformScaleMatrix = D2D1::Matrix3x2F::Scale({ scale, scale }, center);
+}
+
+void Direct2DRenderer::add_scale_matrix(float scale, Renderer::Point<float> center) {
+	m_transformScale += scale;
+	m_transformScaleCenter = center;
+
+	// calc the new scale matrix
+	// boi i wish i would know how this works again...
+	auto mat = D2D1::Matrix3x2F(m_transformScaleMatrix);
+	mat.Invert();
+	mat = D2D1::Matrix3x2F::Scale({ 1 + scale, 1 + scale }, mat.TransformPoint(center));
+	m_transformScaleMatrix = mat * m_transformScaleMatrix;
+}
+
 void Direct2DRenderer::begin_draw() {
 	if (m_isRenderinProgress == 0)
 		m_renderTarget->BeginDraw();
