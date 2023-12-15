@@ -8,8 +8,11 @@ std::unique_ptr<Direct2DRenderer> g_main_renderer;
 Direct2DRenderer::TextFormatObject* g_text_format;
 Direct2DRenderer::BrushObject* g_brush;
 
+Direct2DRenderer::BitmapObject* g_bitmap;
+
 void callback_draw() {
 	g_main_renderer->clear(Renderer::Color(50, 50, 50));
+	g_main_renderer->draw_bitmap(*g_bitmap, {0, 0});
 	g_main_renderer->draw_text(L"Hello World", Renderer::Point<float>(100, 500), *g_text_format, *g_brush);
 }
 
@@ -35,6 +38,9 @@ void main_window_loop_run(HINSTANCE h) {
 	auto default_text_format = g_main_renderer->create_text_format(L"Consolas", 500);
 	g_text_format = &default_text_format;
 
+	auto path = FileHandler::open_file_dialog(L"BMP\0*.bmp\0\0", *g_main_window);
+	auto butmap = g_main_renderer->create_bitmap(path.value_or(L""));
+	g_bitmap = &butmap;
 
 	// do the callbacks
 	g_main_window->set_callback_paint(callback_draw);

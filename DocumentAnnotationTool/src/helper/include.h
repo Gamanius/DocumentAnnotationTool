@@ -74,6 +74,10 @@ namespace Renderer {
 
 		T right() { return x + width; }
 		T bottom() { return y + height; }
+
+		operator std::wstring() const {
+			return std::to_wstring(x) + L", " + std::to_wstring(y) + L", " + std::to_wstring(width) + L", " + std::to_wstring(height); 
+		}
 	};
 
 	struct Color {
@@ -160,6 +164,7 @@ public:
 		}
 	};
 
+
 	typedef RenderObject<ID2D1SolidColorBrush> BrushObject;
 	typedef RenderObject<ID2D1Bitmap> BitmapObject;
 	typedef RenderObject<IDWriteTextFormat> TextFormatObject;
@@ -169,10 +174,12 @@ public:
 
 	void clear(Renderer::Color c) override;
 	void resize(Renderer::Rectangle<long> r);
+	void draw_bitmap(BitmapObject& bitmap, Renderer::Point<float> pos, float opacity = 1.0f);
 	void draw_text(const std::wstring& text, Renderer::Point<float> pos, TextFormatObject& format, BrushObject& brush);
 
 	TextFormatObject create_text_format(std::wstring font, float size);
 	BrushObject create_brush(Renderer::Color c);
+	BitmapObject create_bitmap(const std::wstring& path);
 };
 
 namespace FileHandler {
@@ -204,6 +211,7 @@ namespace FileHandler {
 		}
 	};
 
+
 	/// <summary>
 	/// Will create an open file dialog where only *one* file can be selected
 	/// </summary>
@@ -217,6 +225,13 @@ namespace FileHandler {
 	/// <param name="path">Filepath of the file</param>
 	/// <returns>If succefull it will return a file struct with the data</returns>
 	std::optional<File> open_file(const std::wstring& path);
+
+	/// <summary>
+	/// Returns size of the bitmap
+	/// </summary>
+	/// <param name="path">Path of the bitmap</param>
+	/// <returns>A rectangle with the size</returns>
+	std::optional<Renderer::Rectangle<DWORD>> get_bitmap_size(const std::wstring& path);
 
 }
 
@@ -310,7 +325,7 @@ public:
 	operator HWND() const { return m_hwnd; }
 };
 
-#ifndef NDEBUG
+//#ifndef NDEBUG
 #define ASSERT(x, y) if (!(x)) { Logger::assert_msg(y, __FILE__, __LINE__); __debugbreak(); }
 #define ASSERT_WIN(x,y) if (!(x)) { Logger::assert_msg_win(y, __FILE__, __LINE__); __debugbreak(); }
 #define ASSERT_WITH_STATEMENT(x, y, z) if (!(x)) { Logger::assert_msg(y, __FILE__, __LINE__); __debugbreak(); z; }
@@ -318,6 +333,6 @@ public:
 #define ASSERT_WIN_RETURN_FALSE(x,y)  if (!(x)) { Logger::assert_msg_win(y, __FILE__, __LINE__); __debugbreak(); return false; }
 #define ASSERT_RETURN_NULLOPT(x,y) if (!(x)) { Logger::assert_msg(y, __FILE__, __LINE__); __debugbreak(); return std::nullopt; }
 #define ASSERT_WIN_RETURN_NULLOPT(x,y)  if (!(x)) { Logger::assert_msg_win(y, __FILE__, __LINE__); __debugbreak(); return std::nullopt; }
-#else
-#define ASSERT(x, y)
-#endif // !NDEBUG
+//#else
+//#define ASSERT(x, y)
+//#endif // !NDEBUG

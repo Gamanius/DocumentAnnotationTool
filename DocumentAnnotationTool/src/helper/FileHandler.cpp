@@ -45,3 +45,16 @@ std::optional<FileHandler::File> FileHandler::open_file(const std::wstring& path
     CloseHandle(hFile);
     return std::move(file); 
 }
+
+std::optional<Renderer::Rectangle<DWORD>> FileHandler::get_bitmap_size(const std::wstring& path) {
+    HBITMAP hBitmap = (HBITMAP)LoadImage(NULL, path.c_str(), IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE | LR_CREATEDIBSECTION);
+
+    ASSERT_WIN_RETURN_NULLOPT(hBitmap != NULL, "Could not load bitmap " + std::string(path.begin(), path.end()));
+
+    BITMAP bm;
+    ASSERT_WIN_WITH_STATEMENT(GetObject(hBitmap, sizeof(bm), &bm), 
+        		"Could not get bitmap size of file " + std::string(path.begin(), path.end()),  
+        		DeleteObject(hBitmap); return std::nullopt; );
+
+    return Renderer::Rectangle<DWORD>(0, 0, bm.bmWidth, bm.bmHeight);
+}
