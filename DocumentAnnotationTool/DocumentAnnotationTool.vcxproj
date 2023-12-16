@@ -166,6 +166,7 @@
     <ClCompile Include="src\helper\Direct2D.cpp" />
     <ClCompile Include="src\helper\FileHandler.cpp" />
     <ClCompile Include="src\helper\Logger.cpp" />
+    <ClCompile Include="src\helper\MuPDF.cpp" />
     <ClCompile Include="src\helper\PDFHandler.cpp" />
     <ClCompile Include="src\helper\Window.cpp" />
     <ClCompile Include="src\main.cpp" />

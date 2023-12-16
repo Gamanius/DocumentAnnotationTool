@@ -110,22 +110,40 @@ namespace Renderer {
 
 		Rectangle() = default;
 		Rectangle(T x, T y, T width, T height) : x(x), y(y), width(width), height(height) {}
+		Rectangle(fz_rect rect) : x(rect.x0), y(rect.y0), width(rect.x1 - rect.x0), height(rect.y1 - rect.y0) {}
+		Rectangle(fz_irect rect) : x(rect.x0), y(rect.y0), width(rect.x1 - rect.x0), height(rect.y1 - rect.y0) {}
 
 		operator D2D1_SIZE_U() const {
 			return D2D1::SizeU((UINT32)width, (UINT32)height);
 		}
 
 
-		T right() { return x + width; }
-		T bottom() { return y + height; }
+		T right() const { return x + width; }
+		T bottom() const { return y + height; }
 
-		operator RECT() const {
+		operator RECT() const { 
+			return { x, y, right(), bottom() };
+		} 
+
+		operator D2D1_RECT_F() const {
 			return { x, y, right(), bottom() };
 		}
 
 		operator std::wstring() const {
 			return std::to_wstring(x) + L", " + std::to_wstring(y) + L", " + std::to_wstring(width) + L", " + std::to_wstring(height); 
 		}
+
+		template <typename W>
+		operator Rectangle<W>() const {
+			return Rectangle<W>((W)x, (W)y, (W)width, (W)height);
+		}
+
+		operator fz_rect() const {
+			return { x, y, right(), bottom() };
+		}
+
+		
+
 	};
 
 	struct Color {
@@ -227,6 +245,7 @@ public:
 	void resize(Renderer::Rectangle<long> r);
 	void draw_bitmap(BitmapObject& bitmap, Renderer::Point<float> pos, float opacity = 1.0f);
 	void draw_text(const std::wstring& text, Renderer::Point<float> pos, TextFormatObject& format, BrushObject& brush);
+	void draw_rect(Renderer::Rectangle<float> rec, BrushObject& brush, float thick);
 
 	void set_current_transform_active();
 	void set_identity_transform_active();
@@ -236,9 +255,14 @@ public:
 	void set_scale_matrix(float scale, Renderer::Point<float> center);
 	void add_scale_matrix(float scale, Renderer::Point<float> center);
 
+	float get_transform_scale() const;
+	Renderer::Point<float> get_transform_pos() const;
+	UINT get_dpi() const;
+
 	TextFormatObject create_text_format(std::wstring font, float size);
 	BrushObject create_brush(Renderer::Color c);
 	BitmapObject create_bitmap(const std::wstring& path);
+	BitmapObject create_bitmap(const byte* const data, Renderer::Rectangle<unsigned int> size, unsigned int stride, float dpi);
 };
 
 namespace FileHandler {
@@ -300,7 +324,9 @@ namespace FileHandler {
 
 }
 
-class PDFHandler {
+constexpr float MUPDF_DEFAULT_DPI = 72.0f;
+
+class MuPDFHandler {
 	fz_context* m_ctx = nullptr;
 	std::mutex m_mutex[FZ_LOCK_MAX];
 	fz_locks_context m_locks;
@@ -312,9 +338,10 @@ public:
 	struct PDF : public FileHandler::File {
 		fz_document* m_doc = nullptr;
 		fz_context* m_ctx = nullptr;
+		std::vector<fz_page*> m_pages;
 
 		PDF() = default;
-		PDF(fz_context* ctx);
+		PDF(fz_context* ctx, fz_document* doc);
 
 		// move constructor
 		PDF(PDF&& t) noexcept;
@@ -328,16 +355,85 @@ public:
 		// the fz_context is not allowed to be droped here
 		~PDF();
 
+		fz_page* get_page(size_t page) const;
+
+		/// <summary>
+		/// Will render out the pdf page to a bitmap. It will always give back a bitmap with the DPI 96.
+		/// To account for higher DPI's it will instead scale the size of the image using <c>get_page_size </c> function
+		/// </summary>
+		/// <param name="renderer">Reference to the Direct2D renderer</param>
+		/// <param name="page">The page to be rendererd</param>
+		/// <param name="dpi">The dpi at which it should be rendered</param>
+		/// <returns>The bitmap object</returns>
+		Direct2DRenderer::BitmapObject get_bitmap(Direct2DRenderer& renderer, size_t page, float dpi = 72.0f) const;
+		/// <summary>
+		/// Will render out the pdf page to a bitmap with the given size
+		/// </summary>
+		/// <param name="renderer">Reference to the Direct2D renderer</param>
+		/// <param name="page">The page to be rendererd</param>
+		/// <param name="rec">The end size of the Bitmap</param>
+		/// <returns>Bitmap</returns>
+		Direct2DRenderer::BitmapObject get_bitmap(Direct2DRenderer& renderer, size_t page, Renderer::Rectangle<unsigned int> rec) const;
+		/// <summary>
+		/// Will render out the area of the pdf page given by the source rectangle to a bitmap with the given dpi. 
+		/// </summary>
+		/// <param name="renderer">Reference to the Direct2D renderer</param>
+		/// <param name="page">The page to be rendererd</param>
+		/// <param name="source">The area of the page in docpage pixels. Should be smaller than get_page_size() would give</param>
+		/// <param name="dpi">The dpi at which it should be rendered</param>
+		/// <returns>Returns the DPI-scaled bitmap</returns>
+		/// <remark>If the DPI is 72 the size of the returned bitmap is the same as the size of the source</remark>
+		Direct2DRenderer::BitmapObject get_bitmap(Direct2DRenderer& renderer, size_t page, Renderer::Rectangle<float> source, float dpi) const;
+
 		/// <summary>
 		/// Retrieves the number of pdf pages
 		/// </summary>
 		/// <returns>Number of pages</returns>
 		size_t get_page_count() const;
+
+		Renderer::Rectangle<float> get_page_size(size_t page, float dpi = 72) const;
 	};
 
-	PDFHandler();
+	MuPDFHandler();
 
 	std::optional<PDF> load_pdf(const std::wstring& path);
+
+	operator fz_context* () const { return m_ctx; }
+
+	~MuPDFHandler();
+};
+
+class PDFHandler {
+	MuPDFHandler::PDF m_pdf;
+	// not owned by this class!
+	Direct2DRenderer* const m_renderer = nullptr;
+	// rendererd at half scale or otherwise specified
+	std::vector<Direct2DRenderer::BitmapObject> m_previewBitmaps;
+
+	float m_seperation_distance = 10;
+	float m_preview_scale = 0.5; 
+
+	void create_preview(float scale = 0.5);
+
+public:
+	PDFHandler() = default;
+	/// <summary>
+	/// Will load the pdf from the given path. The MuPDF context and the Direct2DRenderer are not owned by this class
+	/// </summary>
+	/// <param name="renderer">Renderer that should be rendered to</param>
+	/// <param name="handler">Mupdf context</param>
+	/// <param name="path">path of the pdf</param>
+	PDFHandler(Direct2DRenderer* const renderer, MuPDFHandler& handler, const std::wstring& path);
+
+	// move constructor
+	PDFHandler(PDFHandler&& t) noexcept;
+	// move assignment
+	PDFHandler& operator=(PDFHandler&& t) noexcept;
+
+	void render_preview(Renderer::Rectangle<double> screen_clip_coords); 
+	void render(Renderer::Rectangle<double> screen_clip_coords);
+
+	Renderer::Rectangle<double> get_bounding_box_of_page_in_screen_coords(size_t page) const;
 
 	~PDFHandler();
 };

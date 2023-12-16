@@ -8,16 +8,20 @@ std::unique_ptr<Direct2DRenderer> g_main_renderer;
 Direct2DRenderer::TextFormatObject* g_text_format;
 Direct2DRenderer::BrushObject* g_brush;
 
-Direct2DRenderer::BitmapObject* g_bitmap;
+Direct2DRenderer::BitmapObject* g_bitmap = nullptr;
 
-PDFHandler* g_pdf_handler;
+MuPDFHandler* g_mupdfcontext;
+PDFHandler* g_pdfhandler = nullptr;
 
 void callback_draw() {
+	// draw scaled elements
 	g_main_renderer->set_current_transform_active();
 	g_main_renderer->begin_draw();
 	g_main_renderer->clear(Renderer::Color(50, 50, 50));
-	//g_main_renderer->draw_bitmap(*g_bitmap, {0, 0});
-	g_main_renderer->draw_text(L"Hello World", Renderer::Point<float>(100, 500), *g_text_format, *g_brush);
+
+	// draw ui elements
+	g_main_renderer->set_identity_transform_active();
+	g_main_renderer->draw_text(L"DOCANTO ALPHA VERSION 0", Renderer::Point<float>(0, 0), *g_text_format, *g_brush);
 	g_main_renderer->end_draw();
 }
 
@@ -50,16 +54,17 @@ void main_window_loop_run(HINSTANCE h) {
 	g_main_renderer = std::make_unique<Direct2DRenderer>(*g_main_window.get());
 	auto default_brush = g_main_renderer->create_brush(Renderer::Color(255, 0, 0));
 	g_brush = &default_brush;
-	auto default_text_format = g_main_renderer->create_text_format(L"Consolas", 500);
+	auto default_text_format = g_main_renderer->create_text_format(L"Consolas", 20);
 	g_text_format = &default_text_format;
 
+	MuPDFHandler context;
+	PDFHandler pdf_handler; 
+	g_mupdfcontext = &context;
+	Direct2DRenderer::BitmapObject bitmap;
 
-	PDFHandler pdf_handler;
-	g_pdf_handler = &pdf_handler;
 	auto path = FileHandler::open_file_dialog(L"PDF\0*.pdf\0\0", *g_main_window);
 	if (path.has_value()) {
-		auto pdf = pdf_handler.load_pdf(path.value());
-		Logger::log(pdf.value().get_page_count());
+		pdf_handler = PDFHandler(g_main_renderer.get(), *g_mupdfcontext, path.value());
 	}
 
 	// do the callbacks

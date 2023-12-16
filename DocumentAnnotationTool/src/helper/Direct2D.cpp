@@ -92,6 +92,12 @@ void Direct2DRenderer::draw_text(const std::wstring& text, Renderer::Point<float
 
 }
 
+void Direct2DRenderer::draw_rect(Renderer::Rectangle<float> rec, BrushObject& brush, float thicc) {
+	begin_draw();
+	m_renderTarget->DrawRectangle(rec, brush.m_object, thicc);
+	end_draw();
+}
+
 void Direct2DRenderer::set_current_transform_active() {
 	m_renderTarget->SetTransform(m_transformPosMatrix * m_transformScaleMatrix);
 }
@@ -127,6 +133,18 @@ void Direct2DRenderer::add_scale_matrix(float scale, Renderer::Point<float> cent
 	mat.Invert();
 	mat = D2D1::Matrix3x2F::Scale({ 1 + scale, 1 + scale }, mat.TransformPoint(center));
 	m_transformScaleMatrix = mat * m_transformScaleMatrix;
+}
+
+float Direct2DRenderer::get_transform_scale() const {
+	return m_transformScale;
+}
+
+Renderer::Point<float> Direct2DRenderer::get_transform_pos() const {
+	return m_transformPos;
+}
+
+UINT Direct2DRenderer::get_dpi() const {
+	return GetDpiForWindow(m_hwnd);
 }
 
 void Direct2DRenderer::begin_draw() {
@@ -212,4 +230,21 @@ REALEASE:
 	SafeRelease(pConverter); 
 
 	return std::move(obj); 
+}
+
+Direct2DRenderer::BitmapObject Direct2DRenderer::create_bitmap(const byte* const data, Renderer::Rectangle<unsigned int> size, unsigned int stride, float dpi) {
+	ID2D1Bitmap* pBitmap = nullptr;
+	D2D1_BITMAP_PROPERTIES prop;
+
+	prop.dpiX = dpi;
+	prop.dpiY = dpi;
+	prop.pixelFormat.alphaMode = D2D1_ALPHA_MODE_PREMULTIPLIED;
+	prop.pixelFormat.format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+	HRESULT res = m_renderTarget->CreateBitmap({ size.width, size.height }, data, stride, prop, &pBitmap);
+	ASSERT_WIN(res == S_OK, "Could not create bitmap!"); 
+
+	BitmapObject obj;
+	obj.m_object = pBitmap;
+
+	return std::move(obj);
 }
