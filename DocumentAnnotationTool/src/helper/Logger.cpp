@@ -25,6 +25,10 @@ namespace Logger {
 		log(std::to_string(msg), lvl);
 	}
 
+	void log(const double msg, MsgLevel lvl) {
+		log(std::to_string(msg), lvl);
+	}
+
 	void warn(const std::string& msg) {
 		log(msg, Logger::MsgLevel::WARNING);
 	}

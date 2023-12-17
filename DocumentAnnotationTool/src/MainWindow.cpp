@@ -19,6 +19,7 @@ void callback_draw() {
 	g_main_renderer->begin_draw();
 	g_main_renderer->clear(Renderer::Color(50, 50, 50));
 
+	g_pdfhandler->render();
 	// draw ui elements
 	g_main_renderer->set_identity_transform_active();
 	g_main_renderer->draw_text(L"DOCANTO ALPHA VERSION 0", Renderer::Point<float>(0, 0), *g_text_format, *g_brush);
@@ -39,8 +40,12 @@ void callback_pointer_down(WindowHandler::PointerInfo p) {
 }
 
 void callback_mousewheel(short delta, bool hwheel, Renderer::Point<int> center) {
-	if (WindowHandler::is_key_pressed(WindowHandler::LEFT_CONTROL))
-		g_main_renderer->add_scale_matrix(delta > 0 ? 1.5 : -0.75, g_main_window->get_mouse_pos());
+	delta *= 1/g_main_renderer->get_transform_scale();
+	if (WindowHandler::is_key_pressed(WindowHandler::LEFT_CONTROL)) {
+		g_main_renderer->add_scale_matrix(delta > 0 ? 1.25 : 0.8, g_main_window->get_mouse_pos());
+		Logger::log(g_main_renderer->get_transform_scale());
+		Logger::print_to_debug();
+	}
 	else if (WindowHandler::is_key_pressed(WindowHandler::LEFT_SHIFT))
 		g_main_renderer->add_transform_matrix({ (float)delta, 0});
 	else
@@ -65,6 +70,7 @@ void main_window_loop_run(HINSTANCE h) {
 	auto path = FileHandler::open_file_dialog(L"PDF\0*.pdf\0\0", *g_main_window);
 	if (path.has_value()) {
 		pdf_handler = PDFHandler(g_main_renderer.get(), *g_mupdfcontext, path.value());
+		g_pdfhandler = &pdf_handler; 
 	}
 
 	// do the callbacks

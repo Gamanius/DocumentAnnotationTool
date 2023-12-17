@@ -10,13 +10,16 @@
 #include <d2d1.h>
 #include <dwrite_3.h>
 #include <optional>
+#include <tuple>
 #include <crtdbg.h>
 #include "mupdf/fitz.h"
 #include <mutex>
 #include <thread>
+#include <mupdf/fitz/crypt.h>
 
 
 #define APPLICATION_NAME L"Docanto"
+#define EPSILON 0.00001f
 
 inline void SafeRelease(IUnknown* ptr) {
 	if (ptr) {
@@ -36,6 +39,7 @@ namespace Logger {
 	void log(const std::wstring& msg, MsgLevel lvl = MsgLevel::INFO);
 	void log(const std::string& msg, MsgLevel lvl = MsgLevel::INFO);
 	void log(const unsigned long msg, MsgLevel lvl = MsgLevel::INFO);
+	void log(const double msg, MsgLevel lvl = MsgLevel::INFO);
 	void warn(const std::string& msg);
 
 	void assert_msg(const std::string& msg, const std::string& file, long line);
@@ -62,6 +66,7 @@ namespace Renderer {
 		Point(POINT p) : x(p.x), y(p.y) {}
 		template <typename W>
 		Point(Point<W> p) : x((T)p.x), y((T)p.y) {}
+		Point(D2D1_POINT_2F p) : x((T)p.x), y((T)p.y) {}
 		Point(T x, T y) : x(x), y(y) {}
 
 		operator D2D1_POINT_2F() const {
@@ -110,6 +115,8 @@ namespace Renderer {
 
 		Rectangle() = default;
 		Rectangle(T x, T y, T width, T height) : x(x), y(y), width(width), height(height) {}
+		Rectangle(Point<T> p, T width, T height) : x(p.x), y(p.y), width(width), height(height) {}
+		Rectangle(Point<T> p1, Point<T> p2) : x(p1.x), y(p1.y), width(p2.x - p1.x), height(p2.y - p1.y) {}
 		Rectangle(fz_rect rect) : x(rect.x0), y(rect.y0), width(rect.x1 - rect.x0), height(rect.y1 - rect.y0) {}
 		Rectangle(fz_irect rect) : x(rect.x0), y(rect.y0), width(rect.x1 - rect.x0), height(rect.y1 - rect.y0) {}
 
@@ -117,9 +124,9 @@ namespace Renderer {
 			return D2D1::SizeU((UINT32)width, (UINT32)height);
 		}
 
-
 		T right() const { return x + width; }
 		T bottom() const { return y + height; }
+		Point<T> upperleft() const { return { x, y }; }
 
 		operator RECT() const { 
 			return { x, y, right(), bottom() };
@@ -142,7 +149,28 @@ namespace Renderer {
 			return { x, y, right(), bottom() };
 		}
 
-		
+		bool intersects(const Rectangle<T>& other) const {
+			return (x < other.x + other.width && 
+				x + width > other.x && 
+				y < other.y + other.height && 
+				y + height > other.y); 
+		}
+
+		Rectangle<T> calculate_overlap(const Rectangle<T>& other) const {
+			Rectangle<T> overlap;
+
+			// Calculate overlap in x-axis
+			overlap.x = max(x, other.x);
+			T x2 = min(x + width, other.x + other.width);
+			overlap.width = max(static_cast<T>(0), x2 - overlap.x);
+
+			// Calculate overlap in y-axis
+			overlap.y = max(y, other.y);
+			T y2 = min(y + height, other.y + other.height);
+			overlap.height = max(static_cast<T>(0), y2 - overlap.y);
+
+			return overlap;
+		}
 
 	};
 
@@ -190,9 +218,7 @@ class Direct2DRenderer : public Renderer::RenderHandler {
 	float m_transformScale = 1.0f;
 	Renderer::Point<float> m_transformPos, m_transformScaleCenter;
 
-
 	UINT32 m_isRenderinProgress = 0;
-
 
 public:
 	template <typename T>
@@ -236,6 +262,11 @@ public:
 	typedef RenderObject<ID2D1Bitmap> BitmapObject;
 	typedef RenderObject<IDWriteTextFormat> TextFormatObject;
 
+	enum INTERPOLATION_MODE {
+		NEAREST_NEIGHBOR,
+		LINEAR
+	};
+
 	Direct2DRenderer(const WindowHandler& window);
 	~Direct2DRenderer();
 
@@ -243,7 +274,8 @@ public:
 	void end_draw();
 	void clear(Renderer::Color c) override;
 	void resize(Renderer::Rectangle<long> r);
-	void draw_bitmap(BitmapObject& bitmap, Renderer::Point<float> pos, float opacity = 1.0f);
+	void draw_bitmap(BitmapObject& bitmap, Renderer::Point<float> pos, INTERPOLATION_MODE mode = INTERPOLATION_MODE::NEAREST_NEIGHBOR, float opacity = 1.0f);
+	void draw_bitmap(BitmapObject& bitmap, Renderer::Rectangle<float> dest, INTERPOLATION_MODE mode = INTERPOLATION_MODE::NEAREST_NEIGHBOR, float opacity = 1.0f);
 	void draw_text(const std::wstring& text, Renderer::Point<float> pos, TextFormatObject& format, BrushObject& brush);
 	void draw_rect(Renderer::Rectangle<float> rec, BrushObject& brush, float thick);
 
@@ -257,6 +289,16 @@ public:
 
 	float get_transform_scale() const;
 	Renderer::Point<float> get_transform_pos() const;
+	Renderer::Rectangle<long> get_window_size() const;
+	/// <summary>
+	/// Transforms the rectangle using the current transformation matrices
+	/// </summary>
+	/// <param name="rec">The rectangle to be transformed</param>
+	/// <returns>The new transformed rectangle</returns>
+	Renderer::Rectangle<float> transform_rect(const Renderer::Rectangle<float> rec) const;
+
+	Renderer::Rectangle<float> inv_transform_rect(const Renderer::Rectangle<float> rec) const;
+
 	UINT get_dpi() const;
 
 	TextFormatObject create_text_format(std::wstring font, float size);
@@ -385,6 +427,8 @@ public:
 		/// <remark>If the DPI is 72 the size of the returned bitmap is the same as the size of the source</remark>
 		Direct2DRenderer::BitmapObject get_bitmap(Direct2DRenderer& renderer, size_t page, Renderer::Rectangle<float> source, float dpi) const;
 
+		Direct2DRenderer::BitmapObject multithreaded_get_bitmap(Direct2DRenderer* renderer, fz_display_list* list, Renderer::Rectangle<float> source, float dpi) const;
+
 		/// <summary>
 		/// Retrieves the number of pdf pages
 		/// </summary>
@@ -409,11 +453,15 @@ class PDFHandler {
 	Direct2DRenderer* const m_renderer = nullptr;
 	// rendererd at half scale or otherwise specified
 	std::vector<Direct2DRenderer::BitmapObject> m_previewBitmaps;
+	std::vector<Renderer::Rectangle<float>> m_pagerec;
+
+	std::mutex m_draw_lock;
 
 	float m_seperation_distance = 10;
 	float m_preview_scale = 0.5; 
 
 	void create_preview(float scale = 0.5);
+	void render_high_res();
 
 public:
 	PDFHandler() = default;
@@ -430,10 +478,13 @@ public:
 	// move assignment
 	PDFHandler& operator=(PDFHandler&& t) noexcept;
 
-	void render_preview(Renderer::Rectangle<double> screen_clip_coords); 
-	void render(Renderer::Rectangle<double> screen_clip_coords);
+	void render_preview(); 
+	void render();
+	void sort_page_positions();
 
-	Renderer::Rectangle<double> get_bounding_box_of_page_in_screen_coords(size_t page) const;
+	// should be private but i dont know how
+	void draw_lock();
+	void draw_unlock();
 
 	~PDFHandler();
 };

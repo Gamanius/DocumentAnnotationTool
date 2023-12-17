@@ -114,6 +114,7 @@ Direct2DRenderer::BitmapObject MuPDFHandler::PDF::get_bitmap(Direct2DRenderer& r
 		 fz_clear_pixmap_with_value(m_ctx, pixmap, 0xff); // for the white background
 		 drawdevice = fz_new_draw_device(m_ctx, fz_identity, pixmap); 
 		 fz_run_page(m_ctx, get_page(page), drawdevice, ctm, nullptr);
+		 fz_close_device(m_ctx, drawdevice);
 		 obj = renderer.create_bitmap((byte*)pixmap->samples, size, (unsigned int)pixmap->stride, 96); // default dpi of the pixmap
 	} fz_always(m_ctx) {
 		fz_drop_device(m_ctx, drawdevice);
@@ -142,6 +143,7 @@ Direct2DRenderer::BitmapObject MuPDFHandler::PDF::get_bitmap(Direct2DRenderer& r
 		fz_clear_pixmap_with_value(m_ctx, pixmap, 0xff); // for the white background
 		drawdevice = fz_new_draw_device(m_ctx, fz_identity, pixmap);
 		fz_run_page(m_ctx, get_page(page), drawdevice, ctm, nullptr);
+		fz_close_device(m_ctx, drawdevice);
 		obj = renderer.create_bitmap((byte*)pixmap->samples, rec, (unsigned int)pixmap->stride, 96); // default dpi of the pixmap
 	} fz_always(m_ctx) {
 		fz_drop_device(m_ctx, drawdevice);
@@ -170,7 +172,8 @@ Direct2DRenderer::BitmapObject MuPDFHandler::PDF::get_bitmap(Direct2DRenderer& r
 		fz_clear_pixmap_with_value(m_ctx, pixmap, 0xff); // for the white background
 		drawdevice = fz_new_draw_device(m_ctx, fz_identity, pixmap);
 		fz_run_page(m_ctx, get_page(page), drawdevice, fz_concat(transform, ctm), nullptr);
-		obj = renderer.create_bitmap((byte*)pixmap->samples, pixmap_size, (unsigned int)pixmap->stride, 96); // default dpi of the pixmap
+		fz_close_device(m_ctx, drawdevice);
+		obj = renderer.create_bitmap((byte*)pixmap->samples, pixmap_size, (unsigned int)pixmap->stride, dpi); // default dpi of the pixmap
 	} fz_always(m_ctx) {
 		fz_drop_device(m_ctx, drawdevice);
 		fz_drop_pixmap(m_ctx, pixmap);
@@ -179,6 +182,13 @@ Direct2DRenderer::BitmapObject MuPDFHandler::PDF::get_bitmap(Direct2DRenderer& r
 	}
 
 	return std::move(obj); 
+}
+
+Direct2DRenderer::BitmapObject MuPDFHandler::PDF::multithreaded_get_bitmap(Direct2DRenderer* renderer, fz_display_list* list, Renderer::Rectangle<float> source, float dpi) const {
+	auto cloned_ctx = fz_clone_context(m_ctx);
+	fz_matrix ctm = fz_scale((dpi / MUPDF_DEFAULT_DPI), (dpi / MUPDF_DEFAULT_DPI)); fz_matrix ctm;
+
+
 }
 
 size_t MuPDFHandler::PDF::get_page_count() const { 
