@@ -12,9 +12,11 @@
 #include <optional>
 #include <tuple>
 #include <crtdbg.h>
+#include <array>
 #include "mupdf/fitz.h"
 #include <mutex>
 #include <thread>
+#include <atomic>
 #include <mupdf/fitz/crypt.h>
 
 
@@ -218,7 +220,8 @@ class Direct2DRenderer : public Renderer::RenderHandler {
 	float m_transformScale = 1.0f;
 	Renderer::Point<float> m_transformPos, m_transformScaleCenter;
 
-	UINT32 m_isRenderinProgress = 0;
+	std::atomic<UINT32> m_isRenderinProgress = 0;
+	std::mutex draw_lock;
 
 public:
 	template <typename T>
@@ -367,7 +370,7 @@ namespace FileHandler {
 }
 
 constexpr float MUPDF_DEFAULT_DPI = 72.0f;
-
+class PDFHandler;
 class MuPDFHandler {
 	fz_context* m_ctx = nullptr;
 	std::mutex m_mutex[FZ_LOCK_MAX];
@@ -427,7 +430,7 @@ public:
 		/// <remark>If the DPI is 72 the size of the returned bitmap is the same as the size of the source</remark>
 		Direct2DRenderer::BitmapObject get_bitmap(Direct2DRenderer& renderer, size_t page, Renderer::Rectangle<float> source, float dpi) const;
 
-		Direct2DRenderer::BitmapObject multithreaded_get_bitmap(Direct2DRenderer* renderer, fz_display_list* list, Renderer::Rectangle<float> source, float dpi) const;
+		void multithreaded_get_bitmap(Direct2DRenderer* renderer, size_t page, Renderer::Rectangle<float> source, Renderer::Rectangle<float> dest, float dpi, PDFHandler* pdfhandler) const;
 
 		/// <summary>
 		/// Retrieves the number of pdf pages
@@ -481,10 +484,6 @@ public:
 	void render_preview(); 
 	void render();
 	void sort_page_positions();
-
-	// should be private but i dont know how
-	void draw_lock();
-	void draw_unlock();
 
 	~PDFHandler();
 };

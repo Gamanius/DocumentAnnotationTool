@@ -72,6 +72,9 @@ void main_window_loop_run(HINSTANCE h) {
 		pdf_handler = PDFHandler(g_main_renderer.get(), *g_mupdfcontext, path.value());
 		g_pdfhandler = &pdf_handler; 
 	}
+	else {
+		return;
+	}
 
 	// do the callbacks
 	g_main_window->set_callback_paint(callback_draw);

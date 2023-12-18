@@ -176,12 +176,14 @@ UINT Direct2DRenderer::get_dpi() const {
 }
 
 void Direct2DRenderer::begin_draw() {
+	std::unique_lock lock(draw_lock);
 	if (m_isRenderinProgress == 0)
 		m_renderTarget->BeginDraw();
 	m_isRenderinProgress++;
 }
 
 void Direct2DRenderer::end_draw() {
+	std::unique_lock lock(draw_lock);
 	m_isRenderinProgress--;
 	if (m_isRenderinProgress == 0)
 		m_renderTarget->EndDraw();

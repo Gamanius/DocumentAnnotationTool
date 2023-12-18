@@ -157,7 +157,6 @@ Direct2DRenderer::BitmapObject MuPDFHandler::PDF::get_bitmap(Direct2DRenderer& r
 
 Direct2DRenderer::BitmapObject MuPDFHandler::PDF::get_bitmap(Direct2DRenderer& renderer, size_t page, Renderer::Rectangle<float> source, float dpi) const {
 	fz_matrix ctm;
-	auto size = get_page_size(page, dpi);
 	ctm = fz_scale((dpi / MUPDF_DEFAULT_DPI), (dpi / MUPDF_DEFAULT_DPI));
 	auto transform = fz_translate(-source.x, -source.y);
 	// this is to calculate the size of the pixmap using the source
@@ -184,11 +183,93 @@ Direct2DRenderer::BitmapObject MuPDFHandler::PDF::get_bitmap(Direct2DRenderer& r
 	return std::move(obj); 
 }
 
-Direct2DRenderer::BitmapObject MuPDFHandler::PDF::multithreaded_get_bitmap(Direct2DRenderer* renderer, fz_display_list* list, Renderer::Rectangle<float> source, float dpi) const {
-	auto cloned_ctx = fz_clone_context(m_ctx);
-	fz_matrix ctm = fz_scale((dpi / MUPDF_DEFAULT_DPI), (dpi / MUPDF_DEFAULT_DPI)); fz_matrix ctm;
+void do_multithread_rendering(PDFHandler* handerl, Direct2DRenderer* renderer, fz_context* ctx, fz_display_list* list, Renderer::Rectangle<float> source, Renderer::Rectangle<float> dest, float dpi) {
+	// clone the context
+	fz_context* cloned_ctx = fz_clone_context(ctx);
 
+	fz_matrix ctm;
+	ctm = fz_scale((dpi / MUPDF_DEFAULT_DPI), (dpi / MUPDF_DEFAULT_DPI));
+	auto transform = fz_translate(-source.x, -source.y);
+	// this is to calculate the size of the pixmap using the source
+	auto pixmap_size = fz_round_rect(fz_transform_rect(fz_make_rect(0, 0, source.width, source.height), ctm)); 
 
+	fz_pixmap* pixmap = nullptr;
+	fz_device* drawdevice = nullptr;
+	Direct2DRenderer::BitmapObject obj;
+
+	fz_try(cloned_ctx) {
+		// create new pixmap
+		pixmap = fz_new_pixmap_with_bbox(cloned_ctx, fz_device_rgb(cloned_ctx), pixmap_size, nullptr, 1);
+		fz_clear_pixmap_with_value(cloned_ctx, pixmap, 0xff); // for the white background
+		// create draw device
+		drawdevice = fz_new_draw_device(cloned_ctx, fz_concat(transform, ctm), pixmap); 
+		// render to draw device
+		fz_run_display_list(cloned_ctx, list, drawdevice, fz_identity, source, nullptr);  
+		fz_close_device(cloned_ctx, drawdevice);
+		// create the bitmap
+		obj = renderer->create_bitmap((byte*)pixmap->samples, pixmap_size, (unsigned int)pixmap->stride, dpi); // default dpi of the pixmap
+		// now call begin thre drawing
+		renderer->begin_draw();
+		renderer->set_current_transform_active();
+		renderer->draw_bitmap(obj, dest, Direct2DRenderer::INTERPOLATION_MODE::LINEAR);
+		renderer->end_draw();
+	} fz_always(cloned_ctx) {
+		// drop all devices
+		fz_drop_device(cloned_ctx, drawdevice);
+		fz_drop_pixmap(cloned_ctx, pixmap);
+		fz_drop_display_list(cloned_ctx, list); 
+	} fz_catch(cloned_ctx) {
+		return;
+	}
+
+	fz_drop_context(cloned_ctx); 
+}
+
+void MuPDFHandler::PDF::multithreaded_get_bitmap(Direct2DRenderer* renderer, size_t page, Renderer::Rectangle<float> source, Renderer::Rectangle<float> dest, float dpi, PDFHandler* pdfhandler) const {
+	float halfwidth  = source.width / 2.0f;
+	float halfheight = source.height / 2.0f;
+
+	// create the 4 recs
+	Renderer::Rectangle<float> r1 = { source.x, source.y, halfwidth, halfheight };
+	Renderer::Rectangle<float> r2 = { source.x + halfwidth, source.y, halfwidth, halfheight };
+	Renderer::Rectangle<float> r3 = { source.x, source.y + halfheight, halfwidth, halfheight };
+	Renderer::Rectangle<float> r4 = { source.x + halfwidth, source.y + halfheight, halfwidth, halfheight };
+
+	// calculate the destination rectangle
+	halfwidth  = dest.width / 2.0f;
+	halfheight = dest.height / 2.0f;
+	Renderer::Rectangle<float> d1 = { dest.x, dest.y, halfwidth, halfheight };
+	Renderer::Rectangle<float> d2 = { dest.x + halfwidth, dest.y, halfwidth, halfheight };
+	Renderer::Rectangle<float> d3 = { dest.x, dest.y + halfheight, halfwidth, halfheight };
+	Renderer::Rectangle<float> d4 = { dest.x + halfwidth, dest.y + halfheight, halfwidth, halfheight };
+
+	// create the source and destination rectangles
+
+	std::array<Renderer::Rectangle<float>, 4> source_recs = { r1, r2, r3, r4 };
+	std::array<Renderer::Rectangle<float>, 4> destin_recs = { d1, d2, d3, d4 };
+
+	// for each rec create a display list
+	fz_display_list* list = nullptr;
+	fz_device* dev		  = nullptr;
+	// get the page that will be rendered
+	auto p = get_page(page);  
+	for (size_t i = 0; i < source_recs.size(); i++) {
+		fz_try(m_ctx) {
+			// create a display list with all the draw calls and so on
+			list = fz_new_display_list(m_ctx, source_recs.at(i)); 
+			dev = fz_new_list_device(m_ctx, list);
+			// run the device
+			fz_run_page(m_ctx, p, dev, fz_identity, nullptr); 
+		} fz_always(m_ctx) {
+			// flush the device
+			fz_close_device(m_ctx, dev);
+			fz_drop_device(m_ctx, dev);
+		} fz_catch(m_ctx) {
+			return;
+		}
+		// if everything worked we can now create a thread and render the display list
+		std::thread(do_multithread_rendering, pdfhandler, renderer, m_ctx, list, source_recs.at(i), destin_recs.at(i), dpi).detach();
+	}
 }
 
 size_t MuPDFHandler::PDF::get_page_count() const { 

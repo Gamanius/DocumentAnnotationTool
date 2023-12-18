@@ -10,19 +10,8 @@ void PDFHandler::create_preview(float scale) {
 	m_preview_scale = scale;
 }
 
-void multithreaded_high_res(PDFHandler* pdfhandler, Direct2DRenderer* const renderer, MuPDFHandler::PDF* pdf, size_t page, Renderer::Rectangle<float> source, Renderer::Rectangle<float> pagerec) {
-	// render page
-	
-	//auto butmap = pdf->multithreaded_get_bitmap(renderer, page, source, renderer->get_dpi() * renderer->get_transform_scale()); 
-	
-	source.x += pagerec.x;
-	source.y += pagerec.y;
+void multithreaded_high_res(Direct2DRenderer::BitmapObject obj, Direct2DRenderer* renderer, PDFHandler* handler) {
 
-	pdfhandler->draw_lock();
-	renderer->begin_draw();
-	//renderer->draw_bitmap(butmap, source, Direct2DRenderer::INTERPOLATION_MODE::LINEAR);
-	renderer->end_draw();
-	pdfhandler->draw_unlock();
 }
 
 void PDFHandler::render_high_res() {
@@ -61,57 +50,13 @@ void PDFHandler::render_high_res() {
 		// divide rec into 4 equal parts
 		auto page        = std::get<0>(clipped_documents.at(i));
 		auto overlap     = std::get<1>(clipped_documents.at(i));
+		auto dest		 = overlap;
 
-		float halfwidth  = overlap.width / 2.0f;
-		float halfheight = overlap.height/ 2.0f;
+		dest.x += m_pagerec.at(page).x;
+		dest.y += m_pagerec.at(page).y;
 
-		// create the 4 recs
-		Renderer::Rectangle<float> r1 = { overlap.x, overlap.y, halfwidth, halfheight };
-		Renderer::Rectangle<float> r2 = { overlap.x + halfwidth, overlap.y, halfwidth, halfheight };
-		Renderer::Rectangle<float> r3 = { overlap.x, overlap.y + halfheight, halfwidth, halfheight };
-		Renderer::Rectangle<float> r4 = { overlap.x + halfwidth, overlap.y + halfheight, halfwidth, halfheight };
+		m_pdf.multithreaded_get_bitmap(m_renderer, page, overlap, dest, m_renderer->get_dpi() * m_renderer->get_transform_scale(), this);
 
-		// create 4 display lists
-		fz_display_list* list1 = nullptr;
-		fz_display_list* list2 = nullptr;
-		fz_display_list* list3 = nullptr;
-		fz_display_list* list4 = nullptr;
-		fz_try(m_pdf.m_ctx) {
-			// create display list
-			list1 = fz_new_display_list(m_pdf.m_ctx, r1);
-			list2 = fz_new_display_list(m_pdf.m_ctx, r2);
-			list3 = fz_new_display_list(m_pdf.m_ctx, r3);
-			list4 = fz_new_display_list(m_pdf.m_ctx, r4);
-
-			auto dev1 = fz_new_list_device(m_pdf.m_ctx, list1);
-			auto dev2 = fz_new_list_device(m_pdf.m_ctx, list2);
-			auto dev3 = fz_new_list_device(m_pdf.m_ctx, list3);
-			auto dev4 = fz_new_list_device(m_pdf.m_ctx, list4);
-
-			fz_run_page(m_pdf.m_ctx, m_pdf.get_page(page), dev1, fz_identity, NULL);
-			fz_run_page(m_pdf.m_ctx, m_pdf.get_page(page), dev2, fz_identity, NULL);
-			fz_run_page(m_pdf.m_ctx, m_pdf.get_page(page), dev3, fz_identity, NULL);
-			fz_run_page(m_pdf.m_ctx, m_pdf.get_page(page), dev4, fz_identity, NULL);
-
-			// close device and flush
-			fz_close_device(m_pdf.m_ctx, dev1);
-			fz_close_device(m_pdf.m_ctx, dev2);
-			fz_close_device(m_pdf.m_ctx, dev3);
-			fz_close_device(m_pdf.m_ctx, dev4);
-		} fz_catch(m_pdf.m_ctx) {
-			fz_rethrow(m_pdf.m_ctx);
-		}
-
-		// create 4 threads
-		std::thread t1(multithreaded_high_res, this, m_renderer, &m_pdf, page, r1, m_pagerec.at(page));
-		std::thread t2(multithreaded_high_res, this, m_renderer, &m_pdf, page, r2, m_pagerec.at(page));
-		std::thread t3(multithreaded_high_res, this, m_renderer, &m_pdf, page, r3, m_pagerec.at(page));
-		std::thread t4(multithreaded_high_res, this, m_renderer, &m_pdf, page, r4, m_pagerec.at(page));
-
-		t1.join();
-		t2.join();
-		t3.join();
-		t4.join();
 	}
 }
 
@@ -150,8 +95,6 @@ PDFHandler& PDFHandler::operator=(PDFHandler&& t) noexcept {
 }
 
 void PDFHandler::render_preview() {
-	Logger::log("Preview");
-	Logger::print_to_debug();
 	// check for intersection. if it intersects than do the rendering
 	m_renderer->begin_draw();
 	m_renderer->set_current_transform_active();
@@ -169,13 +112,11 @@ void PDFHandler::render() {
 	auto scale = m_renderer->get_transform_scale();
 	//render_preview();
 
+	render_preview();
 	if (scale > m_preview_scale + EPSILON) {
 		// if we are zoomed in, we need to render the page at a higher resolution
 		// than the screen resolution
 		render_high_res();
-	}
-	else {
-		render_preview();
 	}
 }
 
@@ -190,13 +131,6 @@ void PDFHandler::sort_page_positions() {
 	}
 }
 
-void PDFHandler::draw_lock() {
-	m_draw_lock.lock();
-}
-
-void PDFHandler::draw_unlock() {
-	m_draw_lock.unlock();
-}
 
 PDFHandler::~PDFHandler() {
 	//m_pdf will be destroyed automatically
