@@ -42,7 +42,7 @@ void callback_pointer_down(WindowHandler::PointerInfo p) {
 void callback_mousewheel(short delta, bool hwheel, Renderer::Point<int> center) {
 	delta *= 1/g_main_renderer->get_transform_scale();
 	if (WindowHandler::is_key_pressed(WindowHandler::LEFT_CONTROL)) {
-		g_main_renderer->add_scale_matrix(delta > 0 ? 1.25 : 0.8, g_main_window->get_mouse_pos());
+		g_main_renderer->add_scale_matrix(delta > 0 ? 1.25 : 0.8, center);
 		Logger::log(g_main_renderer->get_transform_scale());
 		Logger::print_to_debug();
 	}
