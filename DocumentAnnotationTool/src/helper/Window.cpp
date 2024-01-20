@@ -406,6 +406,28 @@ LRESULT WindowHandler::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam
 		currentInstance->m_callback_mousewheel(GET_WHEEL_DELTA_WPARAM(wParam), GetKeyState(VK_SHIFT) & 0x8000, currentInstance->PxToDp(p));
 		return 0;
 	}
+	case WM_KEYDOWN:
+	case WM_SYSKEYDOWN:
+	{
+		if (currentInstance->m_callback_key_down == nullptr) {
+			break;
+		}
+		auto key = winkey_to_vk(wParam);
+		currentInstance->m_callback_key_down(key);
+			
+		return 0;
+	}
+	case WM_KEYUP:
+	case WM_SYSKEYUP:
+	{
+		if (currentInstance->m_callback_key_up == nullptr) {
+			break;
+		}
+		auto key = winkey_to_vk(wParam);
+		currentInstance->m_callback_key_up(key);
+
+		return 0;
+	}
 	case WM_SIZE:
 	case WM_SIZING:
 	{
@@ -414,11 +436,18 @@ LRESULT WindowHandler::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam
 		}
 		return DefWindowProc(hWnd, uMsg, wParam, lParam);
 	}
+	case WM_PDF_BITMAP_READY:
+	{
+		if (currentInstance->m_callback_paint) {
+			currentInstance->m_callback_paint((std::deque<PDFHandler::CachedBitmap>*)lParam, (std::mutex*)wParam);
+		}
+		return NULL;
+	}
 	// TODO add wm_ncpaint
 	case WM_PAINT: 
 	{
 		if (currentInstance->m_callback_paint) {
-			currentInstance->m_callback_paint();
+			currentInstance->m_callback_paint(std::nullopt, nullptr);
 		}
 
 		ValidateRect(currentInstance->m_hwnd, NULL);
@@ -470,10 +499,10 @@ Renderer::Point<long> WindowHandler::get_mouse_pos() const {
 	Renderer::Point<long> p;
 	GetCursorPos((POINT*)&p); // could be bad
 	ScreenToClient(m_hwnd, (POINT*)&p);
-	return p;
+	return PxToDp(p);
 }
 
-void WindowHandler::set_callback_paint(std::function<void()> callback) {
+void WindowHandler::set_callback_paint(std::function<void(std::optional<std::deque<PDFHandler::CachedBitmap>*>, std::mutex*)> callback) {
 	m_callback_paint = callback;
 }
 
@@ -495,6 +524,14 @@ void WindowHandler::set_callback_pointer_update(std::function<void(PointerInfo)>
 
 void WindowHandler::set_callback_mousewheel(std::function<void(short, bool, Renderer::Point<int>)> callback) {
 	m_callback_mousewheel = callback;
+}
+
+void WindowHandler::set_callback_key_down(std::function<void(VK)> callback) {
+	m_callback_key_down = callback;
+}
+
+void WindowHandler::set_callback_key_up(std::function<void(VK)> callback) {
+	m_callback_key_up = callback;
 }
 
 void WindowHandler::invalidate_drawing_area() {

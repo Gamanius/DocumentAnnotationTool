@@ -18,10 +18,14 @@
 #include <thread>
 #include <atomic>
 #include <mupdf/fitz/crypt.h>
+#include <deque>
 
 
 #define APPLICATION_NAME L"Docanto"
 #define EPSILON 0.00001f
+
+/// Custom WM_APP message to signal that the bitmap is ready to be drawn
+#define WM_PDF_BITMAP_READY (WM_APP + 0x0BAD /*Magic number*/)
 
 inline void SafeRelease(IUnknown* ptr) {
 	if (ptr) {
@@ -450,21 +454,47 @@ public:
 	~MuPDFHandler();
 };
 
+/// <summary>
+/// Class to handle the rendering of only one pdf
+/// </summary>
 class PDFHandler {
+public:
+	struct CachedBitmap {
+		Direct2DRenderer::BitmapObject bitmap;
+		// coordinates in clip space
+		Renderer::Rectangle<float> dest;
+		float dpi = MUPDF_DEFAULT_DPI;
+
+		CachedBitmap() = default;
+		CachedBitmap(Direct2DRenderer::BitmapObject bitmap, Renderer::Rectangle<float> dest, float dpi = MUPDF_DEFAULT_DPI) : bitmap(bitmap), dest(dest), dpi(dpi) {}
+		CachedBitmap(CachedBitmap&& cachedbitmap) noexcept { 
+			bitmap = std::move(cachedbitmap.bitmap);
+			dest = cachedbitmap.dest;
+			dpi = cachedbitmap.dpi;
+		}
+		CachedBitmap& operator=(CachedBitmap&& cachedbitmap) noexcept {
+			bitmap = std::move(cachedbitmap.bitmap);
+			dest = cachedbitmap.dest;
+			dpi = cachedbitmap.dpi;
+			return *this;
+		}
+	};
+private:
 	MuPDFHandler::PDF m_pdf;
 	// not owned by this class!
 	Direct2DRenderer* const m_renderer = nullptr;
 	// rendererd at half scale or otherwise specified
 	std::vector<Direct2DRenderer::BitmapObject> m_previewBitmaps;
 	std::vector<Renderer::Rectangle<float>> m_pagerec;
+	std::deque<CachedBitmap> m_cachedBitmaps;
 
-	std::mutex m_draw_lock;
+	std::mutex m_cachedBitmaplock;
 
 	float m_seperation_distance = 10;
 	float m_preview_scale = 0.5; 
 
 	void create_preview(float scale = 0.5);
-	void render_high_res();
+	void render_high_res(HWND window);
 
 public:
 	PDFHandler() = default;
@@ -482,8 +512,10 @@ public:
 	PDFHandler& operator=(PDFHandler&& t) noexcept;
 
 	void render_preview(); 
-	void render();
+	void render(HWND callbackwindow);
 	void sort_page_positions();
+
+	void add_cachedBitmap(Direct2DRenderer::BitmapObject bitmap, Renderer::Rectangle<float> dest, float dpi = MUPDF_DEFAULT_DPI);
 
 	~PDFHandler();
 };
@@ -670,12 +702,14 @@ public:
 	};
 
 private:
-	std::function<void()> m_callback_paint;
+	std::function<void(std::optional<std::deque<PDFHandler::CachedBitmap>*>, std::mutex*)> m_callback_paint;
 	std::function<void(Renderer::Rectangle<long>)> m_callback_size;
 	std::function<void(PointerInfo)> m_callback_pointer_down;
 	std::function<void(PointerInfo)> m_callback_pointer_up;
 	std::function<void(PointerInfo)> m_callback_pointer_update;
 	std::function<void(short, bool, Renderer::Point<int>)> m_callback_mousewheel;
+	std::function<void(VK)> m_callback_key_down;
+	std::function<void(VK)> m_callback_key_up; 
 public:
 
 	static LRESULT parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -690,12 +724,14 @@ public:
 
 	void set_state(WINDOW_STATE state);
 
-	void set_callback_paint(std::function<void()> callback);
+	void set_callback_paint(std::function<void(std::optional<std::deque<PDFHandler::CachedBitmap>*>, std::mutex*)> callback);
 	void set_callback_size(std::function<void(Renderer::Rectangle<long>)> callback);
 	void set_callback_pointer_down(std::function<void(PointerInfo)> callback);
 	void set_callback_pointer_up(std::function<void(PointerInfo)> callback);
 	void set_callback_pointer_update(std::function<void(PointerInfo)> callback);
 	void set_callback_mousewheel(std::function<void(short, bool, Renderer::Point<int>)> callback);
+	void set_callback_key_down(std::function<void(VK)> callback);
+	void set_callback_key_up(std::function<void(VK)> callback);
 
 	void invalidate_drawing_area();
 	void invalidate_drawing_area(Renderer::Rectangle<long> rec);

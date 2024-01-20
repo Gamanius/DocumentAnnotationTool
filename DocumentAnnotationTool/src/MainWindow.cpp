@@ -13,13 +13,22 @@ Direct2DRenderer::BitmapObject* g_bitmap = nullptr;
 MuPDFHandler* g_mupdfcontext;
 PDFHandler* g_pdfhandler = nullptr;
 
-void callback_draw() {
+void callback_draw(std::optional<std::deque<PDFHandler::CachedBitmap>*> highres_bitmaps, std::mutex* lock) {
 	// draw scaled elements
 	g_main_renderer->set_current_transform_active();
 	g_main_renderer->begin_draw();
 	g_main_renderer->clear(Renderer::Color(50, 50, 50));
 
-	g_pdfhandler->render();
+	// when the highres_bitmaps arg is nullopt then it is a normal draw call from windows
+	if (highres_bitmaps.has_value() == false)
+		g_pdfhandler->render(g_main_window->get_hwnd());
+	//else there are new bitmaps to render that have been created by other threads
+	else {
+		auto* bitmaps = highres_bitmaps.value();
+		for (auto& i : *bitmaps) {
+			g_main_renderer->draw_bitmap(i.bitmap, i.dest, Direct2DRenderer::INTERPOLATION_MODE::LINEAR);
+		}
+	}
 	// draw ui elements
 	g_main_renderer->set_identity_transform_active();
 	g_main_renderer->draw_text(L"DOCANTO ALPHA VERSION 0", Renderer::Point<float>(0, 0), *g_text_format, *g_brush);
@@ -28,6 +37,22 @@ void callback_draw() {
 
 void callback_size(Renderer::Rectangle<long> r) {
 	g_main_renderer->resize(r);
+}
+
+
+void callback_key_up(WindowHandler::VK k) {
+	if (WindowHandler::is_key_pressed(WindowHandler::LEFT_CONTROL)) {
+		auto mouse_pos = g_main_window->get_mouse_pos();
+		if (k == WindowHandler::VK::OEM_PLUS ) {
+			g_main_renderer->add_scale_matrix(1.25, mouse_pos);
+		}
+		else if (k == WindowHandler::VK::OEM_MINUS) {
+			g_main_renderer->add_scale_matrix(0.8, mouse_pos);
+
+		}
+	}
+
+	g_main_window->invalidate_drawing_area();
 }
 
 void callback_pointer_down(WindowHandler::PointerInfo p) {
@@ -46,7 +71,7 @@ void callback_mousewheel(short delta, bool hwheel, Renderer::Point<int> center) 
 		Logger::log(g_main_renderer->get_transform_scale());
 		Logger::print_to_debug();
 	}
-	else if (WindowHandler::is_key_pressed(WindowHandler::LEFT_SHIFT))
+	else if (WindowHandler::is_key_pressed(WindowHandler::LEFT_SHIFT) or hwheel)
 		g_main_renderer->add_transform_matrix({ (float)delta, 0});
 	else
 		g_main_renderer->add_transform_matrix({ 0, (float)delta }); 
@@ -82,6 +107,8 @@ void main_window_loop_run(HINSTANCE h) {
 	g_main_window->set_callback_pointer_down(callback_pointer_down);
 	g_main_window->set_callback_pointer_update(callback_pointer_down);
 	g_main_window->set_callback_mousewheel(callback_mousewheel);
+	//g_main_window->set_callback_key_down(callback_key_down);
+	g_main_window->set_callback_key_up(callback_key_up);
 
 	g_main_window->set_state(WindowHandler::WINDOW_STATE::NORMAL);
 
