@@ -133,6 +133,9 @@ namespace Renderer {
 		T right() const { return x + width; }
 		T bottom() const { return y + height; }
 		Point<T> upperleft() const { return { x, y }; }
+		Point<T> upperright() const { return { right(), y }; }
+		Point<T> lowerleft() const { return { x, bottom() }; }
+		Point<T> lowerright() const { return { right(), bottom() }; }
 
 		operator RECT() const { 
 			return { x, y, right(), bottom() };
@@ -162,6 +165,10 @@ namespace Renderer {
 				y + height > other.y); 
 		}
 
+		bool intersects(const Point<T>& p) const {
+			return (x < p.x && x + width > p.x && y < p.y && y + height > p.y); 
+		}
+
 		Rectangle<T> calculate_overlap(const Rectangle<T>& other) const {
 			Rectangle<T> overlap;
 
@@ -176,6 +183,20 @@ namespace Renderer {
 			overlap.height = max(static_cast<T>(0), y2 - overlap.y);
 
 			return overlap;
+		}
+
+		/// <summary>
+		/// Checks if the width and height are positive. If not it will change x,y,width and height to make it positive
+		/// </summary>
+		void validate() {
+			if (width < 0) {
+				x += width;
+				width = -width;
+			}
+			if (height < 0) {
+				y += height;
+				height = -height;
+			}
 		}
 
 	};
@@ -285,6 +306,7 @@ public:
 	void draw_bitmap(BitmapObject& bitmap, Renderer::Rectangle<float> dest, INTERPOLATION_MODE mode = INTERPOLATION_MODE::NEAREST_NEIGHBOR, float opacity = 1.0f);
 	void draw_text(const std::wstring& text, Renderer::Point<float> pos, TextFormatObject& format, BrushObject& brush);
 	void draw_rect(Renderer::Rectangle<float> rec, BrushObject& brush, float thick);
+	void draw_rect(Renderer::Rectangle<float> rec, BrushObject& brush);
 
 	void set_current_transform_active();
 	void set_identity_transform_active();
@@ -305,6 +327,10 @@ public:
 	Renderer::Rectangle<float> transform_rect(const Renderer::Rectangle<float> rec) const;
 
 	Renderer::Rectangle<float> inv_transform_rect(const Renderer::Rectangle<float> rec) const;
+
+	Renderer::Point<float> transform_point(const Renderer::Point<float> p) const;
+
+	Renderer::Point<float> inv_transform_point(const Renderer::Point<float> p) const;
 
 	UINT get_dpi() const;
 

@@ -107,6 +107,10 @@ void Direct2DRenderer::draw_rect(Renderer::Rectangle<float> rec, BrushObject& br
 	end_draw();
 }
 
+void Direct2DRenderer::draw_rect(Renderer::Rectangle<float> rec, BrushObject& brush) {
+	draw_rect(rec, brush, 1.0f);
+}
+
 void Direct2DRenderer::set_current_transform_active() {
 	m_renderTarget->SetTransform(m_transformPosMatrix * m_transformScaleMatrix);
 }
@@ -169,6 +173,17 @@ Renderer::Rectangle<float> Direct2DRenderer::inv_transform_rect(const Renderer::
 	auto p1 = transform.TransformPoint({ rec.x, rec.y });
 	auto p2 = transform.TransformPoint({ rec.right(), rec.bottom() });
 	return { p1, p2 };
+}
+
+Renderer::Point<float> Direct2DRenderer::transform_point(const Renderer::Point<float> p) const {
+	auto transform = m_transformPosMatrix * m_transformScaleMatrix; 
+	return transform.TransformPoint(p); 
+}
+
+Renderer::Point<float> Direct2DRenderer::inv_transform_point(const Renderer::Point<float> p) const {
+	auto transform = m_transformPosMatrix * m_transformScaleMatrix;
+	transform.Invert();
+	return transform.TransformPoint(p);
 }
 
 UINT Direct2DRenderer::get_dpi() const {
