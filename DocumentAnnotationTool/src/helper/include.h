@@ -23,6 +23,7 @@
 
 #define APPLICATION_NAME L"Docanto"
 #define EPSILON 0.00001f
+#define FLOAT_EQUAL(a, b) (abs(a - b) < EPSILON)
 
 /// Custom WM_APP message to signal that the bitmap is ready to be drawn
 #define WM_PDF_BITMAP_READY (WM_APP + 0x0BAD /*Magic number*/)
@@ -45,6 +46,7 @@ namespace Logger {
 	void log(const std::wstring& msg, MsgLevel lvl = MsgLevel::INFO);
 	void log(const std::string& msg, MsgLevel lvl = MsgLevel::INFO);
 	void log(const unsigned long msg, MsgLevel lvl = MsgLevel::INFO);
+	void log(int msg, MsgLevel lvl = MsgLevel::INFO);
 	void log(const double msg, MsgLevel lvl = MsgLevel::INFO);
 	void warn(const std::string& msg);
 
@@ -122,9 +124,9 @@ namespace Renderer {
 		Rectangle() = default;
 		Rectangle(T x, T y, T width, T height) : x(x), y(y), width(width), height(height) {}
 		Rectangle(Point<T> p, T width, T height) : x(p.x), y(p.y), width(width), height(height) {}
-		Rectangle(Point<T> p1, Point<T> p2) : x(p1.x), y(p1.y), width(p2.x - p1.x), height(p2.y - p1.y) {}
-		Rectangle(fz_rect rect) : x(rect.x0), y(rect.y0), width(rect.x1 - rect.x0), height(rect.y1 - rect.y0) {}
-		Rectangle(fz_irect rect) : x(rect.x0), y(rect.y0), width(rect.x1 - rect.x0), height(rect.y1 - rect.y0) {}
+		Rectangle(Point<T> p1, Point<T> p2) : x(p1.x), y(p1.y), width(p2.x - p1.x), height(p2.y - p1.y) { }
+		Rectangle(fz_rect rect) : x(rect.x0), y(rect.y0), width(rect.x1 - rect.x0), height(rect.y1 - rect.y0) { }
+		Rectangle(fz_irect rect) : x(rect.x0), y(rect.y0), width(rect.x1 - rect.x0), height(rect.y1 - rect.y0) {  }
 
 		operator D2D1_SIZE_U() const {
 			return D2D1::SizeU((UINT32)width, (UINT32)height);
@@ -228,6 +230,266 @@ namespace Renderer {
 		virtual void clear(Color c) {}
 
 	};
+}
+
+/// <summary>
+/// Given two rectangles r1 and r2 it will first remove the overlapping area of r2 from r1. The now non rectangle r1 will be split up into a maximum of
+/// 4 rectangles and returned in an array. The array will be filled with std::nullopt if the rectangle does not exist. It will not return any rectangles
+/// if r2 is either not overlapping or is bigger then r1.
+/// 
+/// Note that the array will always be filled from the begining. If the first element is  std::nullopt then the other elements will also be std::nullopt
+/// </summary>
+/// <typeparam name="T">float</typeparam>
+/// <param name="r1">The main rectangle</param>
+/// <param name="r2">The rectangle that shoulb be subtracted from r1</param>
+/// <returns>An array of rectangles</returns>
+template <typename T>
+std::array<std::optional<Renderer::Rectangle<T>>, 4> splice_rect(Renderer::Rectangle<T> r1, Renderer::Rectangle<T> r2) {
+	// validate the rectangles just in case
+	r1.validate();
+	r2.validate();
+	
+	r2.x -= EPSILON;
+	r2.y -= EPSILON;
+	r2.width += EPSILON * 2;
+	r2.height += EPSILON * 2;
+
+	std::array<std::optional<Renderer::Rectangle<T>>, 4> return_arr = { std::nullopt, std::nullopt, std::nullopt, std::nullopt };
+	// first we check if they overlap
+	if (r1.intersects(r2) == false)
+		return return_arr;
+	// now we check for every point
+	std::array<bool, 4> corner_check = { false, false, false, false };
+	// upperleft
+	if (r1.intersects(r2.upperleft()))
+		corner_check[0] = true;
+	// upperright
+	if (r1.intersects(r2.upperright()))
+		corner_check[1] = true;
+	// bottomleft
+	if (r1.intersects(r2.lowerleft()))
+		corner_check[2] = true;
+	// bottomright
+	if (r1.intersects(r2.lowerright()))
+		corner_check[3] = true;
+
+	// count the number of corners that are inside
+	byte num_corner_inside = 0;
+	for (size_t i = 0; i < corner_check.size(); i++) {
+		if (corner_check[i])
+			num_corner_inside++;
+	}
+
+	if (num_corner_inside == 3) {
+		// well we shouldn't be here
+		Logger::log("This should not happen. Rectangles are weird...");
+		return return_arr;
+	}
+
+	// case for 1 corner inside
+	if (num_corner_inside == 1) {
+		// upperleft is inside https://www.desmos.com/geometry/x17ptqj7yk
+		if (corner_check[0] == true) {
+			return_arr[0] = { {r1.x, r2.y}, {r2.x, r1.bottom() } };
+			return_arr[1] = { r1.upperleft(), r2.upperleft() };
+			return_arr[2] = { {r2.x, r1.y}, {r1.right(), r2.y} };
+		}
+		// upperright is inside https://www.desmos.com/geometry/clide4boo4
+		else if (corner_check[1] == true) {
+			return_arr[0] = { r2.upperright(), r1.lowerright() };
+			return_arr[1] = { r1.upperright(), r2.upperright() };
+			return_arr[2] = { {r1.x, r2.y}, {r2.right(), r1.y} };
+		}
+		// bottomleft is inside https://www.desmos.com/geometry/slaar3gg52
+		else if (corner_check[2] == true) {
+			return_arr[0] = { r2.lowerleft(), r1.lowerright() };
+			return_arr[1] = { r2.lowerleft(), r1.lowerleft() };
+			return_arr[2] = { {r1.x, r2.bottom()}, {r2.x, r1.y} };
+		}
+		// bottomright is inside https://www.desmos.com/geometry/w8a8tnweec
+		else if (corner_check[3] == true) {
+			return_arr[0] = { r2.lowerright() , r1.lowerright() };
+			return_arr[1] = { { r1.x, r2.bottom()}, { r2.right(), r1.bottom() } };
+			return_arr[2] = { { r2.right(), r1.y }, { r1.right(), r2.bottom() } };
+		}
+		return return_arr;
+	}
+
+	if (num_corner_inside == 2) {
+		// upperleft and upperright https://www.desmos.com/geometry/p8by0k5swk
+		if (corner_check[0] == true and corner_check[1] == true) {
+			return_arr[0] = { r1.upperleft(), {r2.x, r1.bottom()} };
+			return_arr[1] = { {r2.x, r1.y}, r2.upperright() };
+			return_arr[2] = { {r2.right(), r1.y}, r1.lowerright() };
+		}
+		// upperleft and bottomleft https://www.desmos.com/geometry/e18umhhck7
+		else if (corner_check[0] == true and corner_check[2] == true) {
+			return_arr[0] = { r1.upperleft(), {r1.right(), r2.y} };
+			return_arr[1] = { {r1.x, r2.y}, r2.lowerleft() };
+			return_arr[2] = { {r1.x, r2.bottom()}, r1.lowerright() };
+		}
+		// bottomleft and bottomright https://www.desmos.com/geometry/g2fplsakd6
+		else if (corner_check[2] == true and corner_check[3] == true) {
+			return_arr[0] = { r1.upperleft(), {r2.x, r1.bottom()} };
+			return_arr[1] = { r2.lowerleft(), {r2.right(), r1.bottom()} };
+			return_arr[2] = { {r2.right(), r1.y}, r1.lowerright() };
+		}
+		// bottomright and upperright https://www.desmos.com/geometry/vwe0vjjtsm
+		else if (corner_check[1] == true and corner_check[3] == true) {
+			return_arr[0] = { r1.upperleft(), {r1.right(), r2.y} };
+			return_arr[1] = { {r2.right(), r2.y}, {r1.right(), r2.bottom() } };
+			return_arr[2] = { {r1.x, r2.bottom()}, r1.lowerright() };
+		}
+		return return_arr;
+	}
+
+	// the rectangle has been eaten o_o https://www.desmos.com/geometry/ziteq1xk2a
+	if (num_corner_inside == 4) {
+		return_arr[0] = { r1.upperleft(), {r2.x, r1.bottom()} };
+		return_arr[1] = { {r2.x, r1.y}, r2.upperright() };
+		return_arr[2] = { r2.lowerleft(), {r2.right(), r1.bottom() } };
+		return_arr[3] = { {r2.right(), r1.y}, r1.lowerright() };
+		return return_arr;
+	}
+
+	// we need to check if every point from r1 is inside r2. If this is the case r2 is bigger than r1 and we return nothing
+	if (r2.intersects(r1.upperleft()) and r2.intersects(r1.upperright()) and r2.intersects(r1.lowerleft()) and r2.intersects(r1.lowerright()))
+		return return_arr;
+
+	// if the rectangle intersects but none of the r2 corners are inside 
+	auto overlapped_rec = r1.calculate_overlap(r2);
+	// Now we need to check which points are inside r2
+	// upperleft and upperright
+	if (r2.intersects(r1.upperleft()) and r2.intersects(r1.upperright())) {
+		return_arr[0] = { overlapped_rec.lowerleft(), r1.lowerright() };
+	}
+	// upperleft and lowerleft
+	else if (r2.intersects(r1.upperleft()) and r2.intersects(r1.lowerleft())) {
+		return_arr[0] = { overlapped_rec.upperright(), r1.lowerright() };
+	}
+	// lowerleft and lowerright
+	else if (r2.intersects(r1.lowerleft()) and r2.intersects(r1.lowerright())) {
+		return_arr[0] = { r1.upperleft(), overlapped_rec.upperright() };
+	}
+	// upperright and lowerright
+	else if (r2.intersects(r1.upperright()) and r2.intersects(r1.lowerright())) {
+		return_arr[0] = { r1.upperleft(), overlapped_rec.lowerleft() };
+	}
+
+	// last case where the rectangle is like this
+	//    ____
+	//  _|____|___
+	// | |    |   |
+	// | |    |   |
+	// | |    |   |
+	// |_|____|___|
+	//   |____|
+
+	if (r1.x < overlapped_rec.x and r1.right() > overlapped_rec.right()) {
+		return_arr[0] = { {r1.x, r1.y}, {overlapped_rec.x, r1.bottom()} };
+		return_arr[1] = { {overlapped_rec.right(), r1.y}, {r1.right(), r1.bottom()} };
+	}
+
+	// or the other way round
+	if (r1.y < overlapped_rec.y and r1.bottom() > overlapped_rec.bottom()) {
+		return_arr[0] = { {r1.x, r1.y}, {r1.right(), overlapped_rec.y} };
+		return_arr[1] = { {r1.x, overlapped_rec.bottom()}, {r1.right(), r1.bottom()} };
+	}
+
+	return return_arr;
+}
+
+template<typename T>
+std::vector<Renderer::Rectangle<T>> splice_rect(Renderer::Rectangle<T> r1, const std::vector<Renderer::Rectangle<T>>& r2) {
+	r1.validate();
+
+	if (r2.empty())
+		return std::vector<Renderer::Rectangle<T>>();
+	std::vector<Renderer::Rectangle<T>> chopped_rects;
+	chopped_rects.reserve(r2.size() * 3);
+	chopped_rects.push_back(r1);
+	// iterate over all secondary rectangles
+	for (size_t i = 0; i < r2.size(); i++) {
+		// we need to check for every spliced rectangle if it needs to be spliced again
+		for (long j = (long)chopped_rects.size() - 1; j >= 0; j--) {
+			// check if the rect is smaller than the r2
+			if (r2.at(i).intersects(chopped_rects.at(j).upperleft())
+				and r2.at(i).intersects(chopped_rects.at(j).upperright())
+				and r2.at(i).intersects(chopped_rects.at(j).lowerleft())
+				and r2.at(i).intersects(chopped_rects.at(j).lowerright())) {
+				// remove if it is smaller
+				chopped_rects.erase(chopped_rects.begin() + j);
+				continue;
+			}
+			// create the new rects
+			std::array<std::optional<Renderer::Rectangle<T>>, 4> temp = splice_rect(chopped_rects.at(j), r2.at(i));
+			// check if array is empty
+			if (temp[0].has_value() == false) {
+				continue;
+			}
+			// we can remove the rectangle since it will be spliced
+			chopped_rects.erase(chopped_rects.begin() + j);
+			// now add the new rects
+			for (size_t k = 0; k < temp.size(); k++) {
+				if (temp[k].has_value()) {
+					chopped_rects.push_back(temp[k].value());
+				}
+			}
+		}
+
+	}
+
+	for (size_t i = 0; i < chopped_rects.size(); i++) {
+		// validate all rects
+		chopped_rects.at(i).validate();
+	}
+	return chopped_rects;
+}
+
+/// <summary>
+/// Expectes validated rectangles
+/// </summary>
+/// <typeparam name="T"></typeparam>
+/// <param name="r"></param>
+template<typename T>
+void merge_rects(std::vector<Renderer::Rectangle<T>>& r) {
+	if (r.size() <= 1)
+		return;
+
+	bool done = true;
+
+	while (done == true) {
+		done = false;
+		for (size_t i = 0; i < r.size(); i++) {
+			for (size_t j = i; j < r.size(); j++) {
+				//check if rectangles are mergeable
+				if (i == j)
+					continue;
+				auto r1 = r.at(i);
+				auto r2 = r.at(j);
+
+				if (FLOAT_EQUAL(r1.x, r2.x)
+					and FLOAT_EQUAL(r1.right(), r2.right())
+					and (FLOAT_EQUAL(r1.bottom(), r2.y) or FLOAT_EQUAL(r2.bottom(), r1.y))) {
+					r.push_back({ r1.x, min(r1.y, r2.y), r1.width, r1.height + r2.height });
+					r.erase(r.begin() + j);
+					r.erase(r.begin() + i);
+					done = true;
+					continue;
+				}
+
+				if (FLOAT_EQUAL(r1.y, r2.y)
+					and FLOAT_EQUAL(r1.bottom(), r2.bottom())
+					and (FLOAT_EQUAL(r1.right(), r2.x) or FLOAT_EQUAL(r1.x, r2.right()))) {
+					r.push_back({ min(r1.x, r2.x), r1.y, r1.width + r2.width, r1.height });
+					r.erase(r.begin() + j);
+					r.erase(r.begin() + i);
+					done = true;
+					continue;
+				}
+			}
+		}
+	}
 }
 
 class WindowHandler;
@@ -460,7 +722,8 @@ public:
 		/// <remark>If the DPI is 72 the size of the returned bitmap is the same as the size of the source</remark>
 		Direct2DRenderer::BitmapObject get_bitmap(Direct2DRenderer& renderer, size_t page, Renderer::Rectangle<float> source, float dpi) const;
 
-		void multithreaded_get_bitmap(Direct2DRenderer* renderer, size_t page, Renderer::Rectangle<float> source, Renderer::Rectangle<float> dest, float dpi, PDFHandler* pdfhandler) const;
+		void multithreaded_get_bitmap(Direct2DRenderer* renderer, size_t page, Renderer::Rectangle<float> source, Renderer::Rectangle<float> dest, float dpi) const;
+		void multithreaded_get_bitmap(Direct2DRenderer* renderer, size_t page, Renderer::Rectangle<float> source, Renderer::Rectangle<float> dest, float dpi, HWND window_callback) const;
 
 		/// <summary>
 		/// Retrieves the number of pdf pages
@@ -490,6 +753,7 @@ public:
 		// coordinates in clip space
 		Renderer::Rectangle<float> dest;
 		float dpi = MUPDF_DEFAULT_DPI;
+		int used = false;
 
 		CachedBitmap() = default;
 		CachedBitmap(Direct2DRenderer::BitmapObject bitmap, Renderer::Rectangle<float> dest, float dpi = MUPDF_DEFAULT_DPI) : bitmap(bitmap), dest(dest), dpi(dpi) {}
@@ -497,11 +761,13 @@ public:
 			bitmap = std::move(cachedbitmap.bitmap);
 			dest = cachedbitmap.dest;
 			dpi = cachedbitmap.dpi;
+			used = cachedbitmap.used;
 		}
 		CachedBitmap& operator=(CachedBitmap&& cachedbitmap) noexcept {
 			bitmap = std::move(cachedbitmap.bitmap);
 			dest = cachedbitmap.dest;
 			dpi = cachedbitmap.dpi;
+			used = cachedbitmap.used;
 			return *this;
 		}
 	};
@@ -521,6 +787,8 @@ private:
 
 	void create_preview(float scale = 0.5);
 	void render_high_res(HWND window);
+
+	void remove_small_cached_bitmaps(float treshold);
 
 public:
 	PDFHandler() = default;
