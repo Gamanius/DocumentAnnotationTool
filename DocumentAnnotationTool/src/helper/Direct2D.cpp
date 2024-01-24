@@ -111,6 +111,28 @@ void Direct2DRenderer::draw_rect(Renderer::Rectangle<float> rec, BrushObject& br
 	draw_rect(rec, brush, 1.0f);
 }
 
+void Direct2DRenderer::draw_rect_filled(Renderer::Rectangle<float> rec, BrushObject& brush) {
+	begin_draw();
+	m_renderTarget->FillRectangle(rec, brush.m_object);
+	end_draw();
+}
+
+void Direct2DRenderer::draw_rect(Renderer::Rectangle<float> rec, Renderer::Color c, float thick) {
+	// create the brush object
+	auto temp_brush = create_brush(c);
+	draw_rect(rec, temp_brush, thick);
+}
+
+void Direct2DRenderer::draw_rect(Renderer::Rectangle<float> rec, Renderer::Color c) {
+	draw_rect(rec, c, 1.0f);
+}
+
+void Direct2DRenderer::draw_rect_filled(Renderer::Rectangle<float> rec, Renderer::Color c) {
+	// create brush object
+	auto temp_brush = create_brush(c);
+	draw_rect_filled(rec, temp_brush);
+}
+
 void Direct2DRenderer::set_current_transform_active() {
 	m_renderTarget->SetTransform(m_transformPosMatrix * m_transformScaleMatrix);
 }
@@ -158,6 +180,11 @@ Renderer::Point<float> Direct2DRenderer::get_transform_pos() const {
 
 Renderer::Rectangle<long> Direct2DRenderer::get_window_size() const {
 	return m_window_size;
+}
+
+Renderer::Rectangle<double> Direct2DRenderer::get_window_size_normalized() const {
+	auto dpi = get_dpi();
+	return Renderer::Rectangle<double>(0, 0, m_window_size.width * (96.0f / dpi), m_window_size.height * (96.0f / dpi));
 }
 
 Renderer::Rectangle<float> Direct2DRenderer::transform_rect(const Renderer::Rectangle<float> rec) const {

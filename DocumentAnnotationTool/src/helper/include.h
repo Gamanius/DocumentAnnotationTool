@@ -190,7 +190,7 @@ namespace Renderer {
 		/// <summary>
 		/// Checks if the width and height are positive. If not it will change x,y,width and height to make it positive
 		/// </summary>
-		void validate() {
+		Rectangle<T>& validate() {
 			if (width < 0) {
 				x += width;
 				width = -width;
@@ -199,6 +199,8 @@ namespace Renderer {
 				y += height;
 				height = -height;
 			}
+
+			return *this;
 		}
 
 	};
@@ -249,10 +251,15 @@ std::array<std::optional<Renderer::Rectangle<T>>, 4> splice_rect(Renderer::Recta
 	r1.validate();
 	r2.validate();
 	
-	r2.x -= EPSILON;
-	r2.y -= EPSILON;
-	r2.width += EPSILON * 2;
-	r2.height += EPSILON * 2;
+	if (r1.x == r2.x) {
+		r2.x += EPSILON;
+		r2.width -= EPSILON * 2;
+	}
+	if (r1.y == r2.y) {
+		r2.y += EPSILON;
+		r2.height -= EPSILON * 2;
+	}
+
 
 	std::array<std::optional<Renderer::Rectangle<T>>, 4> return_arr = { std::nullopt, std::nullopt, std::nullopt, std::nullopt };
 	// first we check if they overlap
@@ -569,6 +576,12 @@ public:
 	void draw_text(const std::wstring& text, Renderer::Point<float> pos, TextFormatObject& format, BrushObject& brush);
 	void draw_rect(Renderer::Rectangle<float> rec, BrushObject& brush, float thick);
 	void draw_rect(Renderer::Rectangle<float> rec, BrushObject& brush);
+	void draw_rect_filled(Renderer::Rectangle<float> rec, BrushObject& brush);
+
+	// draw calls that create the brushobjects. Is slower than the rest i guess?
+	void draw_rect(Renderer::Rectangle<float> rec, Renderer::Color c, float thick);
+	void draw_rect(Renderer::Rectangle<float> rec, Renderer::Color c);
+	void draw_rect_filled(Renderer::Rectangle<float> rec, Renderer::Color c);
 
 	void set_current_transform_active();
 	void set_identity_transform_active();
@@ -580,7 +593,16 @@ public:
 
 	float get_transform_scale() const;
 	Renderer::Point<float> get_transform_pos() const;
+	/// <summary>
+	/// Will return the actual window size
+	/// </summary>
+	/// <returns></returns>
 	Renderer::Rectangle<long> get_window_size() const;
+	/// <summary>
+	/// Will return the window size at 96 DPI
+	/// </summary>
+	/// <returns></returns>
+	Renderer::Rectangle<double> get_window_size_normalized() const;
 	/// <summary>
 	/// Transforms the rectangle using the current transformation matrices
 	/// </summary>
@@ -780,6 +802,8 @@ private:
 	std::vector<Renderer::Rectangle<float>> m_pagerec;
 	std::deque<CachedBitmap> m_cachedBitmaps;
 
+	std::deque<std::tuple<Renderer::Rectangle<float>, float>> m_debug_cachedBitmap; 
+
 	std::mutex m_cachedBitmaplock;
 
 	float m_seperation_distance = 10;
@@ -790,6 +814,8 @@ private:
 
 	void remove_small_cached_bitmaps(float treshold);
 
+	void debug_render_preview();
+	void debug_render_high_res();
 public:
 	PDFHandler() = default;
 	/// <summary>
@@ -807,6 +833,7 @@ public:
 
 	void render_preview(); 
 	void render(HWND callbackwindow);
+	void debug_render();
 	void sort_page_positions();
 
 	void add_cachedBitmap(Direct2DRenderer::BitmapObject bitmap, Renderer::Rectangle<float> dest, float dpi = MUPDF_DEFAULT_DPI);

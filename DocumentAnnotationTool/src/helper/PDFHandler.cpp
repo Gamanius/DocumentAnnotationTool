@@ -14,53 +14,6 @@ void multithreaded_high_res(Direct2DRenderer::BitmapObject obj, Direct2DRenderer
 
 }
 
-template<typename T>
-std::vector<Renderer::Rectangle<T>> splice_rect(Renderer::Rectangle<T> r1, const std::vector<Renderer::Rectangle<T>>& r2, std::vector<bool>& used) {
-	r1.validate();
-
-	if (r2.empty())
-		return std::vector<Renderer::Rectangle<T>>();
-	std::vector<Renderer::Rectangle<T>> chopped_rects;
-	chopped_rects.reserve(r2.size() * 3);
-	chopped_rects.push_back(r1);
-	// iterate over all secondary rectangles
-	for (size_t i = 0; i < r2.size(); i++) {
-		// we need to check for every spliced rectangle if it needs to be spliced again
-		for (long j = (long)chopped_rects.size() - 1; j >= 0; j--) {
-			// check if the rect is smaller than the r2
-			if (r2.at(i).intersects(chopped_rects.at(j).upperleft())
-				and r2.at(i).intersects(chopped_rects.at(j).upperright())
-				and r2.at(i).intersects(chopped_rects.at(j).lowerleft())
-				and r2.at(i).intersects(chopped_rects.at(j).lowerright())) {
-				// remove if it is smaller
-				chopped_rects.erase(chopped_rects.begin() + j);
-				continue;
-			}
-			// create the new rects
-			std::array<std::optional<Renderer::Rectangle<T>>, 4> temp = splice_rect(chopped_rects.at(j), r2.at(i));
-			// check if array is empty
-			if (temp[0].has_value() == false) {
-				continue;
-			}
-			// we can remove the rectangle since it will be spliced
-			chopped_rects.erase(chopped_rects.begin() + j);
-			// now add the new rects
-			for (size_t k = 0; k < temp.size(); k++) {
-				if (temp[k].has_value()) {
-					chopped_rects.push_back(temp[k].value());
-				}
-			}
-		}
-
-	}
-
-	for (size_t i = 0; i < chopped_rects.size(); i++) {
-		// validate all rects
-		chopped_rects.at(i).validate();
-	}
-	return chopped_rects;
-}
-
 void PDFHandler::render_high_res(HWND window) {
 	// get the target dpi
 	auto dpi = m_renderer->get_dpi() * m_renderer->get_transform_scale();
@@ -168,6 +121,95 @@ void PDFHandler::remove_small_cached_bitmaps(float treshold) {
 	}
 }
 
+void PDFHandler::debug_render_preview() {
+	// check for intersection. if it intersects than do the rendering
+	m_renderer->begin_draw();
+	m_renderer->set_current_transform_active();
+	// get the clip space.
+	auto clip_space = m_renderer->inv_transform_rect(m_renderer->get_window_size());
+	for (size_t i = 0; i < m_pdf.get_page_count(); i++) {
+		if (m_pagerec.at(i).intersects(clip_space)) {
+			m_renderer->draw_rect_filled(m_pagerec.at(i), { 255, 255, 255});
+		}
+	}
+	m_renderer->end_draw();
+}
+
+void PDFHandler::debug_render_high_res() {
+	auto dpi = m_renderer->get_dpi() * m_renderer->get_transform_scale();
+
+	Renderer::Rectangle<float> clip_space = m_renderer->inv_transform_rect(m_renderer->get_window_size_normalized());
+
+	std::vector<std::tuple<size_t, Renderer::Rectangle<float>>> clipped_documents;
+	
+	std::vector<std::tuple<size_t, Renderer::Rectangle<float>>> cached_rects;
+
+	for (size_t i = 0; i < m_pdf.get_page_count(); i++) { 
+		if (m_pagerec.at(i).intersects(clip_space)) { 
+			auto overlap = clip_space.validate().calculate_overlap(m_pagerec.at(i));
+
+			std::vector<Renderer::Rectangle<float>> bitmap_dest;
+			for (auto& j : m_debug_cachedBitmap) {
+				// check if the dpi is high enough
+				if (FLOAT_EQUAL(std::get<1>(j)/*dpi*/, dpi) == false)
+					continue;
+
+				bitmap_dest.push_back(std::get<0>(j));
+				cached_rects.push_back(std::make_tuple(i, std::get<0>(j)));
+			}
+
+			if (bitmap_dest.empty()) {
+				clipped_documents.push_back(std::make_tuple(i, overlap));
+				continue;
+			}
+
+			std::vector<Renderer::Rectangle<float>> choppy = splice_rect(overlap, bitmap_dest);
+			merge_rects(choppy);
+
+			for (size_t j = 0; j < choppy.size(); j++) {
+				// just in case
+				choppy.at(j).validate();
+				// we can remove any rectangle that is too small
+				if (choppy.at(j).width < 0.01f or choppy.at(j).height < 0.01f)
+					continue;
+				// transform into doc space
+				choppy.at(j).x -= m_pagerec.at(i).x;
+				choppy.at(j).y -= m_pagerec.at(i).y;
+
+				// and push back
+				clipped_documents.push_back(std::make_tuple(i, choppy.at(j)));
+			}
+		}
+	}
+
+	for (size_t i = 0; i < clipped_documents.size(); i++) {
+		auto page = std::get<0>(clipped_documents.at(i));
+		auto overlap = std::get<1>(clipped_documents.at(i));
+		
+		overlap.x += m_pagerec.at(page).x;
+		overlap.y += m_pagerec.at(page).y;
+		m_renderer->draw_rect(overlap, { 255, 0 ,0 }, 10);
+
+		m_debug_cachedBitmap.push_back(std::make_tuple(overlap, dpi));
+	}
+
+	for (size_t i = 0; i < cached_rects.size(); i++) {
+		auto r = std::get<1>(cached_rects.at(i));
+
+		m_renderer->draw_rect(r, {0, 255, 0}, 5);
+	}
+
+	for (int i = m_debug_cachedBitmap.size() - 1; i >= 0; i--) {
+		if (std::get<0>(m_debug_cachedBitmap.at(i)).width < 50 or std::get<0>(m_debug_cachedBitmap.at(i)).height < 50) {
+			m_debug_cachedBitmap.erase(m_debug_cachedBitmap.begin() + i);
+		}
+	}
+
+	while (m_debug_cachedBitmap.size() > 20) {
+		m_debug_cachedBitmap.pop_front();
+	}
+}
+
 PDFHandler::PDFHandler(Direct2DRenderer* const renderer, MuPDFHandler& handler, const std::wstring& path) : m_renderer(renderer) {
 	// will raise error if path is invalid so we dont need to do assert here
 	auto d = handler.load_pdf(path);
@@ -225,6 +267,15 @@ void PDFHandler::render(HWND callbackwindow) {
 		// if we are zoomed in, we need to render the page at a higher resolution
 		// than the screen resolution
 		render_high_res(callbackwindow);
+	}
+}
+
+void PDFHandler::debug_render() {
+	auto scale = m_renderer->get_transform_scale();
+
+	debug_render_preview();
+	if (scale > m_preview_scale + EPSILON) {
+		debug_render_high_res();
 	}
 }
 
