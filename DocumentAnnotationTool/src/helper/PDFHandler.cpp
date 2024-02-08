@@ -13,6 +13,15 @@ void PDFHandler::create_preview(float scale) {
 void multithreaded_high_res(Direct2DRenderer::BitmapObject obj, Direct2DRenderer* renderer, PDFHandler* handler) {
 
 }
+template<typename T>
+void remove_small_rects(std::vector <Renderer::Rectangle<T>>& rects, float threshold = EPSILON) {
+	for (int i = rects.size() - 1; i >= 0; i--) {
+		rects.at(i).validate();
+		if (rects.at(i).width < threshold or rects.at(i).height < threshold) {
+			rects.erase(rects.begin() + i);
+		}
+	}
+}
 
 void PDFHandler::render_high_res(HWND window) {
 	// get the target dpi
@@ -33,7 +42,6 @@ void PDFHandler::render_high_res(HWND window) {
 			// add all bitmaps sizes of the bitmaps with high enough dpi into an array
 			std::vector<Renderer::Rectangle<float>> bitmap_dest;
 
-
 			bitmap_dest.reserve(m_cachedBitmaps.size());
 			for (auto& j : m_cachedBitmaps) {
 				// check if the dpi is high enough
@@ -52,6 +60,7 @@ void PDFHandler::render_high_res(HWND window) {
 			// now we can chop up the render target. These are all the rectangles that we need to render
 			std::vector<Renderer::Rectangle<float>> choppy = splice_rect(overlap, bitmap_dest);
 			merge_rects(choppy); 
+			remove_small_rects(choppy);
 			Logger::log("Choppy size: " + std::to_string(choppy.size()) + "\n");
 			Logger::print_to_debug();
 
@@ -62,12 +71,15 @@ void PDFHandler::render_high_res(HWND window) {
 			for (size_t j = 0; j < choppy.size(); j++) {
 				// just in case
 				choppy.at(j).validate();
-				// we can remove any rectangle that is too small
-				if (choppy.at(j).width < EPSILON or choppy.at(j).height < EPSILON)
-					continue;
 				// transform into doc space
 				choppy.at(j).x -= m_pagerec.at(i).x;
 				choppy.at(j).y -= m_pagerec.at(i).y;
+
+				// make choppy bigger so the are no stitch lines
+				choppy.at(j).x -= 2;  /* this is just a magic number */
+				choppy.at(j).y -= 2; 
+				choppy.at(j).width += 4;
+				choppy.at(j).height += 4;
 
 				// and push back
 				clipped_documents.push_back(std::make_tuple(i, choppy.at(j)));
@@ -94,8 +106,8 @@ void PDFHandler::render_high_res(HWND window) {
 	}
 	SendMessage(window, WM_PDF_BITMAP_READY, (WPARAM)nullptr, (LPARAM)(&m_cachedBitmaps));
 
-	remove_small_cached_bitmaps(20 / m_renderer->get_transform_scale());
-	while (m_cachedBitmaps.size() > 10) {
+	remove_small_cached_bitmaps(50 / m_renderer->get_transform_scale());
+	while (m_cachedBitmaps.size() > 50) {
 		m_cachedBitmaps.pop_front(); 
 	}
 
@@ -142,7 +154,7 @@ void PDFHandler::debug_render_high_res() {
 
 	std::vector<std::tuple<size_t, Renderer::Rectangle<float>>> clipped_documents;
 	
-	std::vector<std::tuple<size_t, Renderer::Rectangle<float>>> cached_rects;
+	std::vector<Renderer::Rectangle<float>> cached_rects;
 
 	for (size_t i = 0; i < m_pdf.get_page_count(); i++) { 
 		if (m_pagerec.at(i).intersects(clip_space)) { 
@@ -155,13 +167,15 @@ void PDFHandler::debug_render_high_res() {
 					continue;
 
 				bitmap_dest.push_back(std::get<0>(j));
-				cached_rects.push_back(std::make_tuple(i, std::get<0>(j)));
+				cached_rects.push_back(std::get<0>(j));
 			}
 
 			if (bitmap_dest.empty()) {
 				clipped_documents.push_back(std::make_tuple(i, overlap));
 				continue;
 			}
+
+			//merge_rects(bitmap_dest); 
 
 			std::vector<Renderer::Rectangle<float>> choppy = splice_rect(overlap, bitmap_dest);
 			merge_rects(choppy);
@@ -194,9 +208,16 @@ void PDFHandler::debug_render_high_res() {
 	}
 
 	for (size_t i = 0; i < cached_rects.size(); i++) {
-		auto r = std::get<1>(cached_rects.at(i));
+		auto r = cached_rects.at(i);
 
 		m_renderer->draw_rect(r, {0, 255, 0}, 5);
+	}
+
+	merge_rects(cached_rects);
+	for (size_t i = 0; i < cached_rects.size(); i++) {
+		auto r = cached_rects.at(i);
+
+		m_renderer->draw_rect(r, { 0, 0, 255 }, 5);
 	}
 
 	for (int i = m_debug_cachedBitmap.size() - 1; i >= 0; i--) {

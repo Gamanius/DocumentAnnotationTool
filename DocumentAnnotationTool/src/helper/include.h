@@ -168,7 +168,8 @@ namespace Renderer {
 		}
 
 		bool intersects(const Point<T>& p) const {
-			return (x < p.x && x + width > p.x && y < p.y && y + height > p.y); 
+			// NEVER CHANGE it to < or >. Keep it at >= and <= or else EVERYTHING will break!!
+			return (x <= p.x && x + width >= p.x && y <= p.y && y + height >= p.y); 
 		}
 
 		Rectangle<T> calculate_overlap(const Rectangle<T>& other) const {
@@ -251,33 +252,47 @@ std::array<std::optional<Renderer::Rectangle<T>>, 4> splice_rect(Renderer::Recta
 	r1.validate();
 	r2.validate();
 	
+	// return array
+	std::array<std::optional<Renderer::Rectangle<T>>, 4> return_arr = { std::nullopt, std::nullopt, std::nullopt, std::nullopt };
+
+	if (r1.x == r2.x and r1.y == r2.y and r1.width == r2.width and r1.height == r2.height) {
+		return { Renderer::Rectangle<T>(), std::nullopt, std::nullopt, std::nullopt};
+	}
+
+	auto changed_rect = r2;
 	if (r1.x == r2.x) {
-		r2.x += EPSILON;
-		r2.width -= EPSILON * 2;
+		unsigned int mult = 1;
+		while (changed_rect.x == r2.x) {
+			changed_rect.x += EPSILON * mult;
+			mult++;
+		}
+		changed_rect.width -= EPSILON * 2 * mult;
 	}
 	if (r1.y == r2.y) {
-		r2.y += EPSILON;
-		r2.height -= EPSILON * 2;
+		unsigned int mult = 1;
+		while (changed_rect.y == r2.y) {
+			changed_rect.y += EPSILON * mult;
+			mult++;
+		}
+		changed_rect.height -= EPSILON * 2 * mult;
 	}
 
-
-	std::array<std::optional<Renderer::Rectangle<T>>, 4> return_arr = { std::nullopt, std::nullopt, std::nullopt, std::nullopt };
 	// first we check if they overlap
-	if (r1.intersects(r2) == false)
+	if (r1.intersects(changed_rect) == false)
 		return return_arr;
 	// now we check for every point
 	std::array<bool, 4> corner_check = { false, false, false, false };
 	// upperleft
-	if (r1.intersects(r2.upperleft()))
+	if (r1.intersects(changed_rect.upperleft()))
 		corner_check[0] = true;
 	// upperright
-	if (r1.intersects(r2.upperright()))
+	if (r1.intersects(changed_rect.upperright()))
 		corner_check[1] = true;
 	// bottomleft
-	if (r1.intersects(r2.lowerleft()))
+	if (r1.intersects(changed_rect.lowerleft()))
 		corner_check[2] = true;
 	// bottomright
-	if (r1.intersects(r2.lowerright()))
+	if (r1.intersects(changed_rect.lowerright()))
 		corner_check[3] = true;
 
 	// count the number of corners that are inside
@@ -360,7 +375,7 @@ std::array<std::optional<Renderer::Rectangle<T>>, 4> splice_rect(Renderer::Recta
 	}
 
 	// we need to check if every point from r1 is inside r2. If this is the case r2 is bigger than r1 and we return nothing
-	if (r2.intersects(r1.upperleft()) and r2.intersects(r1.upperright()) and r2.intersects(r1.lowerleft()) and r2.intersects(r1.lowerright()))
+	if (changed_rect.intersects(r1.upperleft()) and changed_rect.intersects(r1.upperright()) and changed_rect.intersects(r1.lowerleft()) and changed_rect.intersects(r1.lowerright()))
 		return return_arr;
 
 	// if the rectangle intersects but none of the r2 corners are inside 
@@ -454,10 +469,11 @@ std::vector<Renderer::Rectangle<T>> splice_rect(Renderer::Rectangle<T> r1, const
 }
 
 /// <summary>
-/// Expectes validated rectangles
+/// Expects validated rectangles. Will merge together rectangles that are adjacent to each other. If only adjacent is true it will only merge rectangles that are directly adjacent to each other (so they are touching but not overlapping)
 /// </summary>
 /// <typeparam name="T"></typeparam>
 /// <param name="r"></param>
+/// <param name="only_adjacent"></param>
 template<typename T>
 void merge_rects(std::vector<Renderer::Rectangle<T>>& r) {
 	if (r.size() <= 1)
@@ -477,8 +493,8 @@ void merge_rects(std::vector<Renderer::Rectangle<T>>& r) {
 
 				if (FLOAT_EQUAL(r1.x, r2.x)
 					and FLOAT_EQUAL(r1.right(), r2.right())
-					and (FLOAT_EQUAL(r1.bottom(), r2.y) or FLOAT_EQUAL(r2.bottom(), r1.y))) {
-					r.push_back({ r1.x, min(r1.y, r2.y), r1.width, r1.height + r2.height });
+					and (r1.bottom() >= r2.y and r2.bottom() >= r1.y)) {
+					r.push_back({ r1.x, min(r1.y, r2.y), r1.width, max(r1.bottom(), r2.bottom()) - min(r1.y, r2.y)});
 					r.erase(r.begin() + j);
 					r.erase(r.begin() + i);
 					done = true;
@@ -487,8 +503,8 @@ void merge_rects(std::vector<Renderer::Rectangle<T>>& r) {
 
 				if (FLOAT_EQUAL(r1.y, r2.y)
 					and FLOAT_EQUAL(r1.bottom(), r2.bottom())
-					and (FLOAT_EQUAL(r1.right(), r2.x) or FLOAT_EQUAL(r1.x, r2.right()))) {
-					r.push_back({ min(r1.x, r2.x), r1.y, r1.width + r2.width, r1.height });
+					and (r1.right() >= r2.x and r2.right() >= r1.x)) {
+					r.push_back({ min(r1.x, r2.x), r1.y, max(r1.right(), r2.right()) - min(r1.x, r2.x), r1.height });
 					r.erase(r.begin() + j);
 					r.erase(r.begin() + i);
 					done = true;

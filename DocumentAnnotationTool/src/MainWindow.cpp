@@ -33,27 +33,27 @@ void callback_draw(std::optional<std::deque<PDFHandler::CachedBitmap>*> highres_
 	g_main_renderer->begin_draw();
 	g_main_renderer->clear(Renderer::Color(50, 50, 50));
 
-	g_pdfhandler->debug_render();
 	// when the highres_bitmaps arg is nullopt then it is a normal draw call from windows
-	//if (highres_bitmaps.has_value() == false)
-	//	g_pdfhandler->render(g_main_window->get_hwnd());
-	////else there are new bitmaps to render that have been created by other threads
-	//else if (lock != nullptr) {
-	//	// thread safe
-	//	std::lock_guard l(*lock);
-	//	auto* bitmaps = highres_bitmaps.value();
-	//	for (auto& i : *bitmaps) {
-	//		if (g_main_renderer->inv_transform_rect(g_main_renderer->get_window_size()).intersects(i.dest))
-	//			g_main_renderer->draw_bitmap(i.bitmap, i.dest, Direct2DRenderer::INTERPOLATION_MODE::LINEAR);
-	//	}
-	//}
-	//else {
-	//	auto* bitmaps = highres_bitmaps.value(); 
-	//	for (auto& i : *bitmaps) {
-	//		if (g_main_renderer->inv_transform_rect(g_main_renderer->get_window_size()).intersects(i.dest))
-	//			g_main_renderer->draw_bitmap(i.bitmap, i.dest, Direct2DRenderer::INTERPOLATION_MODE::LINEAR);
-	//	}
-	//}
+	if (highres_bitmaps.has_value() == false)
+		g_pdfhandler->render(g_main_window->get_hwnd());
+	//else there are new bitmaps to render that have been created by other threads
+	else if (lock != nullptr) {
+		// thread safe
+		std::lock_guard l(*lock);
+		auto* bitmaps = highres_bitmaps.value();
+		for (auto& i : *bitmaps) {
+			if (g_main_renderer->inv_transform_rect(g_main_renderer->get_window_size()).intersects(i.dest))
+				g_main_renderer->draw_bitmap(i.bitmap, i.dest, Direct2DRenderer::INTERPOLATION_MODE::LINEAR);
+		}
+	}
+	else {
+		auto* bitmaps = highres_bitmaps.value(); 
+		for (auto& i : *bitmaps) {
+			if (g_main_renderer->inv_transform_rect(g_main_renderer->get_window_size()).intersects(i.dest))
+				g_main_renderer->draw_bitmap(i.bitmap, i.dest, Direct2DRenderer::INTERPOLATION_MODE::LINEAR);
+		}
+	}
+	//g_pdfhandler->debug_render();
 	 
 	// draw the rectangles
 
