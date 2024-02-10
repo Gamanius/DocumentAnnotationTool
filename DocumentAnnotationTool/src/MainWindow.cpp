@@ -27,7 +27,7 @@ std::vector<Renderer::Rectangle<float>> rects;
 
 
 
-void callback_draw(std::optional<std::deque<PDFHandler::CachedBitmap>*> highres_bitmaps, std::mutex* lock) {
+void callback_draw(std::optional<std::vector<CachedBitmap*>*> highres_bitmaps, std::mutex* lock) {
 	// draw scaled elements
 	g_main_renderer->set_current_transform_active();
 	g_main_renderer->begin_draw();
@@ -39,18 +39,18 @@ void callback_draw(std::optional<std::deque<PDFHandler::CachedBitmap>*> highres_
 	//else there are new bitmaps to render that have been created by other threads
 	else if (lock != nullptr) {
 		// thread safe
-		std::lock_guard l(*lock);
-		auto* bitmaps = highres_bitmaps.value();
+		std::lock_guard l(*lock); 
+		auto bitmaps = highres_bitmaps.value();
 		for (auto& i : *bitmaps) {
-			if (g_main_renderer->inv_transform_rect(g_main_renderer->get_window_size()).intersects(i.dest))
-				g_main_renderer->draw_bitmap(i.bitmap, i.dest, Direct2DRenderer::INTERPOLATION_MODE::LINEAR);
+			if (g_main_renderer->inv_transform_rect(g_main_renderer->get_window_size()).intersects(i->dest))
+				g_main_renderer->draw_bitmap(i->bitmap, i->dest, Direct2DRenderer::INTERPOLATION_MODE::LINEAR);
 		}
 	}
 	else {
-		auto* bitmaps = highres_bitmaps.value(); 
+		auto bitmaps = highres_bitmaps.value(); 
 		for (auto& i : *bitmaps) {
-			if (g_main_renderer->inv_transform_rect(g_main_renderer->get_window_size()).intersects(i.dest))
-				g_main_renderer->draw_bitmap(i.bitmap, i.dest, Direct2DRenderer::INTERPOLATION_MODE::LINEAR);
+			if (g_main_renderer->inv_transform_rect(g_main_renderer->get_window_size()).intersects(i->dest))
+				g_main_renderer->draw_bitmap(i->bitmap, i->dest, Direct2DRenderer::INTERPOLATION_MODE::LINEAR);
 		}
 	}
 	//g_pdfhandler->debug_render();

@@ -439,7 +439,7 @@ LRESULT WindowHandler::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam
 	case WM_PDF_BITMAP_READY:
 	{
 		if (currentInstance->m_callback_paint) {
-			currentInstance->m_callback_paint((std::deque<PDFHandler::CachedBitmap>*)lParam, (std::mutex*)wParam);
+			currentInstance->m_callback_paint((std::vector<CachedBitmap*>*)lParam, (std::mutex*)wParam);
 		}
 		return NULL;
 	}
@@ -502,7 +502,7 @@ Renderer::Point<long> WindowHandler::get_mouse_pos() const {
 	return PxToDp(p);
 }
 
-void WindowHandler::set_callback_paint(std::function<void(std::optional<std::deque<PDFHandler::CachedBitmap>*>, std::mutex*)> callback) {
+void WindowHandler::set_callback_paint(std::function<void(std::optional<std::vector<CachedBitmap*>*>, std::mutex*)> callback) {
 	m_callback_paint = callback;
 }
 

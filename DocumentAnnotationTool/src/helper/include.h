@@ -259,40 +259,22 @@ std::array<std::optional<Renderer::Rectangle<T>>, 4> splice_rect(Renderer::Recta
 		return { Renderer::Rectangle<T>(), std::nullopt, std::nullopt, std::nullopt};
 	}
 
-	auto changed_rect = r2;
-	if (r1.x == r2.x) {
-		unsigned int mult = 1;
-		while (changed_rect.x == r2.x) {
-			changed_rect.x += EPSILON * mult;
-			mult++;
-		}
-		changed_rect.width -= EPSILON * 2 * mult;
-	}
-	if (r1.y == r2.y) {
-		unsigned int mult = 1;
-		while (changed_rect.y == r2.y) {
-			changed_rect.y += EPSILON * mult;
-			mult++;
-		}
-		changed_rect.height -= EPSILON * 2 * mult;
-	}
-
 	// first we check if they overlap
-	if (r1.intersects(changed_rect) == false)
+	if (r1.intersects(r2) == false)
 		return return_arr;
 	// now we check for every point
 	std::array<bool, 4> corner_check = { false, false, false, false };
 	// upperleft
-	if (r1.intersects(changed_rect.upperleft()))
+	if (r1.intersects(r2.upperleft()))
 		corner_check[0] = true;
 	// upperright
-	if (r1.intersects(changed_rect.upperright()))
+	if (r1.intersects(r2.upperright()))
 		corner_check[1] = true;
 	// bottomleft
-	if (r1.intersects(changed_rect.lowerleft()))
+	if (r1.intersects(r2.lowerleft()))
 		corner_check[2] = true;
 	// bottomright
-	if (r1.intersects(changed_rect.lowerright()))
+	if (r1.intersects(r2.lowerright()))
 		corner_check[3] = true;
 
 	// count the number of corners that are inside
@@ -375,7 +357,7 @@ std::array<std::optional<Renderer::Rectangle<T>>, 4> splice_rect(Renderer::Recta
 	}
 
 	// we need to check if every point from r1 is inside r2. If this is the case r2 is bigger than r1 and we return nothing
-	if (changed_rect.intersects(r1.upperleft()) and changed_rect.intersects(r1.upperright()) and changed_rect.intersects(r1.lowerleft()) and changed_rect.intersects(r1.lowerright()))
+	if (r2.intersects(r1.upperleft()) and r2.intersects(r1.upperright()) and r2.intersects(r1.lowerleft()) and r2.intersects(r1.lowerright()))
 		return return_arr;
 
 	// if the rectangle intersects but none of the r2 corners are inside 
@@ -701,6 +683,32 @@ namespace FileHandler {
 
 constexpr float MUPDF_DEFAULT_DPI = 72.0f;
 class PDFHandler;
+
+struct CachedBitmap {
+	Direct2DRenderer::BitmapObject bitmap;
+	// coordinates in clip space
+	Renderer::Rectangle<float> dest;
+	float dpi = MUPDF_DEFAULT_DPI;
+	size_t used = false;
+
+	CachedBitmap() = default;
+	CachedBitmap(Direct2DRenderer::BitmapObject bitmap, Renderer::Rectangle<float> dest, float dpi = MUPDF_DEFAULT_DPI) : bitmap(bitmap), dest(dest), dpi(dpi) {}
+	CachedBitmap(Direct2DRenderer::BitmapObject bitmap, Renderer::Rectangle<float> dest, float dpi = MUPDF_DEFAULT_DPI, size_t used = 0) : bitmap(bitmap), dest(dest), dpi(dpi), used(used) {}
+	CachedBitmap(CachedBitmap&& cachedbitmap) noexcept {
+		bitmap = std::move(cachedbitmap.bitmap);
+		dest = cachedbitmap.dest;
+		dpi = cachedbitmap.dpi;
+		used = cachedbitmap.used;
+	}
+	CachedBitmap& operator=(CachedBitmap&& cachedbitmap) noexcept {
+		bitmap = std::move(cachedbitmap.bitmap);
+		dest = cachedbitmap.dest;
+		dpi = cachedbitmap.dpi;
+		used = cachedbitmap.used;
+		return *this;
+	}
+};
+
 class MuPDFHandler {
 	fz_context* m_ctx = nullptr;
 	std::mutex m_mutex[FZ_LOCK_MAX];
@@ -711,12 +719,35 @@ class MuPDFHandler {
 	static void error_callback(void* user, const char* message);
 public:
 	struct PDF : public FileHandler::File {
+		struct PDFRenderInfoStruct {
+			Direct2DRenderer* renderer = nullptr;
+			size_t page = 0;
+			Renderer::Rectangle<float> source;
+			Renderer::Rectangle<float> dest;
+			float dpi = MUPDF_DEFAULT_DPI;
+		};
+
+	private:
 		fz_document* m_doc = nullptr;
 		fz_context* m_ctx = nullptr;
 		std::vector<fz_page*> m_pages;
+		std::vector<fz_display_list*>* m_display_lists;
+
+		// This is only needed if there is multithreaded rendering needed
+		size_t m_amount_of_threads = 0;
+		std::condition_variable* m_thread_conditional = nullptr;
+		bool m_thread_should_die = false;
+	public:
+		std::mutex* m_queue_mutex = nullptr;
+		PDFHandler* handler = nullptr;
+	private:
+		std::deque<std::tuple<PDFRenderInfoStruct, HWND, std::vector<CachedBitmap*>>>* m_threaded_render_queue;
+		void create_display_list();
+	public:
 
 		PDF() = default;
 		PDF(fz_context* ctx, fz_document* doc);
+		PDF(fz_context* ctx, fz_document* doc, size_t threads, PDFHandler* hanlder);
 
 		// move constructor
 		PDF(PDF&& t) noexcept;
@@ -761,7 +792,10 @@ public:
 		Direct2DRenderer::BitmapObject get_bitmap(Direct2DRenderer& renderer, size_t page, Renderer::Rectangle<float> source, float dpi) const;
 
 		void multithreaded_get_bitmap(Direct2DRenderer* renderer, size_t page, Renderer::Rectangle<float> source, Renderer::Rectangle<float> dest, float dpi) const;
-		void multithreaded_get_bitmap(Direct2DRenderer* renderer, size_t page, Renderer::Rectangle<float> source, Renderer::Rectangle<float> dest, float dpi, HWND window_callback) const;
+		void multihreaded_get_bitmap(PDFRenderInfoStruct pdfrenderinfo, HWND window_callback, std::vector<CachedBitmap*> cached_bitmap);
+
+		void create_render_threads(size_t amount, std::deque<CachedBitmap>* globalcachedbitmaps);
+		void stop_render_threads();
 
 		/// <summary>
 		/// Retrieves the number of pdf pages
@@ -785,42 +819,15 @@ public:
 /// Class to handle the rendering of only one pdf
 /// </summary>
 class PDFHandler {
-public:
-	struct CachedBitmap {
-		Direct2DRenderer::BitmapObject bitmap;
-		// coordinates in clip space
-		Renderer::Rectangle<float> dest;
-		float dpi = MUPDF_DEFAULT_DPI;
-		int used = false;
-
-		CachedBitmap() = default;
-		CachedBitmap(Direct2DRenderer::BitmapObject bitmap, Renderer::Rectangle<float> dest, float dpi = MUPDF_DEFAULT_DPI) : bitmap(bitmap), dest(dest), dpi(dpi) {}
-		CachedBitmap(CachedBitmap&& cachedbitmap) noexcept { 
-			bitmap = std::move(cachedbitmap.bitmap);
-			dest = cachedbitmap.dest;
-			dpi = cachedbitmap.dpi;
-			used = cachedbitmap.used;
-		}
-		CachedBitmap& operator=(CachedBitmap&& cachedbitmap) noexcept {
-			bitmap = std::move(cachedbitmap.bitmap);
-			dest = cachedbitmap.dest;
-			dpi = cachedbitmap.dpi;
-			used = cachedbitmap.used;
-			return *this;
-		}
-	};
-private:
-	MuPDFHandler::PDF m_pdf;
+	MuPDFHandler::PDF m_pdf; 
 	// not owned by this class!
 	Direct2DRenderer* const m_renderer = nullptr;
 	// rendererd at half scale or otherwise specified
 	std::vector<Direct2DRenderer::BitmapObject> m_previewBitmaps;
 	std::vector<Renderer::Rectangle<float>> m_pagerec;
-	std::deque<CachedBitmap> m_cachedBitmaps;
+	std::deque<CachedBitmap>* m_cachedBitmaps;
 
 	std::deque<std::tuple<Renderer::Rectangle<float>, float>> m_debug_cachedBitmap; 
-
-	std::mutex m_cachedBitmaplock;
 
 	float m_seperation_distance = 10;
 	float m_preview_scale = 0.5; 
@@ -853,6 +860,11 @@ public:
 	void sort_page_positions();
 
 	void add_cachedBitmap(Direct2DRenderer::BitmapObject bitmap, Renderer::Rectangle<float> dest, float dpi = MUPDF_DEFAULT_DPI);
+	/// <summary>
+	/// Will take ownership of the object
+	/// </summary>
+	/// <param name="c"></param>
+	void add_cachedBitmap(CachedBitmap c);
 
 	~PDFHandler();
 };
@@ -1039,7 +1051,7 @@ public:
 	};
 
 private:
-	std::function<void(std::optional<std::deque<PDFHandler::CachedBitmap>*>, std::mutex*)> m_callback_paint;
+	std::function<void(std::optional<std::vector<CachedBitmap*>*>, std::mutex*)> m_callback_paint;
 	std::function<void(Renderer::Rectangle<long>)> m_callback_size;
 	std::function<void(PointerInfo)> m_callback_pointer_down;
 	std::function<void(PointerInfo)> m_callback_pointer_up;
@@ -1061,7 +1073,7 @@ public:
 
 	void set_state(WINDOW_STATE state);
 
-	void set_callback_paint(std::function<void(std::optional<std::deque<PDFHandler::CachedBitmap>*>, std::mutex*)> callback);
+	void set_callback_paint(std::function<void(std::optional<std::vector<CachedBitmap*>*>, std::mutex*)> callback);
 	void set_callback_size(std::function<void(Renderer::Rectangle<long>)> callback);
 	void set_callback_pointer_down(std::function<void(PointerInfo)> callback);
 	void set_callback_pointer_up(std::function<void(PointerInfo)> callback);
