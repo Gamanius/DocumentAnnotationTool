@@ -31,7 +31,9 @@ void callback_draw(std::optional<std::vector<CachedBitmap*>*> highres_bitmaps, s
 	// draw scaled elements
 	g_main_renderer->set_current_transform_active();
 	g_main_renderer->begin_draw();
-	g_main_renderer->clear(Renderer::Color(50, 50, 50));
+
+	if (highres_bitmaps.has_value() == false)
+		g_main_renderer->clear(Renderer::Color(50, 50, 50));
 
 	// when the highres_bitmaps arg is nullopt then it is a normal draw call from windows
 	if (highres_bitmaps.has_value() == false)
@@ -155,8 +157,8 @@ void main_window_loop_run(HINSTANCE h) {
 	color_magenta = &temp6;
 
 	MuPDFHandler context;
-	PDFHandler pdf_handler; 
 	g_mupdfcontext = &context;
+	PDFHandler pdf_handler; 
 	Direct2DRenderer::BitmapObject bitmap;
 
 	auto path = FileHandler::open_file_dialog(L"PDF\0*.pdf\0\0", *g_main_window);
@@ -182,4 +184,6 @@ void main_window_loop_run(HINSTANCE h) {
 	while(!g_main_window->close_request()) {
 		g_main_window->get_window_messages(true);
 	}
+
+	pdf_handler.stop_rendering(*g_main_window);
 }

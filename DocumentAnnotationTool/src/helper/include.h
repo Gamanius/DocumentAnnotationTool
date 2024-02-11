@@ -23,6 +23,7 @@
 
 #define APPLICATION_NAME L"Docanto"
 #define EPSILON 0.00001f
+#define PDF_STITCH_THRESHOLD 0.1f
 #define FLOAT_EQUAL(a, b) (abs(a - b) < EPSILON)
 
 /// Custom WM_APP message to signal that the bitmap is ready to be drawn
@@ -731,23 +732,22 @@ public:
 		fz_document* m_doc = nullptr;
 		fz_context* m_ctx = nullptr;
 		std::vector<fz_page*> m_pages;
-		std::vector<fz_display_list*>* m_display_lists;
+		std::vector<fz_display_list*>* m_display_lists = nullptr;
 
 		// This is only needed if there is multithreaded rendering needed
-		size_t m_amount_of_threads = 0;
+		std::atomic<size_t>* m_amount_of_threads_running = nullptr;
 		std::condition_variable* m_thread_conditional = nullptr;
-		bool m_thread_should_die = false;
+		bool* m_thread_should_die = nullptr;
+		std::atomic<size_t>* m_render_in_progress = nullptr;
 	public:
 		std::mutex* m_queue_mutex = nullptr;
-		PDFHandler* handler = nullptr;
 	private:
-		std::deque<std::tuple<PDFRenderInfoStruct, HWND, std::vector<CachedBitmap*>>>* m_threaded_render_queue;
+		std::deque<std::tuple<PDFRenderInfoStruct, HWND, std::vector<CachedBitmap*>>>* m_threaded_render_queue = nullptr;
 		void create_display_list();
 	public:
 
 		PDF() = default;
 		PDF(fz_context* ctx, fz_document* doc);
-		PDF(fz_context* ctx, fz_document* doc, size_t threads, PDFHandler* hanlder);
 
 		// move constructor
 		PDF(PDF&& t) noexcept;
@@ -795,7 +795,9 @@ public:
 		void multihreaded_get_bitmap(PDFRenderInfoStruct pdfrenderinfo, HWND window_callback, std::vector<CachedBitmap*> cached_bitmap);
 
 		void create_render_threads(size_t amount, std::deque<CachedBitmap>* globalcachedbitmaps);
-		void stop_render_threads();
+		void stop_render_threads(bool blocking = true);
+
+		bool multithreaded_is_rendering_in_progress() const;
 
 		/// <summary>
 		/// Retrieves the number of pdf pages
@@ -825,7 +827,7 @@ class PDFHandler {
 	// rendererd at half scale or otherwise specified
 	std::vector<Direct2DRenderer::BitmapObject> m_previewBitmaps;
 	std::vector<Renderer::Rectangle<float>> m_pagerec;
-	std::deque<CachedBitmap>* m_cachedBitmaps;
+	std::deque<CachedBitmap>* m_cachedBitmaps = nullptr;
 
 	std::deque<std::tuple<Renderer::Rectangle<float>, float>> m_debug_cachedBitmap; 
 
@@ -856,6 +858,10 @@ public:
 
 	void render_preview(); 
 	void render(HWND callbackwindow);
+	/// <summary>
+	/// This HAS TO BE CALLED when multithreaded rendering is active
+	/// </summary>
+	void stop_rendering(HWND callbackwindow);
 	void debug_render();
 	void sort_page_positions();
 

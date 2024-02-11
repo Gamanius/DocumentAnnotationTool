@@ -1,5 +1,7 @@
 #include "include.h"
 #include "mupdf/pdf.h"
+#include <sstream>
+#include <exception>
 
 void MuPDFHandler::lock_mutex(void* user, int lock) {
 	((std::mutex*)user)[lock].lock();
@@ -89,11 +91,9 @@ MuPDFHandler::PDF::PDF(fz_context* ctx, fz_document* doc) {
 	m_thread_conditional = new std::condition_variable(); 
 	m_queue_mutex = new std::mutex();
 	m_threaded_render_queue = new std::deque<std::tuple<PDFRenderInfoStruct, HWND, std::vector<CachedBitmap*>>>();
-}
-
-MuPDFHandler::PDF::PDF(fz_context* ctx, fz_document* doc, size_t threads, PDFHandler* hanlder) : PDF(ctx, doc) {
-	m_amount_of_threads = threads;
-	handler = hanlder;
+	m_thread_should_die = new bool(false); 
+	m_render_in_progress = new std::atomic<size_t>(0);
+	m_amount_of_threads_running = new std::atomic<size_t>(0);
 }
 
 MuPDFHandler::PDF::PDF(PDF&& t) noexcept {
@@ -111,66 +111,53 @@ MuPDFHandler::PDF::PDF(PDF&& t) noexcept {
 	data = t.data;
 	t.data = nullptr;
 
-	handler = t.handler;
-	t.handler = nullptr;
-
-	m_amount_of_threads = t.m_amount_of_threads;
-	t.m_amount_of_threads = 0;
+	m_amount_of_threads_running = t.m_amount_of_threads_running;
+	t.m_amount_of_threads_running = nullptr;
 
 	m_thread_conditional = t.m_thread_conditional;
 	t.m_thread_conditional = nullptr;
 
 	m_thread_should_die = t.m_thread_should_die;
-	t.m_thread_should_die = false;
+	t.m_thread_should_die = nullptr;
 
 	m_queue_mutex = t.m_queue_mutex;
 	t.m_queue_mutex = nullptr;
 
 	m_threaded_render_queue = t.m_threaded_render_queue;
 	t.m_threaded_render_queue = nullptr;
+
+	m_render_in_progress = t.m_render_in_progress;
+	t.m_render_in_progress = 0;
 }
 
 
 MuPDFHandler::PDF& MuPDFHandler::PDF::operator=(PDF&& t) noexcept {
-	if (this != &t) {
-		m_doc = t.m_doc;
-		t.m_doc = nullptr;
-
-		m_ctx = t.m_ctx;
-		t.m_ctx = nullptr;
-
-		m_pages = std::move(t.m_pages);
-
-		m_display_lists = t.m_display_lists;
-		t.m_display_lists = nullptr;
-
-		data = t.data;
-		t.data = nullptr;
-
-		handler = t.handler;
-		t.handler = nullptr;
-
-		m_amount_of_threads = t.m_amount_of_threads;
-		t.m_amount_of_threads = 0;
-
-		m_thread_conditional = t.m_thread_conditional;
-		t.m_thread_conditional = nullptr;
-
-		m_thread_should_die = t.m_thread_should_die;
-		t.m_thread_should_die = false;
-
-		m_queue_mutex = t.m_queue_mutex;
-		t.m_queue_mutex = nullptr;
-
-		m_threaded_render_queue = t.m_threaded_render_queue;
-		t.m_threaded_render_queue = nullptr;
-	}
+	// new c++ stuff?
+	this->~PDF();
+	new(this) PDF(std::move(t));
 	return *this;
 }
 
 MuPDFHandler::PDF::~PDF() {
 	if (m_ctx == nullptr)
 		return;
+
+	// firts cleanup thethreads
+	stop_render_threads();
+
+	if (m_thread_conditional != nullptr) {
+		delete m_thread_conditional;
+	}
+	if (m_queue_mutex != nullptr) {
+		delete m_queue_mutex;
+	}
+
+	delete m_thread_should_die;
+	delete m_amount_of_threads_running;
+	delete m_threaded_render_queue;
+	delete m_render_in_progress;
+
+	// we can now safely delete all the other used resources
 	for (size_t i = 0; i < m_pages.size(); i++) {
 		fz_drop_page(m_ctx, m_pages.at(i));
 	}
@@ -181,17 +168,6 @@ MuPDFHandler::PDF::~PDF() {
 	delete m_display_lists;
 
 	fz_drop_document(m_ctx, m_doc);
-
-	// cleanup of threads
-	m_thread_should_die = true;
-	if (m_thread_conditional != nullptr) {
-		delete m_thread_conditional;
-	}
-	if (m_queue_mutex != nullptr) {
-		delete m_queue_mutex;
-	}
-
-	delete m_threaded_render_queue;
 }
 
 fz_page* MuPDFHandler::PDF::get_page(size_t page) const {
@@ -433,12 +409,32 @@ struct fz_display_list {
 
 void do_multihread_rendering(fz_context* ctx, std::condition_variable* cv, std::mutex* m, 
 	std::deque<std::tuple<MuPDFHandler::PDF::PDFRenderInfoStruct, HWND, std::vector<CachedBitmap*>>>* render_queue,
-	bool* die, std::vector <fz_display_list*>* displaylist, std::deque<CachedBitmap>* globalcachedbitmaps) {
-	while (true) {
-		fz_context* cloned_ctx = fz_clone_context(ctx);
+	bool* die, std::vector <fz_display_list*>* displaylist, std::deque<CachedBitmap>* globalcachedbitmaps, 
+	std::atomic<size_t>* amount_of_threads, std::atomic<size_t>* renderinprogress) {
+
+	fz_context* cloned_ctx = fz_clone_context(ctx);
+
+	// Copy all lists
+	// this is most likely not safe AT ALL
+	std::vector<fz_display_list*> cloned_lists; 
+	for (size_t i = 0; i < displaylist->size(); i++) {
+		fz_display_list* ls = fz_new_display_list(cloned_ctx, displaylist->at(i)->mediabox);
+		ls->len = displaylist->at(i)->len;
+		ls->max = displaylist->at(i)->max;
+		ls->list = new fz_display_node[ls->max]; 
+		memcpy(ls->list, displaylist->at(i)->list, displaylist->at(i)->len * sizeof(fz_display_node));
+
+		cloned_lists.push_back(ls);
+	}
+
+	while (!(*die)) {
 		// lock to get access to the deque and wait for the conditional variable
 		std::unique_lock<std::mutex> lock(*m);
 		cv->wait(lock, [&] { return render_queue->size() != 0; });
+		// first check if cleanup is neccesesary
+		if (*die) { 
+			break;
+		}
 		// If notified remove the first element and render it
 		MuPDFHandler::PDF::PDFRenderInfoStruct pdfrenderinfo;
 		HWND window; 
@@ -450,6 +446,7 @@ void do_multihread_rendering(fz_context* ctx, std::condition_variable* cv, std::
 			window = std::get<1>(temp);
 			cached_bitmaps = std::get<2>(temp);  
 
+			(*renderinprogress)++;
 			render_queue->pop_front(); 
 		}
 		else {
@@ -457,9 +454,9 @@ void do_multihread_rendering(fz_context* ctx, std::condition_variable* cv, std::
 			continue;
 		}
 
-		// copy display list and ctx
+		// TODO: copy display list and ctx
 		// maybe do it in the begining of the thread life?
-		auto& list = displaylist->at(pdfrenderinfo.page);
+		auto& list = cloned_lists.at(pdfrenderinfo.page);
 		
 		// we can unlock now since we are done with everything
 		lock.unlock();
@@ -488,17 +485,27 @@ void do_multihread_rendering(fz_context* ctx, std::condition_variable* cv, std::
 
 			// we can call the window and lock the mutex since we are modifying stuff again
 			lock.lock();
+			auto myid = std::this_thread::get_id();
+			std::stringstream ss; 
+			ss << myid;
+			std::string mystring = ss.str();
+			Logger::log("Thread: " + mystring + " is rendering page: " + std::to_string(pdfrenderinfo.page) + " with dpi: " + std::to_string(pdfrenderinfo.dpi) + " and source: " + std::to_string(pdfrenderinfo.source.x) + " " + std::to_string(pdfrenderinfo.source.y) + " " + std::to_string(pdfrenderinfo.source.width) + " " + std::to_string(pdfrenderinfo.source.height));
+			Logger::print_to_debug();
 			auto new_cachedbitmap = CachedBitmap(std::move(obj), pdfrenderinfo.dest, pdfrenderinfo.dpi, 1);
 			cached_bitmaps.push_back(&new_cachedbitmap);
+			// unlock to avoid deadlock (If this thread got the lock first and the main thread is waiting on the lock, not unlocking will
+			// lead to a deadlock)
+			lock.unlock();
 			SendMessage(window, WM_PDF_BITMAP_READY, (WPARAM)nullptr, (LPARAM)(&cached_bitmaps));
+			lock.lock();
 			// we can now decreament the used counter
 			for (size_t i = 0; i < cached_bitmaps.size(); i++) {
-				cached_bitmaps.at(i)->used--;
+				if (cached_bitmaps.at(i)->used != 0)
+					cached_bitmaps.at(i)->used--;
 			}
 			// now add the new cached bitmap to the other ones
 			globalcachedbitmaps->push_back(std::move(new_cachedbitmap));
 			lock.unlock();
-
 		} fz_always(cloned_ctx) {
 			// drop all devices
 			fz_drop_device(cloned_ctx, drawdevice);
@@ -506,12 +513,24 @@ void do_multihread_rendering(fz_context* ctx, std::condition_variable* cv, std::
 		} fz_catch(cloned_ctx) {
 			return;
 		}
-		fz_drop_context(cloned_ctx); 
+		(*renderinprogress)--;
 	}
+	// delete all the list elements
+	for (size_t i = 0; i < cloned_lists.size(); i++) {
+		// also not safe and probably not intended
+		delete[] cloned_lists.at(i)->list;
+		cloned_lists.at(i)->list = nullptr;
+		cloned_lists.at(i)->len = 0;
+		cloned_lists.at(i)->max = 0;
+		fz_drop_display_list(cloned_ctx, cloned_lists.at(i));
+	}
+	(*amount_of_threads)--;
+	cv->notify_all();
+	fz_drop_context(cloned_ctx); 
 }
 
 void MuPDFHandler::PDF::multihreaded_get_bitmap(PDFRenderInfoStruct pdfrenderinfo, HWND window_callback, std::vector<CachedBitmap*> cached_bitmap) {
-	if (m_amount_of_threads == 0) {
+	if (*m_amount_of_threads_running == 0) {
 		// dont do anything if no threads exists
 		return;
 	}
@@ -527,17 +546,35 @@ void MuPDFHandler::PDF::multihreaded_get_bitmap(PDFRenderInfoStruct pdfrenderinf
 
 
 void MuPDFHandler::PDF::create_render_threads(size_t amount, std::deque<CachedBitmap>* globalcachedbitmaps) {
-	m_amount_of_threads = amount;
+	*m_amount_of_threads_running = amount;
 	// create the threads
-	for (size_t i = 0; i < m_amount_of_threads; i++) {
+	for (size_t i = 0; i < *m_amount_of_threads_running; i++) {
 		std::thread(do_multihread_rendering, m_ctx, m_thread_conditional, m_queue_mutex, m_threaded_render_queue,
-			&m_thread_should_die, m_display_lists, globalcachedbitmaps).detach();
+			m_thread_should_die, m_display_lists, globalcachedbitmaps, m_amount_of_threads_running, m_render_in_progress).detach(); 
 	}
 }
 
-void MuPDFHandler::PDF::stop_render_threads() {
-	m_thread_should_die = true;
+void MuPDFHandler::PDF::stop_render_threads(bool blocking) {
+	if (*m_render_in_progress != 0 and blocking)
+		std::terminate();
+	*m_thread_should_die = true;
+	// check how many threads are alive
+	if (*m_amount_of_threads_running == 0) {
+		return;
+	}
+	// put dummy data in the queue
+	m_threaded_render_queue->push_back(std::make_tuple(PDFRenderInfoStruct(), nullptr, std::vector<CachedBitmap*>())); 
+	// notify all threads 
 	m_thread_conditional->notify_all();
+	// aquire conditional variable and wait
+	if (blocking) {
+		std::unique_lock<std::mutex> lock(*m_queue_mutex);
+		m_thread_conditional->wait(lock, [this] { return *m_amount_of_threads_running == 0; });
+	}
+}
+
+bool MuPDFHandler::PDF::multithreaded_is_rendering_in_progress() const {
+	return *m_render_in_progress != 0;
 }
 
 size_t MuPDFHandler::PDF::get_page_count() const { 

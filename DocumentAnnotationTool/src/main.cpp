@@ -24,4 +24,6 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 	
 	Logger::print_to_debug();
 	Logger::clear();
+
+	return 0;
 }
