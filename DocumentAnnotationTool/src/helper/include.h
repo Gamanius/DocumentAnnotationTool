@@ -27,7 +27,7 @@
 #define FLOAT_EQUAL(a, b) (abs(a - b) < EPSILON)
 
 /// Custom WM_APP message to signal that the bitmap is ready to be drawn
-#define WM_PDF_BITMAP_READY (WM_APP + 0x0BAD /*Magic number*/)
+#define WM_PDF_BITMAP_READY (WM_APP + 0x0BAD /*Magic number (rolled by fair dice)*/)
 
 inline void SafeRelease(IUnknown* ptr) {
 	if (ptr) {
@@ -683,7 +683,7 @@ namespace FileHandler {
 }
 
 constexpr float MUPDF_DEFAULT_DPI = 72.0f;
-class PDFHandler;
+class PDFRenderHandler;
 
 struct CachedBitmap {
 	Direct2DRenderer::BitmapObject bitmap;
@@ -719,6 +719,7 @@ class MuPDFHandler {
 	static void unlock_mutex(void* user, int lock);
 	static void error_callback(void* user, const char* message);
 public:
+
 	struct PDF : public FileHandler::File {
 		struct PDFRenderInfoStruct {
 			Direct2DRenderer* renderer = nullptr;
@@ -732,18 +733,6 @@ public:
 		fz_document* m_doc = nullptr;
 		fz_context* m_ctx = nullptr;
 		std::vector<fz_page*> m_pages;
-		std::vector<fz_display_list*>* m_display_lists = nullptr;
-
-		// This is only needed if there is multithreaded rendering needed
-		std::atomic<size_t>* m_amount_of_threads_running = nullptr;
-		std::condition_variable* m_thread_conditional = nullptr;
-		bool* m_thread_should_die = nullptr;
-		std::atomic<size_t>* m_render_in_progress = nullptr;
-	public:
-		std::mutex* m_queue_mutex = nullptr;
-	private:
-		std::deque<std::tuple<PDFRenderInfoStruct, HWND, std::vector<CachedBitmap*>>>* m_threaded_render_queue = nullptr;
-		void create_display_list();
 	public:
 
 		PDF() = default;
@@ -764,46 +753,12 @@ public:
 		fz_page* get_page(size_t page) const;
 
 		/// <summary>
-		/// Will render out the pdf page to a bitmap. It will always give back a bitmap with the DPI 96.
-		/// To account for higher DPI's it will instead scale the size of the image using <c>get_page_size </c> function
-		/// </summary>
-		/// <param name="renderer">Reference to the Direct2D renderer</param>
-		/// <param name="page">The page to be rendererd</param>
-		/// <param name="dpi">The dpi at which it should be rendered</param>
-		/// <returns>The bitmap object</returns>
-		Direct2DRenderer::BitmapObject get_bitmap(Direct2DRenderer& renderer, size_t page, float dpi = 72.0f) const;
-		/// <summary>
-		/// Will render out the pdf page to a bitmap with the given size
-		/// </summary>
-		/// <param name="renderer">Reference to the Direct2D renderer</param>
-		/// <param name="page">The page to be rendererd</param>
-		/// <param name="rec">The end size of the Bitmap</param>
-		/// <returns>Bitmap</returns>
-		Direct2DRenderer::BitmapObject get_bitmap(Direct2DRenderer& renderer, size_t page, Renderer::Rectangle<unsigned int> rec) const;
-		/// <summary>
-		/// Will render out the area of the pdf page given by the source rectangle to a bitmap with the given dpi. 
-		/// </summary>
-		/// <param name="renderer">Reference to the Direct2D renderer</param>
-		/// <param name="page">The page to be rendererd</param>
-		/// <param name="source">The area of the page in docpage pixels. Should be smaller than get_page_size() would give</param>
-		/// <param name="dpi">The dpi at which it should be rendered</param>
-		/// <returns>Returns the DPI-scaled bitmap</returns>
-		/// <remark>If the DPI is 72 the size of the returned bitmap is the same as the size of the source</remark>
-		Direct2DRenderer::BitmapObject get_bitmap(Direct2DRenderer& renderer, size_t page, Renderer::Rectangle<float> source, float dpi) const;
-
-		void multithreaded_get_bitmap(Direct2DRenderer* renderer, size_t page, Renderer::Rectangle<float> source, Renderer::Rectangle<float> dest, float dpi) const;
-		void multihreaded_get_bitmap(PDFRenderInfoStruct pdfrenderinfo, HWND window_callback, std::vector<CachedBitmap*> cached_bitmap);
-
-		void create_render_threads(size_t amount, std::deque<CachedBitmap>* globalcachedbitmaps);
-		void stop_render_threads(bool blocking = true);
-
-		bool multithreaded_is_rendering_in_progress() const;
-
-		/// <summary>
 		/// Retrieves the number of pdf pages
 		/// </summary>
 		/// <returns>Number of pages</returns>
 		size_t get_page_count() const;
+
+		operator fz_context*() const { return m_ctx; }
 
 		Renderer::Rectangle<float> get_page_size(size_t page, float dpi = 72) const;
 	};
@@ -820,14 +775,43 @@ public:
 /// <summary>
 /// Class to handle the rendering of only one pdf
 /// </summary>
-class PDFHandler {
-	MuPDFHandler::PDF m_pdf; 
+class PDFRenderHandler {
+public:
+	struct RenderInfo {
+		Direct2DRenderer* renderer = nullptr;
+		size_t page = 0;
+		Renderer::Rectangle<float> source;
+		Renderer::Rectangle<float> dest;
+		float dpi = MUPDF_DEFAULT_DPI;
+		size_t render_status = 0;
+		fz_cookie pdf_cookie = { 0 };
+		HWND callback_window = 0;
+	};
+private:
+	// not owned by this class
+	MuPDFHandler::PDF* const m_pdf = nullptr;
 	// not owned by this class!
 	Direct2DRenderer* const m_renderer = nullptr;
+
+	// Position and dimensions of the pages 
+	std::vector<Renderer::Rectangle<float>> m_pagerec;
+
+	// Preview rendering
 	// rendererd at half scale or otherwise specified
 	std::vector<Direct2DRenderer::BitmapObject> m_previewBitmaps;
-	std::vector<Renderer::Rectangle<float>> m_pagerec;
-	std::deque<CachedBitmap>* m_cachedBitmaps = nullptr;
+
+	// High res rendering
+	std::shared_ptr<std::vector<fz_display_list*>> m_display_lists = nullptr;
+	std::shared_ptr<std::deque<CachedBitmap>> m_cachedBitmaps = nullptr;
+	
+	// For Multithreading
+	std::shared_ptr<std::mutex> m_queue_mutex = nullptr;
+	std::shared_ptr<std::atomic_size_t> m_amount_of_threads_running = nullptr;
+	std::shared_ptr<std::atomic_size_t> m_render_in_progress = nullptr; 
+	std::shared_ptr<std::condition_variable> m_thread_conditional = nullptr;
+	std::shared_ptr<bool> m_thread_should_die = nullptr; 
+	size_t m_render_queue_frame = 1;
+	std::shared_ptr<std::map<size_t, RenderInfo>> m_render_queue = nullptr;
 
 	std::deque<std::tuple<Renderer::Rectangle<float>, float>> m_debug_cachedBitmap; 
 
@@ -835,6 +819,11 @@ class PDFHandler {
 	float m_preview_scale = 0.5; 
 
 	void create_preview(float scale = 0.5);
+	void create_display_list();
+	void create_render_threads(size_t amount = 2);
+
+	void update_render_queue();
+
 	void render_high_res(HWND window);
 
 	void remove_small_cached_bitmaps(float treshold);
@@ -842,37 +831,56 @@ class PDFHandler {
 	void debug_render_preview();
 	void debug_render_high_res();
 public:
-	PDFHandler() = default;
-	/// <summary>
-	/// Will load the pdf from the given path. The MuPDF context and the Direct2DRenderer are not owned by this class
-	/// </summary>
-	/// <param name="renderer">Renderer that should be rendered to</param>
-	/// <param name="handler">Mupdf context</param>
-	/// <param name="path">path of the pdf</param>
-	PDFHandler(Direct2DRenderer* const renderer, MuPDFHandler& handler, const std::wstring& path);
+	PDFRenderHandler() = default;
+
+	PDFRenderHandler(MuPDFHandler::PDF* const pdf, Direct2DRenderer* const renderer);
+	PDFRenderHandler(MuPDFHandler::PDF* const pdf, Direct2DRenderer* const renderer, size_t amount_of_render_threads);
 
 	// move constructor
-	PDFHandler(PDFHandler&& t) noexcept;
+	PDFRenderHandler(PDFRenderHandler&& t) noexcept;
 	// move assignment
-	PDFHandler& operator=(PDFHandler&& t) noexcept;
+	PDFRenderHandler& operator=(PDFRenderHandler&& t) noexcept;
+
+	~PDFRenderHandler(); 
+
+	/// <summary>
+	/// Will render out the pdf page to a bitmap. It will always give back a bitmap with the DPI 96.
+	/// To account for higher DPI's it will instead scale the size of the image using <c>get_page_size </c> function
+	/// </summary>
+	/// <param name="renderer">Reference to the Direct2D renderer</param>
+	/// <param name="page">The page to be rendererd</param>
+	/// <param name="dpi">The dpi at which it should be rendered</param>
+	/// <returns>The bitmap object</returns>
+	Direct2DRenderer::BitmapObject get_bitmap(Direct2DRenderer& renderer, size_t page, float dpi = 72.0f) const;
+	/// <summary>
+	/// Will render out the pdf page to a bitmap with the given size
+	/// </summary>
+	/// <param name="renderer">Reference to the Direct2D renderer</param>
+	/// <param name="page">The page to be rendererd</param>
+	/// <param name="rec">The end size of the Bitmap</param>
+	/// <returns>Bitmap</returns>
+	Direct2DRenderer::BitmapObject get_bitmap(Direct2DRenderer& renderer, size_t page, Renderer::Rectangle<unsigned int> rec) const;
+	/// <summary>
+	/// Will render out the area of the pdf page given by the source rectangle to a bitmap with the given dpi. 
+	/// </summary>
+	/// <param name="renderer">Reference to the Direct2D renderer</param>
+	/// <param name="page">The page to be rendererd</param>
+	/// <param name="source">The area of the page in docpage pixels. Should be smaller than get_page_size() would give</param>
+	/// <param name="dpi">The dpi at which it should be rendered</param>
+	/// <returns>Returns the DPI-scaled bitmap</returns>
+	/// <remark>If the DPI is 72 the size of the returned bitmap is the same as the size of the source</remark>
+	Direct2DRenderer::BitmapObject get_bitmap(Direct2DRenderer& renderer, size_t page, Renderer::Rectangle<float> source, float dpi) const;
 
 	void render_preview(); 
 	void render(HWND callbackwindow);
 	/// <summary>
 	/// This HAS TO BE CALLED when multithreaded rendering is active
 	/// </summary>
-	void stop_rendering(HWND callbackwindow);
+	//void stop_rendering(HWND callbackwindow);
 	void debug_render();
 	void sort_page_positions();
 
-	void add_cachedBitmap(Direct2DRenderer::BitmapObject bitmap, Renderer::Rectangle<float> dest, float dpi = MUPDF_DEFAULT_DPI);
-	/// <summary>
-	/// Will take ownership of the object
-	/// </summary>
-	/// <param name="c"></param>
-	void add_cachedBitmap(CachedBitmap c);
-
-	~PDFHandler();
+	void stop_render_threads();
 };
 
 class WindowHandler {

@@ -8,18 +8,9 @@ std::unique_ptr<Direct2DRenderer> g_main_renderer;
 Direct2DRenderer::TextFormatObject* g_text_format;
 Direct2DRenderer::BrushObject* g_brush;
 
-Direct2DRenderer::BrushObject* color_red;
-Direct2DRenderer::BrushObject* color_blue;
-
-Direct2DRenderer::BrushObject* color_green;
-Direct2DRenderer::BrushObject* color_yellow;
-Direct2DRenderer::BrushObject* color_cyan;
-Direct2DRenderer::BrushObject* color_magenta;
-
-Direct2DRenderer::BitmapObject* g_bitmap = nullptr;
-
+MuPDFHandler::PDF* g_pdf;
 MuPDFHandler* g_mupdfcontext;
-PDFHandler* g_pdfhandler = nullptr;
+PDFRenderHandler* g_pdfrenderhandler = nullptr;
 
 std::vector<Renderer::Rectangle<float>> new_rect;
 Renderer::Rectangle<float> main_rec = {0, 0, 1000, 1000};
@@ -37,7 +28,7 @@ void callback_draw(std::optional<std::vector<CachedBitmap*>*> highres_bitmaps, s
 
 	// when the highres_bitmaps arg is nullopt then it is a normal draw call from windows
 	if (highres_bitmaps.has_value() == false)
-		g_pdfhandler->render(g_main_window->get_hwnd());
+		g_pdfrenderhandler->render(g_main_window->get_hwnd());
 	//else there are new bitmaps to render that have been created by other threads
 	else if (lock != nullptr) {
 		// thread safe
@@ -143,32 +134,22 @@ void main_window_loop_run(HINSTANCE h) {
 	auto default_text_format = g_main_renderer->create_text_format(L"Consolas", 20);
 	g_text_format = &default_text_format;
 
-	auto temp = g_main_renderer->create_brush(Renderer::Color(255, 0, 0));
-	color_red = &temp;
-	auto temp2 = g_main_renderer->create_brush(Renderer::Color(0, 0, 255));
-	color_blue = &temp2;
-	auto temp3 = g_main_renderer->create_brush(Renderer::Color(0, 255, 0));
-	color_green = &temp3;
-	auto temp4 = g_main_renderer->create_brush(Renderer::Color(255, 255, 0));
-	color_yellow = &temp4;
-	auto temp5 = g_main_renderer->create_brush(Renderer::Color(0, 255, 255));
-	color_cyan = &temp5;
-	auto temp6 = g_main_renderer->create_brush(Renderer::Color(255, 0, 255));
-	color_magenta = &temp6;
-
 	MuPDFHandler context;
 	g_mupdfcontext = &context;
-	PDFHandler pdf_handler; 
+	PDFRenderHandler pdf_handler; 
 	Direct2DRenderer::BitmapObject bitmap;
 
+
 	auto path = FileHandler::open_file_dialog(L"PDF\0*.pdf\0\0", *g_main_window);
-	if (path.has_value()) {
-		pdf_handler = PDFHandler(g_main_renderer.get(), *g_mupdfcontext, path.value());
-		g_pdfhandler = &pdf_handler; 
-	}
-	else {
+
+	if (!path.has_value()) {
 		return;
 	}
+	auto pdf = context.load_pdf(path.value());
+	g_pdf = &pdf.value(); 
+
+	pdf_handler = PDFRenderHandler(g_pdf, g_main_renderer.get(), 2);
+	g_pdfrenderhandler = &pdf_handler; 
 
 	// do the callbacks
 	g_main_window->set_callback_paint(callback_draw);
@@ -185,5 +166,5 @@ void main_window_loop_run(HINSTANCE h) {
 		g_main_window->get_window_messages(true);
 	}
 
-	pdf_handler.stop_rendering(*g_main_window);
+	//pdf_handler.stop_rendering(*g_main_window);
 }

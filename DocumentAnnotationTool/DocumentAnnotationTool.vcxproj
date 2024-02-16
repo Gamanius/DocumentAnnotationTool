@@ -176,6 +176,10 @@
     <ClInclude Include="src\helper\include.h" />
     <ClInclude Include="src\MainWindow.h" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="rsc\ENR6.3-9.slow.rendering.pdf" />
+    <None Include="rsc\Physikpraktikum_1-4.pdf" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

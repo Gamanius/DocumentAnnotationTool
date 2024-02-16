@@ -50,33 +50,33 @@ MuPDFHandler::~MuPDFHandler() {
 
 // PDF CODE //
 
-void MuPDFHandler::PDF::create_display_list() {
-	// for each rec create a display list
-	fz_display_list* list = nullptr;
-	fz_device* dev = nullptr;
-
-	m_display_lists = new std::vector<fz_display_list*>();
-
-	for (size_t i = 0; i < get_page_count(); i++) {
-		// get the page that will be rendered
-		auto p = get_page(i);
-		fz_try(m_ctx) {
-			// create a display list with all the draw calls and so on
-			list = fz_new_display_list(m_ctx, fz_bound_page(m_ctx, p)); 
-			dev = fz_new_list_device(m_ctx, list); 
-			// run the device
-			fz_run_page(m_ctx, p, dev, fz_identity, nullptr); 
-			// add list to array
-			m_display_lists->push_back(list); 
-		} fz_always(m_ctx) {
-			// flush the device
-			fz_close_device(m_ctx, dev);  
-			fz_drop_device(m_ctx, dev);  
-		} fz_catch(m_ctx) {
-			ASSERT(false, "Could not create display list");
-		}
-	}
-}
+//void MuPDFHandler::PDF::create_display_list() {
+//	// for each rec create a display list
+//	fz_display_list* list = nullptr;
+//	fz_device* dev = nullptr;
+//
+//	m_display_lists = new std::vector<fz_display_list*>();
+//
+//	for (size_t i = 0; i < get_page_count(); i++) {
+//		// get the page that will be rendered
+//		auto p = get_page(i);
+//		fz_try(m_ctx) {
+//			// create a display list with all the draw calls and so on
+//			list = fz_new_display_list(m_ctx, fz_bound_page(m_ctx, p)); 
+//			dev = fz_new_list_device(m_ctx, list); 
+//			// run the device
+//			fz_run_page(m_ctx, p, dev, fz_identity, nullptr); 
+//			// add list to array
+//			m_display_lists->push_back(list); 
+//		} fz_always(m_ctx) {
+//			// flush the device
+//			fz_close_device(m_ctx, dev);  
+//			fz_drop_device(m_ctx, dev);  
+//		} fz_catch(m_ctx) {
+//			ASSERT(false, "Could not create display list");
+//		}
+//	}
+//}
 
 MuPDFHandler::PDF::PDF(fz_context* ctx, fz_document* doc) {
 	m_ctx = ctx;
@@ -85,15 +85,6 @@ MuPDFHandler::PDF::PDF(fz_context* ctx, fz_document* doc) {
 	for (size_t i = 0; i < get_page_count(); i++) { 
 		m_pages.push_back(fz_load_page(m_ctx, m_doc, i)); 
 	}
-
-	create_display_list();
-	// create the conditional variable
-	m_thread_conditional = new std::condition_variable(); 
-	m_queue_mutex = new std::mutex();
-	m_threaded_render_queue = new std::deque<std::tuple<PDFRenderInfoStruct, HWND, std::vector<CachedBitmap*>>>();
-	m_thread_should_die = new bool(false); 
-	m_render_in_progress = new std::atomic<size_t>(0);
-	m_amount_of_threads_running = new std::atomic<size_t>(0);
 }
 
 MuPDFHandler::PDF::PDF(PDF&& t) noexcept {
@@ -105,29 +96,8 @@ MuPDFHandler::PDF::PDF(PDF&& t) noexcept {
 
 	m_pages = std::move(t.m_pages);
 
-	m_display_lists = t.m_display_lists;
-	t.m_display_lists = nullptr;
-
 	data = t.data;
 	t.data = nullptr;
-
-	m_amount_of_threads_running = t.m_amount_of_threads_running;
-	t.m_amount_of_threads_running = nullptr;
-
-	m_thread_conditional = t.m_thread_conditional;
-	t.m_thread_conditional = nullptr;
-
-	m_thread_should_die = t.m_thread_should_die;
-	t.m_thread_should_die = nullptr;
-
-	m_queue_mutex = t.m_queue_mutex;
-	t.m_queue_mutex = nullptr;
-
-	m_threaded_render_queue = t.m_threaded_render_queue;
-	t.m_threaded_render_queue = nullptr;
-
-	m_render_in_progress = t.m_render_in_progress;
-	t.m_render_in_progress = 0;
 }
 
 
@@ -142,30 +112,11 @@ MuPDFHandler::PDF::~PDF() {
 	if (m_ctx == nullptr)
 		return;
 
-	// firts cleanup thethreads
-	stop_render_threads();
-
-	if (m_thread_conditional != nullptr) {
-		delete m_thread_conditional;
-	}
-	if (m_queue_mutex != nullptr) {
-		delete m_queue_mutex;
-	}
-
-	delete m_thread_should_die;
-	delete m_amount_of_threads_running;
-	delete m_threaded_render_queue;
-	delete m_render_in_progress;
-
 	// we can now safely delete all the other used resources
 	for (size_t i = 0; i < m_pages.size(); i++) {
 		fz_drop_page(m_ctx, m_pages.at(i));
 	}
 
-	for (size_t i = 0; i < m_display_lists->size(); i++) {
-		fz_drop_display_list(m_ctx, m_display_lists->at(i));
-	}
-	delete m_display_lists;
 
 	fz_drop_document(m_ctx, m_doc);
 }
@@ -174,88 +125,7 @@ fz_page* MuPDFHandler::PDF::get_page(size_t page) const {
 	return m_pages.at(page);
 }
 
-Direct2DRenderer::BitmapObject MuPDFHandler::PDF::get_bitmap(Direct2DRenderer& renderer, size_t page, float dpi) const {
-	fz_matrix ctm;
-	auto size = get_page_size(page, dpi); 
-	ctm = fz_scale((dpi / MUPDF_DEFAULT_DPI), (dpi / MUPDF_DEFAULT_DPI));
-
-	fz_pixmap* pixmap     = nullptr;
-	fz_device* drawdevice = nullptr;
-	Direct2DRenderer::BitmapObject obj;
-
-	fz_try(m_ctx) {
-		 pixmap     = fz_new_pixmap(m_ctx, fz_device_rgb(m_ctx), size.width, size.height, nullptr, 1);
-		 fz_clear_pixmap_with_value(m_ctx, pixmap, 0xff); // for the white background
-		 drawdevice = fz_new_draw_device(m_ctx, fz_identity, pixmap); 
-		 fz_run_page(m_ctx, get_page(page), drawdevice, ctm, nullptr);
-		 fz_close_device(m_ctx, drawdevice);
-		 obj = renderer.create_bitmap((byte*)pixmap->samples, size, (unsigned int)pixmap->stride, 96); // default dpi of the pixmap
-	} fz_always(m_ctx) {
-		fz_drop_device(m_ctx, drawdevice);
-		fz_drop_pixmap(m_ctx, pixmap);
-	} fz_catch(m_ctx) {
-		return Direct2DRenderer::BitmapObject();
-	}
-
-	return std::move(obj);
-}
-
-Direct2DRenderer::BitmapObject MuPDFHandler::PDF::get_bitmap(Direct2DRenderer& renderer, size_t page, Renderer::Rectangle<unsigned int> rec) const {
-	fz_matrix ctm; 
-	auto size = get_page_size(page);
-	ctm = fz_scale((rec.width / size.width), (rec.height / size.height)); 
-
-	// this is to calculate the size of the pixmap
-	auto bbox = fz_round_rect(fz_transform_rect(fz_make_rect(0, 0, size.width, size.height), ctm)); 
-
-	fz_pixmap* pixmap = nullptr; 
-	fz_device* drawdevice = nullptr; 
-	Direct2DRenderer::BitmapObject obj; 
-
-	fz_try(m_ctx) {
-		pixmap = fz_new_pixmap_with_bbox(m_ctx, fz_device_rgb(m_ctx), bbox, nullptr, 1);
-		fz_clear_pixmap_with_value(m_ctx, pixmap, 0xff); // for the white background
-		drawdevice = fz_new_draw_device(m_ctx, fz_identity, pixmap);
-		fz_run_page(m_ctx, get_page(page), drawdevice, ctm, nullptr);
-		fz_close_device(m_ctx, drawdevice);
-		obj = renderer.create_bitmap((byte*)pixmap->samples, rec, (unsigned int)pixmap->stride, 96); // default dpi of the pixmap
-	} fz_always(m_ctx) {
-		fz_drop_device(m_ctx, drawdevice);
-		fz_drop_pixmap(m_ctx, pixmap);
-	} fz_catch(m_ctx) {
-		return Direct2DRenderer::BitmapObject();
-	}
-
-	return std::move(obj);
-}
-
-Direct2DRenderer::BitmapObject MuPDFHandler::PDF::get_bitmap(Direct2DRenderer& renderer, size_t page, Renderer::Rectangle<float> source, float dpi) const {
-	fz_matrix ctm;
-	ctm = fz_scale((dpi / MUPDF_DEFAULT_DPI), (dpi / MUPDF_DEFAULT_DPI));
-	auto transform = fz_translate(-source.x, -source.y);
-	// this is to calculate the size of the pixmap using the source
-	auto pixmap_size = fz_round_rect(fz_transform_rect(fz_make_rect(0, 0, source.width, source.height), ctm));
-
-	fz_pixmap* pixmap = nullptr;
-	fz_device* drawdevice = nullptr;
-	Direct2DRenderer::BitmapObject obj;
-
-	fz_try(m_ctx) {
-		pixmap = fz_new_pixmap_with_bbox(m_ctx, fz_device_rgb(m_ctx), pixmap_size, nullptr, 1); 
-		fz_clear_pixmap_with_value(m_ctx, pixmap, 0xff); // for the white background
-		drawdevice = fz_new_draw_device(m_ctx, fz_identity, pixmap);
-		fz_run_page(m_ctx, get_page(page), drawdevice, fz_concat(transform, ctm), nullptr);
-		fz_close_device(m_ctx, drawdevice);
-		obj = renderer.create_bitmap((byte*)pixmap->samples, pixmap_size, (unsigned int)pixmap->stride, dpi); // default dpi of the pixmap
-	} fz_always(m_ctx) {
-		fz_drop_device(m_ctx, drawdevice);
-		fz_drop_pixmap(m_ctx, pixmap);
-	} fz_catch(m_ctx) {
-		return Direct2DRenderer::BitmapObject();
-	}
-
-	return std::move(obj); 
-}
+/*
 
 void do_multithread_rendering(Direct2DRenderer* renderer, fz_context* ctx, fz_display_list* list, Renderer::Rectangle<float> source, Renderer::Rectangle<float> dest, float dpi) {
 	// clone the context
@@ -336,54 +206,6 @@ void do_multithread_rendering_with_windowcallback(Direct2DRenderer* renderer, fz
 
 	fz_drop_context(cloned_ctx);
 }
-
-void MuPDFHandler::PDF::multithreaded_get_bitmap(Direct2DRenderer* renderer, size_t page, Renderer::Rectangle<float> source, Renderer::Rectangle<float> dest, float dpi) const {
-	float halfwidth  = source.width / 2.0f;
-	float halfheight = source.height / 2.0f;
-
-	// create the 4 recs
-	Renderer::Rectangle<float> r1 = { source.x, source.y, halfwidth, halfheight };
-	Renderer::Rectangle<float> r2 = { source.x + halfwidth, source.y, halfwidth, halfheight };
-	Renderer::Rectangle<float> r3 = { source.x, source.y + halfheight, halfwidth, halfheight };
-	Renderer::Rectangle<float> r4 = { source.x + halfwidth, source.y + halfheight, halfwidth, halfheight };
-
-	// calculate the destination rectangle
-	halfwidth  = dest.width / 2.0f;
-	halfheight = dest.height / 2.0f;
-	Renderer::Rectangle<float> d1 = { dest.x, dest.y, halfwidth, halfheight };
-	Renderer::Rectangle<float> d2 = { dest.x + halfwidth, dest.y, halfwidth, halfheight };
-	Renderer::Rectangle<float> d3 = { dest.x, dest.y + halfheight, halfwidth, halfheight };
-	Renderer::Rectangle<float> d4 = { dest.x + halfwidth, dest.y + halfheight, halfwidth, halfheight };
-
-	// create the source and destination rectangles
-
-	std::array<Renderer::Rectangle<float>, 4> source_recs = { r1, r2, r3, r4 };
-	std::array<Renderer::Rectangle<float>, 4> destin_recs = { d1, d2, d3, d4 };
-
-	// for each rec create a display list
-	fz_display_list* list = nullptr;
-	fz_device* dev		  = nullptr;
-	// get the page that will be rendered
-	auto p = get_page(page);  
-	for (size_t i = 0; i < source_recs.size(); i++) {
-		fz_try(m_ctx) {
-			// create a display list with all the draw calls and so on
-			list = fz_new_display_list(m_ctx, source_recs.at(i)); 
-			dev = fz_new_list_device(m_ctx, list);
-			// run the device
-			fz_run_page(m_ctx, p, dev, fz_identity, nullptr); 
-		} fz_always(m_ctx) {
-			// flush the device
-			fz_close_device(m_ctx, dev);
-			fz_drop_device(m_ctx, dev);
-		} fz_catch(m_ctx) {
-			return;
-		}
-		// if everything worked we can now create a thread and render the display list
-		std::thread(do_multithread_rendering, renderer, m_ctx, list, source_recs.at(i), destin_recs.at(i), dpi).detach();
-	}
-}
-
 
 typedef struct {
 	unsigned int cmd : 5;
@@ -576,6 +398,7 @@ void MuPDFHandler::PDF::stop_render_threads(bool blocking) {
 bool MuPDFHandler::PDF::multithreaded_is_rendering_in_progress() const {
 	return *m_render_in_progress != 0;
 }
+*/
 
 size_t MuPDFHandler::PDF::get_page_count() const { 
 	return fz_count_pages(m_ctx, m_doc);
