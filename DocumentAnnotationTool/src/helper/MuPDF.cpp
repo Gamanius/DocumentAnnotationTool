@@ -125,6 +125,10 @@ fz_page* MuPDFHandler::PDF::get_page(size_t page) const {
 	return m_pages.at(page);
 }
 
+fz_context* MuPDFHandler::PDF::get_context() const {
+	return m_ctx;
+}
+
 /*
 
 void do_multithread_rendering(Direct2DRenderer* renderer, fz_context* ctx, fz_display_list* list, Renderer::Rectangle<float> source, Renderer::Rectangle<float> dest, float dpi) {

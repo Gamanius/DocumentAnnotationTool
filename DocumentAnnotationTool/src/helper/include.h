@@ -47,6 +47,7 @@ namespace Logger {
 	void log(const std::wstring& msg, MsgLevel lvl = MsgLevel::INFO);
 	void log(const std::string& msg, MsgLevel lvl = MsgLevel::INFO);
 	void log(const unsigned long msg, MsgLevel lvl = MsgLevel::INFO);
+	void log(size_t msg, MsgLevel lvl = MsgLevel::INFO);
 	void log(int msg, MsgLevel lvl = MsgLevel::INFO);
 	void log(const double msg, MsgLevel lvl = MsgLevel::INFO);
 	void warn(const std::string& msg);
@@ -751,6 +752,7 @@ public:
 		~PDF();
 
 		fz_page* get_page(size_t page) const;
+		fz_context* get_context() const;
 
 		/// <summary>
 		/// Retrieves the number of pdf pages
@@ -778,14 +780,34 @@ public:
 class PDFRenderHandler {
 public:
 	struct RenderInfo {
-		Direct2DRenderer* renderer = nullptr;
 		size_t page = 0;
-		Renderer::Rectangle<float> source;
-		Renderer::Rectangle<float> dest;
-		float dpi = MUPDF_DEFAULT_DPI;
-		size_t render_status = 0;
-		fz_cookie pdf_cookie = { 0 };
-		HWND callback_window = 0;
+		Renderer::Rectangle<float> overlap_in_docspace;
+
+		RenderInfo() = default;
+		RenderInfo(size_t page, Renderer::Rectangle<float> overlap) : page(page), overlap_in_docspace(overlap) {}
+		// move constructor
+		RenderInfo(RenderInfo&& t) noexcept {
+			page = t.page;
+			overlap_in_docspace = t.overlap_in_docspace;
+		}
+		// move assignment
+		RenderInfo& operator=(RenderInfo&& t) noexcept {
+			this->~RenderInfo(); 
+			new(this) RenderInfo(std::move(t));
+			return *this;
+		}
+
+		RenderInfo(const RenderInfo& t) {
+			page = t.page;
+			overlap_in_docspace = t.overlap_in_docspace;
+		}
+		RenderInfo& operator=(const RenderInfo& t) {
+			page = t.page;
+			overlap_in_docspace = t.overlap_in_docspace;
+			return *this;
+		}
+
+		~RenderInfo() {}
 	};
 private:
 	// not owned by this class
@@ -805,13 +827,6 @@ private:
 	std::shared_ptr<std::deque<CachedBitmap>> m_cachedBitmaps = nullptr;
 	
 	// For Multithreading
-	std::shared_ptr<std::mutex> m_queue_mutex = nullptr;
-	std::shared_ptr<std::atomic_size_t> m_amount_of_threads_running = nullptr;
-	std::shared_ptr<std::atomic_size_t> m_render_in_progress = nullptr; 
-	std::shared_ptr<std::condition_variable> m_thread_conditional = nullptr;
-	std::shared_ptr<bool> m_thread_should_die = nullptr; 
-	size_t m_render_queue_frame = 1;
-	std::shared_ptr<std::map<size_t, RenderInfo>> m_render_queue = nullptr;
 
 	std::deque<std::tuple<Renderer::Rectangle<float>, float>> m_debug_cachedBitmap; 
 
@@ -820,13 +835,19 @@ private:
 
 	void create_preview(float scale = 0.5);
 	void create_display_list();
-	void create_render_threads(size_t amount = 2);
-
-	void update_render_queue();
 
 	void render_high_res(HWND window);
 
+	std::vector<Renderer::Rectangle<float>> render_job_splice_recs(Renderer::Rectangle<float>, const std::vector<size_t>& cashedBitmapindex);
+	std::vector<size_t> render_job_clipped_cashed_bitmaps(Renderer::Rectangle<float> overlap_clip_space, float dpi);
+
 	void remove_small_cached_bitmaps(float treshold);
+
+	/// <summary>
+	/// 
+	/// </summary>
+	/// <param name="max_memory">In Mega Bytes</param>
+	void reduce_cache_size(unsigned long long max_memory);
 
 	void debug_render_preview();
 	void debug_render_high_res();
@@ -880,7 +901,7 @@ public:
 	void debug_render();
 	void sort_page_positions();
 
-	void stop_render_threads();
+	unsigned long long get_cache_memory_usage() const;
 };
 
 class WindowHandler {
