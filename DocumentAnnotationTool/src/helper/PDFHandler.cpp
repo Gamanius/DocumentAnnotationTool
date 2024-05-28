@@ -145,11 +145,42 @@ void PDFRenderHandler::create_display_list() {
 }
 
 void PDFRenderHandler::create_display_list_async() {
+	// for each rec create a display list
+	fz_display_list* list = nullptr; 
+	fz_device* dev = nullptr; 
 
+	// copy the context
+	fz_context* copy_ctx = nullptr;
+	{
+		auto ctx = m_pdf->get_context();
+		copy_ctx = fz_clone_context(*ctx);
+	}
+	
+	for (size_t i = 0; i < m_pdf->get_page_count(); i++) { 
+		// get the page that will be rendered
+		auto p = m_pdf->get_page(i);
+		fz_try(copy_ctx) {
+			// create a display list with all the draw calls and so on
+			list = fz_new_display_list(copy_ctx, fz_bound_page(copy_ctx, *p));
+			dev = fz_new_list_device(copy_ctx, list);
+			// run the device
+			fz_run_page(copy_ctx, *p, dev, fz_identity, nullptr);
+			// add list to array
+			m_display_lists->push_back(std::shared_ptr<DisplayListWrapper>(new DisplayListWrapper(m_pdf->get_context_wrapper(), list)));
+		} fz_always(copy_ctx) {
+			// flush the device
+			fz_close_device(copy_ctx, dev);
+			fz_drop_device(copy_ctx, dev);
+		} fz_catch(copy_ctx) {
+			ASSERT(false, "Could not create display list"); 
+		}
+	}
+
+	fz_drop_context(copy_ctx);
 }
 
 
-PDFRenderHandler::PDFRenderHandler(MuPDFHandler::PDF* const pdf, Direct2DRenderer* const renderer, HWND window) : m_pdf(pdf), m_renderer(renderer), m_windowCallback(window) {
+PDFRenderHandler::PDFRenderHandler(MuPDFHandler::PDF* const pdf, Direct2DRenderer* const renderer, WindowHandler* const window) : m_pdf(pdf), m_renderer(renderer), m_window(window) {
 	// init of m_pagerec
 	sort_page_positions();
 	// init of m_previewBitmaps
@@ -160,9 +191,6 @@ PDFRenderHandler::PDFRenderHandler(MuPDFHandler::PDF* const pdf, Direct2DRendere
 	create_display_list();
 }
 
-PDFRenderHandler::PDFRenderHandler(MuPDFHandler::PDF* const pdf, Direct2DRenderer* const renderer, HWND window, size_t amount_of_render) : PDFRenderHandler(pdf, renderer, window) {
-	//create_render_threads(amount_of_render);
-}
 
 void PDFRenderHandler::create_preview(float scale) {
 	m_previewBitmaps.clear();
@@ -216,7 +244,7 @@ std::vector<Renderer::Rectangle<float>> PDFRenderHandler::render_job_splice_recs
 	return choppy; 
 } 
 
-void PDFRenderHandler::render_high_res(HWND window) {
+void PDFRenderHandler::render_high_res() {
 	// get the target dpi
 	auto dpi = m_renderer->get_dpi() * m_renderer->get_transform_scale();
 	// first check which pages intersect with the clip space
@@ -285,7 +313,7 @@ void PDFRenderHandler::render_high_res(HWND window) {
 				temp_cachedBitmaps.push_back(&m_cachedBitmaps->at(cached_bitmap_index.at(i)));
 			}
 			// we can send some of the cached bitmaps already to the window
-			SendMessage(window, WM_PDF_BITMAP_READY, (WPARAM)nullptr, (LPARAM)(&temp_cachedBitmaps));
+			SendMessage(m_window->get_hwnd(), WM_PDF_BITMAP_READY, (WPARAM)nullptr, (LPARAM)(&temp_cachedBitmaps));
 		}
 	}
 
@@ -308,7 +336,7 @@ void PDFRenderHandler::render_high_res(HWND window) {
 	}
 
 	// send the new rendered bitmaps to the window
-	SendMessage(window, WM_PDF_BITMAP_READY, (WPARAM)nullptr, (LPARAM)(&temp_cachedBitmaps));
+	SendMessage(m_window->get_hwnd(), WM_PDF_BITMAP_READY, (WPARAM)nullptr, (LPARAM)(&temp_cachedBitmaps));
 }
 
 void PDFRenderHandler::remove_small_cached_bitmaps(float treshold) {
@@ -430,7 +458,7 @@ void PDFRenderHandler::debug_render_high_res() {
 	}
 }
 
-PDFRenderHandler::PDFRenderHandler(PDFRenderHandler&& t) noexcept : m_renderer(t.m_renderer), m_pdf(t.m_pdf) {
+PDFRenderHandler::PDFRenderHandler(PDFRenderHandler&& t) noexcept : m_renderer(t.m_renderer), m_pdf(t.m_pdf), m_window(t.m_window) {
 	m_previewBitmaps = std::move(t.m_previewBitmaps); 
 
 	m_preview_scale = t.m_preview_scale;
@@ -475,18 +503,9 @@ void PDFRenderHandler::render(HWND callbackwindow) {
 	if (scale > m_preview_scale + EPSILON) {
 		// if we are zoomed in, we need to render the page at a higher resolution
 		// than the screen resolution
-		render_high_res(callbackwindow);
+		render_high_res();
 	}
 }
-
-
-//void PDFRenderHandler::stop_rendering(HWND callbackwindow) {
-//	m_pdf.stop_render_threads(false);
-//	//first block
-//	MSG msg;
-//	while (m_pdf.multithreaded_is_rendering_in_progress())
-//		GetMessage(&msg, 0, 0, 0);
-//}
 
 void PDFRenderHandler::debug_render() {
 	auto scale = m_renderer->get_transform_scale();
@@ -517,6 +536,4 @@ unsigned long long PDFRenderHandler::get_cache_memory_usage() const {
 	return mem;
 }
 
-PDFRenderHandler::~PDFRenderHandler() {
-	
-}
+PDFRenderHandler::~PDFRenderHandler() {}

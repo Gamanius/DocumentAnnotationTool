@@ -1,16 +1,15 @@
 #include "include.h"
 
-ContextWrapper::ContextWrapper(fz_context* c) {
-	m_ctx = c;
-}
+ContextWrapper::ContextWrapper(fz_context* c) : ThreadSafeWrapper<fz_context*>(c) {}
 
 ThreadSafeContextWrapper ContextWrapper::get_context() {
-	return ThreadSafeContextWrapper(m_mutex, &m_ctx);
+	return this->get_item();
 }
 
+
 ContextWrapper::~ContextWrapper() {
-	std::unique_lock<std::mutex>(m_mutex);
-	fz_drop_context(m_ctx);
+	auto c = this->get_item(); 
+	fz_drop_context(*c);
 }
 
 

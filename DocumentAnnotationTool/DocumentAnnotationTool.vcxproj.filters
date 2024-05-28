@@ -54,5 +54,10 @@
   <ItemGroup>
     <None Include="rsc\ENR6.3-9.slow.rendering.pdf" />
     <None Include="rsc\Physikpraktikum_1-4.pdf" />
+    <None Include="rsc\second_measurement_red_sensor_HEAVY.pdf" />
+    <None Include="rsc\Ghent_PDF_Output_Suite_V50_Testpages\PR_Ghent-PDF-Output-Suite-5-Conformance-Certification.pdf" />
+    <None Include="rsc\Ghent_PDF_Output_Suite_V50_Testpages\Ghent_PDF-Output-Test-V50_ALL_REFERENCE.pdf" />
+    <None Include="rsc\Ghent_PDF_Output_Suite_V50_Testpages\Ghent_PDF-Output-Test-V50_ALL_X4.pdf" />
+    <None Include="rsc\Ghent_PDF_Output_Suite_V50_Testpages\GhentPDFOutputSuite50_ReadMes.pdf" />
   </ItemGroup>
 </Project>

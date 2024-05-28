@@ -22,7 +22,7 @@ MuPDFHandler::MuPDFHandler() {
 
 	m_context = std::shared_ptr<ContextWrapper>(new ContextWrapper(fz_new_context(nullptr, &m_locks, FZ_STORE_UNLIMITED)));
 	
-	auto c = m_context->get_context();
+	auto c = m_context->get_item();
 
 	fz_set_error_callback(*c, error_callback, nullptr);
 	fz_register_document_handlers(*c);
@@ -52,7 +52,7 @@ std::optional<MuPDFHandler::PDF> MuPDFHandler::load_pdf(const std::wstring& path
 }
 
 ThreadSafeContextWrapper MuPDFHandler::get_context() {
-	return m_context->get_context();
+	return m_context->get_item();
 }
 
 MuPDFHandler::~MuPDFHandler() {}
@@ -92,7 +92,7 @@ MuPDFHandler::PDF::PDF(std::shared_ptr<ContextWrapper> ctx, std::shared_ptr<Docu
 	m_document = doc; 
 
 	// get context
-	auto c = ctx->get_context();
+	auto c = ctx->get_item();
 	// and document
 	auto d = doc->get_document();
 
@@ -131,7 +131,7 @@ ThreadSafePageWrapper MuPDFHandler::PDF::get_page(size_t page) const {
 }
 
 ThreadSafeContextWrapper MuPDFHandler::PDF::get_context() const {
-	return m_ctx->get_context();
+	return m_ctx->get_item();
 }
 
 std::shared_ptr<ContextWrapper> MuPDFHandler::PDF::get_context_wrapper() const {

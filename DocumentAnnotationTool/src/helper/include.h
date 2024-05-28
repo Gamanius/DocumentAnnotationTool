@@ -104,6 +104,24 @@ public:
 	}
 };
 
+template<typename T, typename M = std::recursive_mutex, typename C = RawThreadSafeClass<T, M>>
+struct ThreadSafeWrapper {
+private:
+	T m_item;
+	M m_mutex;
+public:
+	ThreadSafeWrapper(T item) : m_item(item) {}
+
+	C get_item() {
+		return C(m_mutex, &m_item);
+	}
+
+	~ThreadSafeWrapper() {
+		// make sure mutex is not used
+		get_item();
+	}
+};
+
 
 namespace Logger {
 	enum MsgLevel {
@@ -771,30 +789,27 @@ struct CachedBitmap {
 		dpi = cachedbitmap.dpi;
 		used = cachedbitmap.used;
 	}
-	CachedBitmap& operator=(CachedBitmap&& cachedbitmap) noexcept {
-		bitmap = std::move(cachedbitmap.bitmap);
-		dest = cachedbitmap.dest;
-		dpi = cachedbitmap.dpi;
-		used = cachedbitmap.used;
+	CachedBitmap& operator=(CachedBitmap&& t) noexcept {
+		// new c++ stuff?
+		this->~CachedBitmap();
+		new(this) CachedBitmap(std::move(t));
 		return *this;
 	}
 };
 
-struct ContextWrapper;
+
+template <typename T>
+using ThreadSafeVector = ThreadSafeWrapper<std::vector<T>>;
+
 typedef RawThreadSafeClass<fz_context*, std::recursive_mutex> ThreadSafeContextWrapper;
-
-struct ContextWrapper {
-private:
-	fz_context* m_ctx = nullptr;
-	std::recursive_mutex m_mutex;
-
-public:
+struct ContextWrapper : public ThreadSafeWrapper<fz_context*> {
 	ContextWrapper(fz_context* c);
 
 	ThreadSafeContextWrapper get_context();
 
 	~ContextWrapper();
 };
+
 
 struct DocumentWrapper;
 typedef RawThreadSafeClass<fz_document*, std::recursive_mutex> ThreadSafeDocumentWrapper;
@@ -827,6 +842,7 @@ public:
 
 	~PageWrapper();
 };
+
 
 struct DisplayListWrapper;
 typedef RawThreadSafeClass<fz_display_list*, std::recursive_mutex> ThreadSafeDisplayListWrapper;
@@ -909,6 +925,8 @@ public:
 	~MuPDFHandler();
 };
 
+class WindowHandler;
+
 /// <summary>
 /// Class to handle the rendering of only one pdf
 /// </summary>
@@ -949,12 +967,11 @@ private:
 	MuPDFHandler::PDF* const m_pdf = nullptr;
 	// not owned by this class!
 	Direct2DRenderer* const m_renderer = nullptr;
+	// not owned by this class!
+	WindowHandler* const m_window = nullptr;
 
 	// Position and dimensions of the pages 
 	std::vector<Renderer::Rectangle<float>> m_pagerec;
-
-	// Callback to the window when the bitmaps are ready
-	HWND m_windowCallback = 0;
 
 	// Preview rendering
 	// rendererd at half scale or otherwise specified
@@ -965,7 +982,6 @@ private:
 	std::shared_ptr<std::deque<CachedBitmap>> m_cachedBitmaps = nullptr;
 	
 	// For Multithreading
-
 	std::deque<std::tuple<Renderer::Rectangle<float>, float>> m_debug_cachedBitmap; 
 
 	float m_seperation_distance = 10;
@@ -975,7 +991,7 @@ private:
 	void create_display_list();
 	void create_display_list_async();
 
-	void render_high_res(HWND window);
+	void render_high_res();
 
 	std::vector<Renderer::Rectangle<float>> render_job_splice_recs(Renderer::Rectangle<float>, const std::vector<size_t>& cashedBitmapindex);
 	std::vector<size_t> render_job_clipped_cashed_bitmaps(Renderer::Rectangle<float> overlap_clip_space, float dpi);
@@ -993,8 +1009,7 @@ private:
 public:
 	PDFRenderHandler() = default;
 
-	PDFRenderHandler(MuPDFHandler::PDF* const pdf, Direct2DRenderer* const renderer, HWND window);
-	PDFRenderHandler(MuPDFHandler::PDF* const pdf, Direct2DRenderer* const renderer, HWND window, size_t amount_of_render_threads);
+	PDFRenderHandler(MuPDFHandler::PDF* const pdf, Direct2DRenderer* const renderer, WindowHandler* const window);
 
 	// move constructor
 	PDFRenderHandler(PDFRenderHandler&& t) noexcept;
