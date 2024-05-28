@@ -1,117 +1,5 @@
 #include "include.h"
 
-
-Direct2DRenderer::BitmapObject PDFRenderHandler::get_bitmap(Direct2DRenderer& renderer, size_t page, float dpi) const {
-	fz_matrix ctm;
-	auto size = m_pdf->get_page_size(page, dpi);
-	ctm = fz_scale((dpi / MUPDF_DEFAULT_DPI), (dpi / MUPDF_DEFAULT_DPI));
-
-	fz_pixmap* pixmap = nullptr;
-	fz_device* drawdevice = nullptr;
-	Direct2DRenderer::BitmapObject obj;
-
-	fz_try(*m_pdf) {
-		pixmap = fz_new_pixmap(*m_pdf, fz_device_rgb(*m_pdf), size.width, size.height, nullptr, 1);
-		fz_clear_pixmap_with_value(*m_pdf, pixmap, 0xff); // for the white background
-		drawdevice = fz_new_draw_device(*m_pdf, fz_identity, pixmap);
-		fz_run_page(*m_pdf, m_pdf->get_page(page), drawdevice, ctm, nullptr);
-		fz_close_device(*m_pdf, drawdevice);
-		obj = renderer.create_bitmap((byte*)pixmap->samples, size, (unsigned int)pixmap->stride, 96); // default dpi of the pixmap
-	} fz_always(*m_pdf) {
-		fz_drop_device(*m_pdf, drawdevice);
-		fz_drop_pixmap(*m_pdf, pixmap);
-	} fz_catch(*m_pdf) {
-		return Direct2DRenderer::BitmapObject();
-	}
-
-	return std::move(obj);
-}
-
-Direct2DRenderer::BitmapObject PDFRenderHandler::get_bitmap(Direct2DRenderer& renderer, size_t page, Renderer::Rectangle<unsigned int> rec) const {
-	fz_matrix ctm;
-	auto size = m_pdf->get_page_size(page); 
-	ctm = fz_scale((rec.width / size.width), (rec.height / size.height));
-
-	// this is to calculate the size of the pixmap
-	auto bbox = fz_round_rect(fz_transform_rect(fz_make_rect(0, 0, size.width, size.height), ctm));
-
-	fz_pixmap* pixmap = nullptr;
-	fz_device* drawdevice = nullptr;
-	Direct2DRenderer::BitmapObject obj;
-
-	fz_try(*m_pdf) {
-		pixmap = fz_new_pixmap_with_bbox(*m_pdf, fz_device_rgb(*m_pdf), bbox, nullptr, 1);
-		fz_clear_pixmap_with_value(*m_pdf, pixmap, 0xff); // for the white background
-		drawdevice = fz_new_draw_device(*m_pdf, fz_identity, pixmap);
-		fz_run_page(*m_pdf, m_pdf->get_page(page), drawdevice, ctm, nullptr);
-		fz_close_device(*m_pdf, drawdevice);
-		obj = renderer.create_bitmap((byte*)pixmap->samples, rec, (unsigned int)pixmap->stride, 96); // default dpi of the pixmap
-	} fz_always(*m_pdf) {
-		fz_drop_device(*m_pdf, drawdevice);
-		fz_drop_pixmap(*m_pdf, pixmap);
-	} fz_catch(*m_pdf) {
-		return Direct2DRenderer::BitmapObject();
-	}
-
-	return std::move(obj);
-}
-
-Direct2DRenderer::BitmapObject PDFRenderHandler::get_bitmap(Direct2DRenderer& renderer, size_t page, Renderer::Rectangle<float> source, float dpi) const {
-	fz_matrix ctm;
-	ctm = fz_scale((dpi / MUPDF_DEFAULT_DPI), (dpi / MUPDF_DEFAULT_DPI));
-	auto transform = fz_translate(-source.x, -source.y);
-	// this is to calculate the size of the pixmap using the source
-	auto pixmap_size = fz_round_rect(fz_transform_rect(fz_make_rect(0, 0, source.width, source.height), ctm));
-
-	fz_pixmap* pixmap = nullptr;
-	fz_device* drawdevice = nullptr;
-	Direct2DRenderer::BitmapObject obj;
-
-	fz_try(*m_pdf) {
-		pixmap = fz_new_pixmap_with_bbox(*m_pdf, fz_device_rgb(*m_pdf), pixmap_size, nullptr, 1);
-		fz_clear_pixmap_with_value(*m_pdf, pixmap, 0xff); // for the white background
-		drawdevice = fz_new_draw_device(*m_pdf, fz_identity, pixmap);
-		fz_run_page(*m_pdf, m_pdf->get_page(page), drawdevice, fz_concat(transform, ctm), nullptr);
-		fz_close_device(*m_pdf, drawdevice);
-		obj = renderer.create_bitmap((byte*)pixmap->samples, pixmap_size, (unsigned int)pixmap->stride, dpi); // default dpi of the pixmap
-	} fz_always(*m_pdf) {
-		fz_drop_device(*m_pdf, drawdevice);
-		fz_drop_pixmap(*m_pdf, pixmap);
-	} fz_catch(*m_pdf) {
-		return Direct2DRenderer::BitmapObject();
-	}
-
-	return std::move(obj);
-}
-
-void PDFRenderHandler::create_display_list() {
-	// for each rec create a display list
-	fz_display_list* list = nullptr;
-	fz_device* dev = nullptr; 
-		
-	m_display_lists = std::make_shared<std::vector<fz_display_list*>>();
-
-	for (size_t i = 0; i < m_pdf->get_page_count(); i++) {
-		// get the page that will be rendered
-		auto p = m_pdf->get_page(i);
-		fz_try(*m_pdf) {
-			// create a display list with all the draw calls and so on
-			list = fz_new_display_list(*m_pdf, fz_bound_page(*m_pdf, p));
-			dev = fz_new_list_device(*m_pdf, list);
-			// run the device
-			fz_run_page(*m_pdf, p, dev, fz_identity, nullptr);
-			// add list to array
-			m_display_lists->push_back(list);
-		} fz_always(*m_pdf) {
-			// flush the device
-			fz_close_device(*m_pdf, dev);
-			fz_drop_device(*m_pdf, dev);
-		} fz_catch(*m_pdf) {
-			ASSERT(false, "Could not create display list");
-		}
-	}
-}
-
 typedef struct {
 	unsigned int cmd : 5;
 	unsigned int size : 9;
@@ -134,7 +22,134 @@ struct fz_display_list {
 	size_t len;
 };
 
-PDFRenderHandler::PDFRenderHandler(MuPDFHandler::PDF* const pdf, Direct2DRenderer* const renderer) : m_pdf(pdf), m_renderer(renderer) {
+Direct2DRenderer::BitmapObject PDFRenderHandler::get_bitmap(Direct2DRenderer& renderer, size_t page, float dpi) const {
+	fz_matrix ctm;
+	auto size = m_pdf->get_page_size(page, dpi);
+	ctm = fz_scale((dpi / MUPDF_DEFAULT_DPI), (dpi / MUPDF_DEFAULT_DPI));
+
+	fz_pixmap* pixmap = nullptr;
+	fz_device* drawdevice = nullptr;
+	Direct2DRenderer::BitmapObject obj;
+
+	auto ctx = m_pdf->get_context();
+	auto pag = m_pdf->get_page(page);
+
+	fz_try(*ctx) {
+		pixmap = fz_new_pixmap(*ctx, fz_device_rgb(*ctx), size.width, size.height, nullptr, 1);
+		fz_clear_pixmap_with_value(*ctx, pixmap, 0xff); // for the white background
+		drawdevice = fz_new_draw_device(*ctx, fz_identity, pixmap);
+		fz_run_page(*ctx, *pag, drawdevice, ctm, nullptr);
+		fz_close_device(*ctx, drawdevice);
+		obj = renderer.create_bitmap((byte*)pixmap->samples, size, (unsigned int)pixmap->stride, 96); // default dpi of the pixmap
+	} fz_always(*ctx) {
+		fz_drop_device(*ctx, drawdevice);
+		fz_drop_pixmap(*ctx, pixmap);
+	} fz_catch(*ctx) {
+		return Direct2DRenderer::BitmapObject();
+	}
+
+	return std::move(obj);
+}
+
+Direct2DRenderer::BitmapObject PDFRenderHandler::get_bitmap(Direct2DRenderer& renderer, size_t page, Renderer::Rectangle<unsigned int> rec) const {
+	fz_matrix ctm;
+	auto size = m_pdf->get_page_size(page); 
+	ctm = fz_scale((rec.width / size.width), (rec.height / size.height));
+
+	// this is to calculate the size of the pixmap
+	auto bbox = fz_round_rect(fz_transform_rect(fz_make_rect(0, 0, size.width, size.height), ctm));
+
+	fz_pixmap* pixmap = nullptr;
+	fz_device* drawdevice = nullptr;
+	Direct2DRenderer::BitmapObject obj;
+
+	auto ctx = m_pdf->get_context();
+	auto pag = m_pdf->get_page(page);
+
+	fz_try(*ctx) {
+		pixmap = fz_new_pixmap_with_bbox(*ctx, fz_device_rgb(*ctx), bbox, nullptr, 1);
+		fz_clear_pixmap_with_value(*ctx, pixmap, 0xff); // for the white background
+		drawdevice = fz_new_draw_device(*ctx, fz_identity, pixmap);
+		fz_run_page(*ctx, *pag, drawdevice, ctm, nullptr);
+		fz_close_device(*ctx, drawdevice);
+		obj = renderer.create_bitmap((byte*)pixmap->samples, rec, (unsigned int)pixmap->stride, 96); // default dpi of the pixmap
+	} fz_always(*ctx) {
+		fz_drop_device(*ctx, drawdevice);
+		fz_drop_pixmap(*ctx, pixmap);
+	} fz_catch(*ctx) {
+		return Direct2DRenderer::BitmapObject();
+	}
+
+	return std::move(obj);
+}
+
+Direct2DRenderer::BitmapObject PDFRenderHandler::get_bitmap(Direct2DRenderer& renderer, size_t page, Renderer::Rectangle<float> source, float dpi) const {
+	fz_matrix ctm;
+	ctm = fz_scale((dpi / MUPDF_DEFAULT_DPI), (dpi / MUPDF_DEFAULT_DPI));
+	auto transform = fz_translate(-source.x, -source.y);
+	// this is to calculate the size of the pixmap using the source
+	auto pixmap_size = fz_round_rect(fz_transform_rect(fz_make_rect(0, 0, source.width, source.height), ctm));
+
+	fz_pixmap* pixmap = nullptr;
+	fz_device* drawdevice = nullptr;
+	Direct2DRenderer::BitmapObject obj;
+
+	auto ctx = m_pdf->get_context();
+	auto pag = m_pdf->get_page(page);
+
+	fz_try(*ctx) {
+		pixmap = fz_new_pixmap_with_bbox(*ctx, fz_device_rgb(*ctx), pixmap_size, nullptr, 1);
+		fz_clear_pixmap_with_value(*ctx, pixmap, 0xff); // for the white background
+		drawdevice = fz_new_draw_device(*ctx, fz_identity, pixmap);
+		fz_run_page(*ctx, *pag, drawdevice, fz_concat(transform, ctm), nullptr);
+		fz_close_device(*ctx, drawdevice);
+		obj = renderer.create_bitmap((byte*)pixmap->samples, pixmap_size, (unsigned int)pixmap->stride, dpi); // default dpi of the pixmap
+	} fz_always(*ctx) {
+		fz_drop_device(*ctx, drawdevice);
+		fz_drop_pixmap(*ctx, pixmap);
+	} fz_catch(*ctx) {
+		return Direct2DRenderer::BitmapObject();
+	}
+
+	return std::move(obj);
+}
+
+void PDFRenderHandler::create_display_list() {
+	// for each rec create a display list
+	fz_display_list* list = nullptr;
+	fz_device* dev = nullptr; 
+		
+	m_display_lists = std::make_shared<std::vector<std::shared_ptr<DisplayListWrapper>>>();
+
+	auto ctx = m_pdf->get_context();
+
+	for (size_t i = 0; i < m_pdf->get_page_count(); i++) {
+		// get the page that will be rendered
+		auto p = m_pdf->get_page(i);
+		fz_try(*ctx) {
+			// create a display list with all the draw calls and so on
+			list = fz_new_display_list(*ctx, fz_bound_page(*ctx, *p));
+			dev = fz_new_list_device(*ctx, list);
+			// run the device
+			fz_run_page(*ctx, *p, dev, fz_identity, nullptr);
+			// add list to array
+			m_display_lists->push_back(std::shared_ptr<DisplayListWrapper>(new DisplayListWrapper(m_pdf->get_context_wrapper(), list)));
+		} fz_always(*ctx) {
+			// flush the device
+			fz_close_device(*ctx, dev);
+			fz_drop_device(*ctx, dev);
+		} fz_catch(*ctx) {
+			ASSERT(false, "Could not create display list");
+		}
+	}
+}
+
+void PDFRenderHandler::create_display_list_async() {
+
+}
+
+
+PDFRenderHandler::PDFRenderHandler(MuPDFHandler::PDF* const pdf, Direct2DRenderer* const renderer, HWND window) : m_pdf(pdf), m_renderer(renderer), m_windowCallback(window) {
 	// init of m_pagerec
 	sort_page_positions();
 	// init of m_previewBitmaps
@@ -145,7 +160,7 @@ PDFRenderHandler::PDFRenderHandler(MuPDFHandler::PDF* const pdf, Direct2DRendere
 	create_display_list();
 }
 
-PDFRenderHandler::PDFRenderHandler(MuPDFHandler::PDF* const pdf, Direct2DRenderer* const renderer, size_t amount_of_render) : PDFRenderHandler(pdf, renderer) {
+PDFRenderHandler::PDFRenderHandler(MuPDFHandler::PDF* const pdf, Direct2DRenderer* const renderer, HWND window, size_t amount_of_render) : PDFRenderHandler(pdf, renderer, window) {
 	//create_render_threads(amount_of_render);
 }
 
@@ -503,9 +518,5 @@ unsigned long long PDFRenderHandler::get_cache_memory_usage() const {
 }
 
 PDFRenderHandler::~PDFRenderHandler() {
-	if (m_display_lists == nullptr)
-		return;
-	for (size_t i = 0; i < m_display_lists->size(); i++) {
-		fz_drop_display_list(m_pdf->get_context(), m_display_lists->at(i));
-	}
+	
 }

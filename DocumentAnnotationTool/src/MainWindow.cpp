@@ -9,7 +9,7 @@ Direct2DRenderer::TextFormatObject* g_text_format;
 Direct2DRenderer::BrushObject* g_brush;
 
 MuPDFHandler::PDF* g_pdf;
-MuPDFHandler* g_mupdfcontext;
+std::shared_ptr<MuPDFHandler> g_mupdfcontext;
 PDFRenderHandler* g_pdfrenderhandler = nullptr;
 
 std::vector<Renderer::Rectangle<float>> new_rect;
@@ -17,54 +17,24 @@ Renderer::Rectangle<float> main_rec = {0, 0, 1000, 1000};
 std::vector<Renderer::Rectangle<float>> rects;
 
 
-
-void callback_draw(std::optional<std::vector<CachedBitmap*>*> highres_bitmaps, std::mutex* lock) {
+void callback_draw(std::optional<std::vector<CachedBitmap*>*> highres_bitmaps) {
 	// draw scaled elements
 	g_main_renderer->set_current_transform_active();
 	g_main_renderer->begin_draw();
 
-	if (highres_bitmaps.has_value() == false)
+	if (highres_bitmaps.has_value() == false) {
 		g_main_renderer->clear(Renderer::Color(50, 50, 50));
-
-	// when the highres_bitmaps arg is nullopt then it is a normal draw call from windows
-	if (highres_bitmaps.has_value() == false)
+		// when the highres_bitmaps arg is nullopt then it is a normal draw call from windows
 		g_pdfrenderhandler->render(g_main_window->get_hwnd());
-	//else there are new bitmaps to render that have been created by other threads
-	else if (lock != nullptr) {
-		// thread safe
-		std::lock_guard l(*lock); 
-		auto bitmaps = highres_bitmaps.value();
-		for (auto& i : *bitmaps) {
-			if (g_main_renderer->inv_transform_rect(g_main_renderer->get_window_size()).intersects(i->dest))
-				g_main_renderer->draw_bitmap(i->bitmap, i->dest, Direct2DRenderer::INTERPOLATION_MODE::LINEAR);
-		}
 	}
 	else {
+		//else there are new bitmaps to render that have been created by other threads
 		auto bitmaps = highres_bitmaps.value(); 
 		for (auto& i : *bitmaps) {
 			if (g_main_renderer->inv_transform_rect(g_main_renderer->get_window_size()).intersects(i->dest))
 				g_main_renderer->draw_bitmap(i->bitmap, i->dest, Direct2DRenderer::INTERPOLATION_MODE::LINEAR);
 		}
 	}
-	//g_pdfhandler->debug_render();
-	 
-	// draw the rectangles
-
-	//int size_before = 0;
-	//auto arr = splice_rect(main_rec, rects);
-	//size_before = arr.size();
-	//merge_rects(arr);
-	//Logger::log((int)(arr.size() - size_before));
-	//
-	//Logger::print_to_debug();
-	//for (auto& i : arr) {
-	//	g_main_renderer->draw_rect(i, *color_cyan, 5);
-	//}
-	//g_main_renderer->draw_rect(main_rec, *color_red);
-	//for (size_t i = 0; i < rects.size(); i++) {
-	//	g_main_renderer->draw_rect(rects[i], *color_yellow);
-	//}
-	
 	// draw ui elements
 	g_main_renderer->set_identity_transform_active();
 	g_main_renderer->draw_text(L"DOCANTO ALPHA VERSION 0", Renderer::Point<float>(0, 0), *g_text_format, *g_brush);
@@ -134,10 +104,7 @@ void main_window_loop_run(HINSTANCE h) {
 	auto default_text_format = g_main_renderer->create_text_format(L"Consolas", 20);
 	g_text_format = &default_text_format;
 
-	MuPDFHandler context;
-	g_mupdfcontext = &context;
-	PDFRenderHandler pdf_handler; 
-	Direct2DRenderer::BitmapObject bitmap;
+	g_mupdfcontext = std::shared_ptr<MuPDFHandler>(new MuPDFHandler);
 
 
 	auto path = FileHandler::open_file_dialog(L"PDF\0*.pdf\0\0", *g_main_window);
@@ -145,11 +112,11 @@ void main_window_loop_run(HINSTANCE h) {
 	if (!path.has_value()) {
 		return;
 	}
-	auto pdf = context.load_pdf(path.value());
-	g_pdf = &pdf.value(); 
+	auto pdf = g_mupdfcontext->load_pdf(path.value());
+	g_pdf = &pdf.value();
 
-	pdf_handler = PDFRenderHandler(g_pdf, g_main_renderer.get(), 2);
-	g_pdfrenderhandler = &pdf_handler; 
+	auto pdf_handler = PDFRenderHandler(g_pdf, g_main_renderer.get(), g_main_window->get_hwnd());
+	g_pdfrenderhandler = &pdf_handler;
 
 	// do the callbacks
 	g_main_window->set_callback_paint(callback_draw);

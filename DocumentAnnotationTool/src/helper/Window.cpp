@@ -439,7 +439,7 @@ LRESULT WindowHandler::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam
 	case WM_PDF_BITMAP_READY:
 	{
 		if (currentInstance->m_callback_paint) {
-			currentInstance->m_callback_paint((std::vector<CachedBitmap*>*)lParam, (std::mutex*)wParam);
+			currentInstance->m_callback_paint((std::vector<CachedBitmap*>*)lParam);
 		}
 		return NULL;
 	}
@@ -447,7 +447,7 @@ LRESULT WindowHandler::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam
 	case WM_PAINT: 
 	{
 		if (currentInstance->m_callback_paint) {
-			currentInstance->m_callback_paint(std::nullopt, nullptr);
+			currentInstance->m_callback_paint(std::nullopt);
 		}
 
 		ValidateRect(currentInstance->m_hwnd, NULL);
@@ -502,7 +502,7 @@ Renderer::Point<long> WindowHandler::get_mouse_pos() const {
 	return PxToDp(p);
 }
 
-void WindowHandler::set_callback_paint(std::function<void(std::optional<std::vector<CachedBitmap*>*>, std::mutex*)> callback) {
+void WindowHandler::set_callback_paint(std::function<void(std::optional<std::vector<CachedBitmap*>*>)> callback) {
 	m_callback_paint = callback;
 }
 
@@ -583,7 +583,7 @@ bool WindowHandler::init(std::wstring windowName, HINSTANCE instance) {
 	ASSERT_WIN_RETURN_FALSE(m_hwnd, "Window creation was not succefull");
 
 	m_hdc = GetDC(m_hwnd);
-	ASSERT_WIN_RETURN_FALSE(m_hwnd, "Could not retrieve device context");
+	ASSERT_WIN_RETURN_FALSE(m_hwnd, "Could not retrieve device m_context");
 
 	bool temp = EnableMouseInPointer(true);
 	ASSERT_WIN_RETURN_FALSE(temp, "Couldn't add Mouse input into Pointer Input Stack API");

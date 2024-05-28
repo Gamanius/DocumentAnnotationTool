@@ -20,6 +20,10 @@
 #include <mupdf/fitz/crypt.h>
 #include <deque>
 
+/// <summary>
+/// ID of the main thread. All other thread should use an ID > 1. ID = 0 is reserved 
+/// </summary>
+constexpr size_t MAIN_THREAD_ID = 1;
 
 #define APPLICATION_NAME L"Docanto"
 #define EPSILON 0.00001f
@@ -35,6 +39,71 @@ inline void SafeRelease(IUnknown* ptr) {
 		ptr = nullptr;
 	}
 }
+
+template <typename T>
+class ThreadSafeClass {
+	std::shared_ptr<T> obj;
+	std::unique_lock<std::mutex> lock;
+
+public:
+	ThreadSafeClass(std::pair<std::mutex, std::shared_ptr<T>>& p) : lock(p.first) {
+		obj = std::shared_ptr<T>(p.second);
+	}
+
+	ThreadSafeClass(std::mutex& m, std::shared_ptr<T> p) : lock(m) {
+		obj = std::shared_ptr<T>(p);
+	}
+
+	ThreadSafeClass(ThreadSafeClass&& a) noexcept {
+		obj = std::move(a.obj);
+		a.lock.swap(lock);
+	}
+
+	ThreadSafeClass& operator=(ThreadSafeClass&& t) noexcept {
+		this->~ThreadSafeClass();
+		new(this) ThreadSafeClass(std::move(t));
+		return *this;
+	}
+
+	T* operator->()const { return obj.get(); }
+	T& operator*() const { return *obj; }
+
+	~ThreadSafeClass() {
+		lock.unlock();
+	}
+};
+
+
+template <typename T, typename M>
+class RawThreadSafeClass {
+	T* obj = nullptr;
+	std::unique_lock<M> lock;
+
+public:
+	RawThreadSafeClass(M& m, T* p) : lock(m) {
+		obj = p;
+	}
+
+	RawThreadSafeClass(RawThreadSafeClass&& a) noexcept {
+		obj = a.obj;
+		a.lock.swap(lock);
+	}
+
+	RawThreadSafeClass& operator=(RawThreadSafeClass&& t) noexcept {
+		this->~RawThreadSafeClass();
+		new(this) RawThreadSafeClass(std::move(t));
+		return *this;
+	}
+
+	T* operator->()const { return obj; }
+	T& operator*() const { return *obj; }
+
+	~RawThreadSafeClass() {
+		// will not delete pointer since it is not owning it
+		lock.unlock(); 
+	}
+};
+
 
 namespace Logger {
 	enum MsgLevel {
@@ -711,8 +780,73 @@ struct CachedBitmap {
 	}
 };
 
-class MuPDFHandler {
+struct ContextWrapper;
+typedef RawThreadSafeClass<fz_context*, std::recursive_mutex> ThreadSafeContextWrapper;
+
+struct ContextWrapper {
+private:
 	fz_context* m_ctx = nullptr;
+	std::recursive_mutex m_mutex;
+
+public:
+	ContextWrapper(fz_context* c);
+
+	ThreadSafeContextWrapper get_context();
+
+	~ContextWrapper();
+};
+
+struct DocumentWrapper;
+typedef RawThreadSafeClass<fz_document*, std::recursive_mutex> ThreadSafeDocumentWrapper;
+
+struct DocumentWrapper {
+private:
+	std::shared_ptr<ContextWrapper> m_context;
+	fz_document* m_doc = nullptr;
+	std::recursive_mutex m_mutex;
+public:
+	DocumentWrapper(std::shared_ptr<ContextWrapper> a, fz_document* d);
+
+	ThreadSafeDocumentWrapper get_document();
+
+	~DocumentWrapper();
+};
+
+struct PageWrapper;
+typedef RawThreadSafeClass<fz_page*, std::recursive_mutex> ThreadSafePageWrapper;
+
+struct PageWrapper {
+private:
+	std::shared_ptr<ContextWrapper> m_context; 
+	fz_page* m_pag = nullptr;
+	std::recursive_mutex m_mutex;
+public:
+	PageWrapper(std::shared_ptr<ContextWrapper> a, fz_page* p);
+
+	ThreadSafePageWrapper get_page();
+
+	~PageWrapper();
+};
+
+struct DisplayListWrapper;
+typedef RawThreadSafeClass<fz_display_list*, std::recursive_mutex> ThreadSafeDisplayListWrapper;
+
+struct DisplayListWrapper {
+private:
+	std::shared_ptr<ContextWrapper> m_context;
+	fz_display_list* m_lis = nullptr;
+	std::recursive_mutex m_mutex;
+public:
+	DisplayListWrapper(std::shared_ptr<ContextWrapper> a, fz_display_list* l);
+
+	ThreadSafeDisplayListWrapper get_displaylist();
+
+	~DisplayListWrapper();
+};
+
+class MuPDFHandler {
+	std::shared_ptr<ContextWrapper> m_context;
+
 	std::mutex m_mutex[FZ_LOCK_MAX];
 	fz_locks_context m_locks;
 
@@ -731,13 +865,14 @@ public:
 		};
 
 	private:
-		fz_document* m_doc = nullptr;
-		fz_context* m_ctx = nullptr;
-		std::vector<fz_page*> m_pages;
+		// Pointer to the context from the MuPDFHandler
+		std::shared_ptr<ContextWrapper> m_ctx;
+		std::shared_ptr<DocumentWrapper> m_document;
+		std::vector<std::shared_ptr<PageWrapper>> m_pages;
 	public:
 
-		PDF() = default;
-		PDF(fz_context* ctx, fz_document* doc);
+		PDF() = default; 
+		PDF(std::shared_ptr<ContextWrapper> ctx, std::shared_ptr<DocumentWrapper> doc);
 
 		// move constructor
 		PDF(PDF&& t) noexcept;
@@ -751,16 +886,16 @@ public:
 		// the fz_context is not allowed to be droped here
 		~PDF();
 
-		fz_page* get_page(size_t page) const;
-		fz_context* get_context() const;
+		ThreadSafePageWrapper get_page(size_t page) const;
+		ThreadSafeContextWrapper get_context() const;
+
+		std::shared_ptr<ContextWrapper> get_context_wrapper() const;
 
 		/// <summary>
 		/// Retrieves the number of pdf pages
 		/// </summary>
 		/// <returns>Number of pages</returns>
 		size_t get_page_count() const;
-
-		operator fz_context*() const { return m_ctx; }
 
 		Renderer::Rectangle<float> get_page_size(size_t page, float dpi = 72) const;
 	};
@@ -769,7 +904,7 @@ public:
 
 	std::optional<PDF> load_pdf(const std::wstring& path);
 
-	operator fz_context* () const { return m_ctx; }
+	ThreadSafeContextWrapper get_context();
 
 	~MuPDFHandler();
 };
@@ -818,12 +953,15 @@ private:
 	// Position and dimensions of the pages 
 	std::vector<Renderer::Rectangle<float>> m_pagerec;
 
+	// Callback to the window when the bitmaps are ready
+	HWND m_windowCallback = 0;
+
 	// Preview rendering
 	// rendererd at half scale or otherwise specified
 	std::vector<Direct2DRenderer::BitmapObject> m_previewBitmaps;
 
 	// High res rendering
-	std::shared_ptr<std::vector<fz_display_list*>> m_display_lists = nullptr;
+	std::shared_ptr<std::vector<std::shared_ptr<DisplayListWrapper>>> m_display_lists = nullptr;
 	std::shared_ptr<std::deque<CachedBitmap>> m_cachedBitmaps = nullptr;
 	
 	// For Multithreading
@@ -835,6 +973,7 @@ private:
 
 	void create_preview(float scale = 0.5);
 	void create_display_list();
+	void create_display_list_async();
 
 	void render_high_res(HWND window);
 
@@ -854,8 +993,8 @@ private:
 public:
 	PDFRenderHandler() = default;
 
-	PDFRenderHandler(MuPDFHandler::PDF* const pdf, Direct2DRenderer* const renderer);
-	PDFRenderHandler(MuPDFHandler::PDF* const pdf, Direct2DRenderer* const renderer, size_t amount_of_render_threads);
+	PDFRenderHandler(MuPDFHandler::PDF* const pdf, Direct2DRenderer* const renderer, HWND window);
+	PDFRenderHandler(MuPDFHandler::PDF* const pdf, Direct2DRenderer* const renderer, HWND window, size_t amount_of_render_threads);
 
 	// move constructor
 	PDFRenderHandler(PDFRenderHandler&& t) noexcept;
@@ -1086,7 +1225,7 @@ public:
 	};
 
 private:
-	std::function<void(std::optional<std::vector<CachedBitmap*>*>, std::mutex*)> m_callback_paint;
+	std::function<void(std::optional<std::vector<CachedBitmap*>*>)> m_callback_paint;
 	std::function<void(Renderer::Rectangle<long>)> m_callback_size;
 	std::function<void(PointerInfo)> m_callback_pointer_down;
 	std::function<void(PointerInfo)> m_callback_pointer_up;
@@ -1108,7 +1247,7 @@ public:
 
 	void set_state(WINDOW_STATE state);
 
-	void set_callback_paint(std::function<void(std::optional<std::vector<CachedBitmap*>*>, std::mutex*)> callback);
+	void set_callback_paint(std::function<void(std::optional<std::vector<CachedBitmap*>*>)> callback);
 	void set_callback_size(std::function<void(Renderer::Rectangle<long>)> callback);
 	void set_callback_pointer_down(std::function<void(PointerInfo)> callback);
 	void set_callback_pointer_up(std::function<void(PointerInfo)> callback);
