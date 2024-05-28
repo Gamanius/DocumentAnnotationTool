@@ -1,6 +1,6 @@
 #include "include.h"
 
-ContextWrapper::ContextWrapper(fz_context* c) : ThreadSafeWrapper<fz_context*>(c) {}
+ContextWrapper::ContextWrapper(fz_context* c) : ThreadSafeWrapper<fz_context*>(std::move(c)) {}
 
 ThreadSafeContextWrapper ContextWrapper::get_context() {
 	return this->get_item();
@@ -13,13 +13,12 @@ ContextWrapper::~ContextWrapper() {
 }
 
 
-DocumentWrapper::DocumentWrapper(std::shared_ptr<ContextWrapper> a, fz_document* d) {
+DocumentWrapper::DocumentWrapper(std::shared_ptr<ContextWrapper> a, fz_document* d) : ThreadSafeWrapper<fz_document*>(std::move(d)) {
 	m_context = a;
-	m_doc = d;
 }
 
 ThreadSafeDocumentWrapper DocumentWrapper::get_document() {
-	return ThreadSafeDocumentWrapper(m_mutex, &m_doc);
+	return this->get_item();
 }
 
 DocumentWrapper::~DocumentWrapper() {
@@ -28,13 +27,12 @@ DocumentWrapper::~DocumentWrapper() {
 	fz_drop_document(*ctx, *doc);
 }
 
-PageWrapper::PageWrapper(std::shared_ptr<ContextWrapper> a, fz_page* p) {
+PageWrapper::PageWrapper(std::shared_ptr<ContextWrapper> a, fz_page* p) : ThreadSafeWrapper<fz_page*>(std::move(p)) {
 	m_context = a;
-	m_pag = p;
 }
 
 ThreadSafePageWrapper PageWrapper::get_page() {
-	return ThreadSafePageWrapper(m_mutex, &m_pag);
+	return this->get_item();
 }
 
 PageWrapper::~PageWrapper() {
@@ -43,13 +41,12 @@ PageWrapper::~PageWrapper() {
 	fz_drop_page(*ctx, *pag);
 }
 
-DisplayListWrapper::DisplayListWrapper(std::shared_ptr<ContextWrapper> a, fz_display_list* l) {
+DisplayListWrapper::DisplayListWrapper(std::shared_ptr<ContextWrapper> a, fz_display_list* l) : ThreadSafeWrapper<fz_display_list*>(std::move(l)) {
 	m_context = a;
-	m_lis = l;
 }
 
 ThreadSafeDisplayListWrapper DisplayListWrapper::get_displaylist() {
-	return ThreadSafeDisplayListWrapper(m_mutex, &m_lis);
+	return this->get_item();
 }
 
 DisplayListWrapper::~DisplayListWrapper() {

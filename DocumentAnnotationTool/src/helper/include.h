@@ -84,6 +84,11 @@ public:
 		obj = p;
 	}
 
+	RawThreadSafeClass(std::unique_lock<M>& l, T* p) {
+		std::swap(l, lock);
+		obj = p;
+	}
+
 	RawThreadSafeClass(RawThreadSafeClass&& a) noexcept {
 		obj = a.obj;
 		a.lock.swap(lock);
@@ -110,11 +115,28 @@ private:
 	T m_item;
 	M m_mutex;
 public:
-	ThreadSafeWrapper(T item) : m_item(item) {}
+	ThreadSafeWrapper(T&& item) {
+		m_item = std::move(item);
+	}
 
 	C get_item() {
 		return C(m_mutex, &m_item);
 	}
+
+	std::optional<C> try_get_item() {
+		// TODO DEBUG TO SEE IF IT WORKS
+		std::unique_lock<M> lock(m_mutex, std::defer_lock);
+		bool succ = lock.try_lock();
+		if (!succ)
+			return std::nullopt;
+		return C(lock, &m_item);
+	}
+
+	ThreadSafeWrapper(const ThreadSafeWrapper& o) = delete;
+	ThreadSafeWrapper(ThreadSafeWrapper&& o) = delete;
+	ThreadSafeWrapper& operator=(const ThreadSafeWrapper& t) = delete;
+	ThreadSafeWrapper& operator=(ThreadSafeWrapper&& t) = delete;
+
 
 	~ThreadSafeWrapper() {
 		// make sure mutex is not used
@@ -801,10 +823,17 @@ struct CachedBitmap {
 template <typename T>
 using ThreadSafeVector = ThreadSafeWrapper<std::vector<T>>;
 
+template <typename T>
+using ThreadSafeDeque = ThreadSafeWrapper<std::deque<T>>;
+
 typedef RawThreadSafeClass<fz_context*, std::recursive_mutex> ThreadSafeContextWrapper;
 struct ContextWrapper : public ThreadSafeWrapper<fz_context*> {
 	ContextWrapper(fz_context* c);
 
+	/// <summary>
+	/// alias for get_item
+	/// </summary>
+	/// <returns></returns>
 	ThreadSafeContextWrapper get_context();
 
 	~ContextWrapper();
@@ -814,11 +843,9 @@ struct ContextWrapper : public ThreadSafeWrapper<fz_context*> {
 struct DocumentWrapper;
 typedef RawThreadSafeClass<fz_document*, std::recursive_mutex> ThreadSafeDocumentWrapper;
 
-struct DocumentWrapper {
+struct DocumentWrapper : public ThreadSafeWrapper<fz_document*>{
 private:
 	std::shared_ptr<ContextWrapper> m_context;
-	fz_document* m_doc = nullptr;
-	std::recursive_mutex m_mutex;
 public:
 	DocumentWrapper(std::shared_ptr<ContextWrapper> a, fz_document* d);
 
@@ -830,11 +857,9 @@ public:
 struct PageWrapper;
 typedef RawThreadSafeClass<fz_page*, std::recursive_mutex> ThreadSafePageWrapper;
 
-struct PageWrapper {
+struct PageWrapper : public ThreadSafeWrapper<fz_page*> {
 private:
 	std::shared_ptr<ContextWrapper> m_context; 
-	fz_page* m_pag = nullptr;
-	std::recursive_mutex m_mutex;
 public:
 	PageWrapper(std::shared_ptr<ContextWrapper> a, fz_page* p);
 
@@ -847,11 +872,9 @@ public:
 struct DisplayListWrapper;
 typedef RawThreadSafeClass<fz_display_list*, std::recursive_mutex> ThreadSafeDisplayListWrapper;
 
-struct DisplayListWrapper {
+struct DisplayListWrapper : public ThreadSafeWrapper<fz_display_list*> {
 private:
 	std::shared_ptr<ContextWrapper> m_context;
-	fz_display_list* m_lis = nullptr;
-	std::recursive_mutex m_mutex;
 public:
 	DisplayListWrapper(std::shared_ptr<ContextWrapper> a, fz_display_list* l);
 
@@ -974,13 +997,17 @@ private:
 	std::vector<Renderer::Rectangle<float>> m_pagerec;
 
 	// Preview rendering
-	// rendererd at half scale or otherwise specified
-	std::vector<Direct2DRenderer::BitmapObject> m_previewBitmaps;
+	// rendererd at half scale or otherwise specified 
+	std::shared_ptr<ThreadSafeVector<Direct2DRenderer::BitmapObject>> m_preview_bitmaps;
+	std::thread m_preview_bitmap_thread;
+	std::atomic_bool m_preview_bitmaps_processed = false;
 
 	// High res rendering
-	std::shared_ptr<std::vector<std::shared_ptr<DisplayListWrapper>>> m_display_lists = nullptr;
-	std::shared_ptr<std::deque<CachedBitmap>> m_cachedBitmaps = nullptr;
-	
+	std::shared_ptr<ThreadSafeVector<std::shared_ptr<DisplayListWrapper>>> m_display_list;
+	std::thread m_display_list_thread;
+
+	std::shared_ptr<ThreadSafeDeque<CachedBitmap>> m_cachedBitmaps = nullptr; 
+
 	// For Multithreading
 	std::deque<std::tuple<Renderer::Rectangle<float>, float>> m_debug_cachedBitmap; 
 
@@ -1004,8 +1031,6 @@ private:
 	/// <param name="max_memory">In Mega Bytes</param>
 	void reduce_cache_size(unsigned long long max_memory);
 
-	void debug_render_preview();
-	void debug_render_high_res();
 public:
 	PDFRenderHandler() = default;
 
@@ -1046,8 +1071,9 @@ public:
 	/// <remark>If the DPI is 72 the size of the returned bitmap is the same as the size of the source</remark>
 	Direct2DRenderer::BitmapObject get_bitmap(Direct2DRenderer& renderer, size_t page, Renderer::Rectangle<float> source, float dpi) const;
 
-	void render_preview(); 
-	void render(HWND callbackwindow);
+	void render_preview();
+	void render_outline();
+	void render();
 	/// <summary>
 	/// This HAS TO BE CALLED when multithreaded rendering is active
 	/// </summary>

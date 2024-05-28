@@ -25,7 +25,7 @@ void callback_draw(std::optional<std::vector<CachedBitmap*>*> highres_bitmaps) {
 	if (highres_bitmaps.has_value() == false) {
 		g_main_renderer->clear(Renderer::Color(50, 50, 50));
 		// when the highres_bitmaps arg is nullopt then it is a normal draw call from windows
-		g_pdfrenderhandler->render(g_main_window->get_hwnd());
+		g_pdfrenderhandler->render();
 	}
 	else {
 		//else there are new bitmaps to render that have been created by other threads
