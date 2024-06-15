@@ -115,7 +115,7 @@ void main_window_loop_run(HINSTANCE h) {
 	auto pdf = g_mupdfcontext->load_pdf(path.value());
 	g_pdf = &pdf.value();
 
-	auto pdf_handler = PDFRenderHandler(g_pdf, g_main_renderer.get(), g_main_window.get()); 
+	auto pdf_handler = PDFRenderHandler(g_pdf, g_main_renderer.get(), g_main_window.get(), 4); 
 	g_pdfrenderhandler = &pdf_handler;
 
 	// do the callbacks

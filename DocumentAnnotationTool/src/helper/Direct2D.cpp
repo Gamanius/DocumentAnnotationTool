@@ -101,6 +101,12 @@ void Direct2DRenderer::draw_text(const std::wstring& text, Renderer::Point<float
 
 }
 
+void Direct2DRenderer::draw_text(const std::wstring& text, Renderer::Point<float> pos, Renderer::Color c, float size) {
+	auto format = create_text_format(L"Consolas", size);
+	auto brush  = create_brush(c);
+	draw_text(text, pos, format, brush);
+}
+
 void Direct2DRenderer::draw_rect(Renderer::Rectangle<float> rec, BrushObject& brush, float thicc) {
 	begin_draw();
 	m_renderTarget->DrawRectangle(rec, brush.m_object, thicc);

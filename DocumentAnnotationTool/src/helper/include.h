@@ -683,6 +683,7 @@ public:
 	void draw_bitmap(BitmapObject& bitmap, Renderer::Point<float> pos, INTERPOLATION_MODE mode = INTERPOLATION_MODE::NEAREST_NEIGHBOR, float opacity = 1.0f);
 	void draw_bitmap(BitmapObject& bitmap, Renderer::Rectangle<float> dest, INTERPOLATION_MODE mode = INTERPOLATION_MODE::NEAREST_NEIGHBOR, float opacity = 1.0f);
 	void draw_text(const std::wstring& text, Renderer::Point<float> pos, TextFormatObject& format, BrushObject& brush);
+	void draw_text(const std::wstring& text, Renderer::Point<float> pos, Renderer::Color c, float size);
 	void draw_rect(Renderer::Rectangle<float> rec, BrushObject& brush, float thick);
 	void draw_rect(Renderer::Rectangle<float> rec, BrushObject& brush);
 	void draw_rect_filled(Renderer::Rectangle<float> rec, BrushObject& brush);
@@ -800,6 +801,9 @@ struct CachedBitmap {
 	// coordinates in clip space
 	Renderer::Rectangle<float> dest;
 	float dpi = MUPDF_DEFAULT_DPI;
+	size_t page = 0;
+
+	// Currently not used
 	size_t used = false;
 
 	CachedBitmap() = default;
@@ -810,6 +814,7 @@ struct CachedBitmap {
 		dest = cachedbitmap.dest;
 		dpi = cachedbitmap.dpi;
 		used = cachedbitmap.used;
+		page = cachedbitmap.page;
 	}
 	CachedBitmap& operator=(CachedBitmap&& t) noexcept {
 		// new c++ stuff?
@@ -957,13 +962,15 @@ class PDFRenderHandler {
 public:
 	struct RenderInfo {
 		size_t page = 0;
+		float dpi = MUPDF_DEFAULT_DPI;
 		Renderer::Rectangle<float> overlap_in_docspace;
 
 		RenderInfo() = default;
-		RenderInfo(size_t page, Renderer::Rectangle<float> overlap) : page(page), overlap_in_docspace(overlap) {}
+		RenderInfo(size_t page, float dpi, Renderer::Rectangle<float> overlap) : page(page), dpi(dpi), overlap_in_docspace(overlap) {}
 		// move constructor
 		RenderInfo(RenderInfo&& t) noexcept {
 			page = t.page;
+			dpi = t.dpi;
 			overlap_in_docspace = t.overlap_in_docspace;
 		}
 		// move assignment
@@ -975,10 +982,12 @@ public:
 
 		RenderInfo(const RenderInfo& t) {
 			page = t.page;
+			dpi = t.dpi;
 			overlap_in_docspace = t.overlap_in_docspace;
 		}
 		RenderInfo& operator=(const RenderInfo& t) {
 			page = t.page;
+			dpi = t.dpi;
 			overlap_in_docspace = t.overlap_in_docspace;
 			return *this;
 		}
@@ -994,13 +1003,14 @@ private:
 	WindowHandler* const m_window = nullptr;
 
 	// Position and dimensions of the pages 
-	std::vector<Renderer::Rectangle<float>> m_pagerec;
+	std::shared_ptr<ThreadSafeVector<Renderer::Rectangle<float>>> m_pagerec;
 
 	// Preview rendering
 	// rendererd at half scale or otherwise specified 
 	std::shared_ptr<ThreadSafeVector<Direct2DRenderer::BitmapObject>> m_preview_bitmaps;
 	std::thread m_preview_bitmap_thread;
 	std::atomic_bool m_preview_bitmaps_processed = false;
+	std::atomic_bool m_display_list_processed    = false;
 
 	// High res rendering
 	std::shared_ptr<ThreadSafeVector<std::shared_ptr<DisplayListWrapper>>> m_display_list;
@@ -1009,7 +1019,13 @@ private:
 	std::shared_ptr<ThreadSafeDeque<CachedBitmap>> m_cachedBitmaps = nullptr; 
 
 	// For Multithreading
-	std::deque<std::tuple<Renderer::Rectangle<float>, float>> m_debug_cachedBitmap; 
+	std::atomic_bool m_should_threads_die = false;
+	std::atomic_bool m_render_jobs_available = false;
+	std::atomic_long m_amount_thread_running = 0;
+	std::shared_ptr<ThreadSafeDeque<RenderInfo>> m_render_queue = nullptr;
+	std::mutex m_render_queue_mutex; 
+	std::condition_variable m_render_queue_condition_var;
+	std::vector<std::thread> m_render_threads;
 
 	float m_seperation_distance = 10;
 	float m_preview_scale = 0.5; 
@@ -1019,6 +1035,8 @@ private:
 	void create_display_list_async();
 
 	void render_high_res();
+
+	void async_render();
 
 	std::vector<Renderer::Rectangle<float>> render_job_splice_recs(Renderer::Rectangle<float>, const std::vector<size_t>& cashedBitmapindex);
 	std::vector<size_t> render_job_clipped_cashed_bitmaps(Renderer::Rectangle<float> overlap_clip_space, float dpi);
@@ -1034,7 +1052,7 @@ private:
 public:
 	PDFRenderHandler() = default;
 
-	PDFRenderHandler(MuPDFHandler::PDF* const pdf, Direct2DRenderer* const renderer, WindowHandler* const window);
+	PDFRenderHandler(MuPDFHandler::PDF* const pdf, Direct2DRenderer* const renderer, WindowHandler* const window, size_t amount_threads = 2);
 
 	// move constructor
 	PDFRenderHandler(PDFRenderHandler&& t) noexcept;
