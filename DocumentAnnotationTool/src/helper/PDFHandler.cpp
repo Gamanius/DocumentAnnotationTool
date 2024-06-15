@@ -203,10 +203,10 @@ void PDFRenderHandler::create_preview(float scale) {
 		prev->push_back(get_bitmap(*m_renderer, i, m_renderer->get_dpi() * scale));
 		{
 			// add to the cached bitmaps
+			auto dest = m_pagerec->get_item();
 			auto cached = m_cachedBitmaps->get_item();
 			CachedBitmap p;
 			p.bitmap = prev->back();
-			auto dest = m_pagerec->get_item();
 			p.dest = dest->at(i);
 			p.page = i;
 			cached->push_back(std::move(p)); 
