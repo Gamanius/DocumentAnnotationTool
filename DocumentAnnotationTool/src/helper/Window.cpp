@@ -342,10 +342,13 @@ static WindowHandler::PointerInfo parse_pointer_info(const WindowHandler& w, WPA
 		info.button5pressed = CHECK_BIT(pointerinfo.pointerFlags, 8) != 0;
 		break;
 	}
-	//ScreenToClient(w->m_hwnd, &pointerinfo.ptPixelLocation);
+	Logger::log(Renderer::Point<long>(pointerinfo.ptPixelLocation));
+	Logger::print_to_debug();
 	info.pos.x = pointerinfo.ptPixelLocation.x - (float)p.x;
 	info.pos.y = pointerinfo.ptPixelLocation.y - (float)p.y;
-
+	p = { (long)info.pos.x, (long)info.pos.y };
+	ScreenToClient(w.get_hwnd(), &p);
+	info.pos = p;
 	//info.pos = Point2D<float>(pointerinfo.ptPixelLocation);
 
 

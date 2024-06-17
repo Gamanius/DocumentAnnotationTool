@@ -145,6 +145,69 @@ public:
 };
 
 
+template <typename T>
+using ThreadSafeVector = ThreadSafeWrapper<std::vector<T>>;
+
+template <typename T>
+using ThreadSafeDeque = ThreadSafeWrapper<std::deque<T>>;
+
+typedef RawThreadSafeClass<fz_context*, std::recursive_mutex> ThreadSafeContextWrapper;
+struct ContextWrapper : public ThreadSafeWrapper<fz_context*> {
+	ContextWrapper(fz_context* c);
+
+	/// <summary>
+	/// alias for get_item
+	/// </summary>
+	/// <returns></returns>
+	ThreadSafeContextWrapper get_context();
+
+	~ContextWrapper();
+};
+
+
+struct DocumentWrapper;
+typedef RawThreadSafeClass<fz_document*, std::recursive_mutex> ThreadSafeDocumentWrapper;
+
+struct DocumentWrapper : public ThreadSafeWrapper<fz_document*> {
+private:
+	std::shared_ptr<ContextWrapper> m_context;
+public:
+	DocumentWrapper(std::shared_ptr<ContextWrapper> a, fz_document* d);
+
+	ThreadSafeDocumentWrapper get_document();
+
+	~DocumentWrapper();
+};
+
+struct PageWrapper;
+typedef RawThreadSafeClass<fz_page*, std::recursive_mutex> ThreadSafePageWrapper;
+
+struct PageWrapper : public ThreadSafeWrapper<fz_page*> {
+private:
+	std::shared_ptr<ContextWrapper> m_context;
+public:
+	PageWrapper(std::shared_ptr<ContextWrapper> a, fz_page* p);
+
+	ThreadSafePageWrapper get_page();
+
+	~PageWrapper();
+};
+
+
+struct DisplayListWrapper;
+typedef RawThreadSafeClass<fz_display_list*, std::recursive_mutex> ThreadSafeDisplayListWrapper;
+
+struct DisplayListWrapper : public ThreadSafeWrapper<fz_display_list*> {
+private:
+	std::shared_ptr<ContextWrapper> m_context;
+public:
+	DisplayListWrapper(std::shared_ptr<ContextWrapper> a, fz_display_list* l);
+
+	ThreadSafeDisplayListWrapper get_displaylist();
+
+	~DisplayListWrapper();
+};
+
 namespace Logger {
 	enum MsgLevel {
 		INFO = 0,
@@ -824,70 +887,6 @@ struct CachedBitmap {
 	}
 };
 
-
-template <typename T>
-using ThreadSafeVector = ThreadSafeWrapper<std::vector<T>>;
-
-template <typename T>
-using ThreadSafeDeque = ThreadSafeWrapper<std::deque<T>>;
-
-typedef RawThreadSafeClass<fz_context*, std::recursive_mutex> ThreadSafeContextWrapper;
-struct ContextWrapper : public ThreadSafeWrapper<fz_context*> {
-	ContextWrapper(fz_context* c);
-
-	/// <summary>
-	/// alias for get_item
-	/// </summary>
-	/// <returns></returns>
-	ThreadSafeContextWrapper get_context();
-
-	~ContextWrapper();
-};
-
-
-struct DocumentWrapper;
-typedef RawThreadSafeClass<fz_document*, std::recursive_mutex> ThreadSafeDocumentWrapper;
-
-struct DocumentWrapper : public ThreadSafeWrapper<fz_document*>{
-private:
-	std::shared_ptr<ContextWrapper> m_context;
-public:
-	DocumentWrapper(std::shared_ptr<ContextWrapper> a, fz_document* d);
-
-	ThreadSafeDocumentWrapper get_document();
-
-	~DocumentWrapper();
-};
-
-struct PageWrapper;
-typedef RawThreadSafeClass<fz_page*, std::recursive_mutex> ThreadSafePageWrapper;
-
-struct PageWrapper : public ThreadSafeWrapper<fz_page*> {
-private:
-	std::shared_ptr<ContextWrapper> m_context; 
-public:
-	PageWrapper(std::shared_ptr<ContextWrapper> a, fz_page* p);
-
-	ThreadSafePageWrapper get_page();
-
-	~PageWrapper();
-};
-
-
-struct DisplayListWrapper;
-typedef RawThreadSafeClass<fz_display_list*, std::recursive_mutex> ThreadSafeDisplayListWrapper;
-
-struct DisplayListWrapper : public ThreadSafeWrapper<fz_display_list*> {
-private:
-	std::shared_ptr<ContextWrapper> m_context;
-public:
-	DisplayListWrapper(std::shared_ptr<ContextWrapper> a, fz_display_list* l);
-
-	ThreadSafeDisplayListWrapper get_displaylist();
-
-	~DisplayListWrapper();
-};
-
 class MuPDFHandler {
 	std::shared_ptr<ContextWrapper> m_context;
 
@@ -995,6 +994,16 @@ public:
 		~RenderInfo() {}
 	};
 private:
+	/**
+	* List by which ThreadSafeItems should be acquired
+	* 1. m_pdf member
+	* 2. m_pagerec
+	* 3. m_preview_bitmaps
+	* 4. m_display_list
+	* 5. m_cachedBitmaps
+	* 6. m_render_queue
+	*/ 
+
 	// not owned by this class
 	MuPDFHandler::PDF* const m_pdf = nullptr;
 	// not owned by this class!
@@ -1036,6 +1045,7 @@ private:
 
 	void render_high_res();
 
+	void remove_unused_queue_items();
 	void async_render();
 
 	std::vector<Renderer::Rectangle<float>> render_job_splice_recs(Renderer::Rectangle<float>, const std::vector<size_t>& cashedBitmapindex);

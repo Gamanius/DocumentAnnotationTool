@@ -12,10 +12,6 @@ MuPDFHandler::PDF* g_pdf;
 std::shared_ptr<MuPDFHandler> g_mupdfcontext;
 PDFRenderHandler* g_pdfrenderhandler = nullptr;
 
-std::vector<Renderer::Rectangle<float>> new_rect;
-Renderer::Rectangle<float> main_rec = {0, 0, 1000, 1000};
-std::vector<Renderer::Rectangle<float>> rects;
-
 
 void callback_draw(std::optional<std::vector<CachedBitmap*>*> highres_bitmaps) {
 	// draw scaled elements
@@ -23,6 +19,8 @@ void callback_draw(std::optional<std::vector<CachedBitmap*>*> highres_bitmaps) {
 	g_main_renderer->begin_draw();
 
 	if (highres_bitmaps.has_value() == false) {
+		Logger::log("Draw");
+		Logger::log(g_main_renderer->get_transform_pos());
 		g_main_renderer->clear(Renderer::Color(50, 50, 50));
 		// when the highres_bitmaps arg is nullopt then it is a normal draw call from windows
 		g_pdfrenderhandler->render();
@@ -61,26 +59,39 @@ void callback_key_up(WindowHandler::VK k) {
 	g_main_window->invalidate_drawing_area();
 }
 
+Renderer::Point<float> g_init_touch_pos = { 0, 0 };
+Renderer::Point<float> g_init_trans_pos = { 0, 0 };
+
 void callback_pointer_down(WindowHandler::PointerInfo p) {
-/*	Logger::log("Pointer at " + std::to_string(p.pos.x) + ", " + std::to_string(p.pos.y));
-	Logger::log("Buttons " + std::to_string(p.button1pressed) +
-		", " + std::to_string(p.button2pressed) + ", " + std::to_string(p.button3pressed) +
-		", " + std::to_string(p.button4pressed) + ", " + std::to_string(p.button5pressed));
-	Logger::log("Pressure " + std::to_string(p.pressure)); 
-	Logger::print_to_console(false); */
-	p.pos = g_main_renderer->inv_transform_point(p.pos);
-	static int index = 0;
-	static Renderer::Point<float> p1 = {0, 0};
-	if (index == 0) {
-		p1 = p.pos;
-		index++;
-	}
-	else {
-		rects.push_back({ p1, p.pos });
-		rects.at(rects.size() - 1).validate();
-		index = 0;
-	}
+	Logger::log("Down");
+	Logger::print_to_debug();
 	g_main_window->invalidate_drawing_area();
+
+	// handle hand
+	if (p.type == WindowHandler::POINTER_TYPE::TOUCH) {
+		g_init_trans_pos = g_main_renderer->get_transform_pos() - g_main_renderer->inv_transform_point({ 0, 0 });
+		g_init_touch_pos = p.pos;
+	}
+}
+
+void callback_pointer_up(WindowHandler::PointerInfo p) {
+	Logger::log("Up");
+	Logger::print_to_debug();
+
+}
+
+void callback_pointer_update(WindowHandler::PointerInfo p) {
+	if (p.type == WindowHandler::POINTER_TYPE::TOUCH) {
+		Logger::log(g_main_renderer->get_transform_scale());
+		Logger::print_to_debug();
+		auto offset = g_main_renderer->inv_transform_point((p.pos - g_init_touch_pos) / 2);
+		g_main_renderer->set_transform_matrix(offset + g_init_trans_pos);
+
+		g_init_trans_pos = g_main_renderer->get_transform_pos() - g_main_renderer->inv_transform_point({ 0, 0 });
+		g_init_touch_pos = p.pos;
+
+		g_main_window->invalidate_drawing_area();
+	}
 }
 
 void callback_mousewheel(short delta, bool hwheel, Renderer::Point<int> center) {
@@ -121,8 +132,11 @@ void main_window_loop_run(HINSTANCE h) {
 	// do the callbacks
 	g_main_window->set_callback_paint(callback_draw);
 	g_main_window->set_callback_size(callback_size);
+
 	g_main_window->set_callback_pointer_down(callback_pointer_down);
-	//g_main_window->set_callback_pointer_update(callback_pointer_down);
+	g_main_window->set_callback_pointer_update(callback_pointer_update);
+	g_main_window->set_callback_pointer_up(callback_pointer_up);
+
 	g_main_window->set_callback_mousewheel(callback_mousewheel);
 	//g_main_window->set_callback_key_down(callback_key_down);
 	g_main_window->set_callback_key_up(callback_key_up);
