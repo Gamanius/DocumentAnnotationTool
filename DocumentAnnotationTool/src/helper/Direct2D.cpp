@@ -152,6 +152,10 @@ void Direct2DRenderer::set_transform_matrix(Renderer::Point<float> p) {
 	m_transformPosMatrix = D2D1::Matrix3x2F::Translation(p.x, p.y);
 }
 
+void Direct2DRenderer::set_transform_matrix(D2D1::Matrix3x2F m) {
+	m_transformPosMatrix = m;
+}
+
 void Direct2DRenderer::add_transform_matrix(Renderer::Point<float> p) {
 	m_transformPos += p;
 	m_transformPosMatrix = D2D1::Matrix3x2F::Translation(p.x, p.y) * m_transformPosMatrix;
@@ -162,6 +166,13 @@ void Direct2DRenderer::set_scale_matrix(float scale, Renderer::Point<float> cent
 	m_transformScaleCenter = center;
 
 	m_transformScaleMatrix = D2D1::Matrix3x2F::Scale({ scale, scale }, center);
+}
+
+void Direct2DRenderer::set_scale_matrix(D2D1::Matrix3x2F m) {
+	m_transformScale = m.m11;
+	// TODO: do this
+	//m_transformScaleCenter = m.
+	m_transformScaleMatrix = m;
 }
 
 void Direct2DRenderer::add_scale_matrix(float scale, Renderer::Point<float> center) {
@@ -178,6 +189,10 @@ void Direct2DRenderer::add_scale_matrix(float scale, Renderer::Point<float> cent
 
 float Direct2DRenderer::get_transform_scale() const {
 	return m_transformScale;
+}
+
+D2D1::Matrix3x2F Direct2DRenderer::get_scale_matrix() const {
+	return m_transformScaleMatrix;
 }
 
 Renderer::Point<float> Direct2DRenderer::get_transform_pos() const {

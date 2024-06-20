@@ -674,19 +674,33 @@ void PDFRenderHandler::render_outline() {
 }
 
 void PDFRenderHandler::render() {
-	if (m_preview_bitmaps_processed == false) {
-		render_outline();
-		return;
-	}
 	auto scale = m_renderer->get_transform_scale();
 	//render_preview();
 
-	render_preview();
-	if (scale > m_preview_scale + EPSILON) {
+	draw();
+	if (scale > m_preview_scale + EPSILON and m_preview_bitmaps_processed) {
 		// if we are zoomed in, we need to render the page at a higher resolution
 		// than the screen resolution
 		render_high_res();
 	}
+}
+
+void PDFRenderHandler::draw() {
+	if (m_preview_bitmaps_processed == false) {
+		render_outline();
+		return;
+	}
+	render_preview();
+
+	
+	auto cached = m_cachedBitmaps->get_item();
+	// add all bitmaps into an array so it can be send to the main window
+	std::vector<CachedBitmap*> temp_cachedBitmaps;
+	for (size_t i = 0; i < cached->size(); i++) {
+		temp_cachedBitmaps.push_back(&cached->at(i));
+	}
+	// we can send some of the cached bitmaps already to the window
+	SendMessage(m_window->get_hwnd(), WM_PDF_BITMAP_READY, (WPARAM)nullptr, (LPARAM)(&temp_cachedBitmaps)); 
 }
 
 void PDFRenderHandler::debug_render() {

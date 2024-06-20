@@ -165,6 +165,7 @@
   <ItemGroup>
     <ClCompile Include="src\helper\Direct2D.cpp" />
     <ClCompile Include="src\helper\FileHandler.cpp" />
+    <ClCompile Include="src\helper\GestureHandler.cpp" />
     <ClCompile Include="src\helper\Logger.cpp" />
     <ClCompile Include="src\helper\MuPDF.cpp" />
     <ClCompile Include="src\helper\PDFHandler.cpp" />

@@ -12,6 +12,7 @@ MuPDFHandler::PDF* g_pdf;
 std::shared_ptr<MuPDFHandler> g_mupdfcontext;
 PDFRenderHandler* g_pdfrenderhandler = nullptr;
 
+GestureHandler g_gesturehandler;
 
 void callback_draw(std::optional<std::vector<CachedBitmap*>*> highres_bitmaps) {
 	// draw scaled elements
@@ -19,11 +20,15 @@ void callback_draw(std::optional<std::vector<CachedBitmap*>*> highres_bitmaps) {
 	g_main_renderer->begin_draw();
 
 	if (highres_bitmaps.has_value() == false) {
-		Logger::log("Draw");
-		Logger::log(g_main_renderer->get_transform_pos());
 		g_main_renderer->clear(Renderer::Color(50, 50, 50));
 		// when the highres_bitmaps arg is nullopt then it is a normal draw call from windows
-		g_pdfrenderhandler->render();
+		// but only call when no gesture is in progress
+		if (g_gesturehandler.is_gesture_active() == false) {
+			g_pdfrenderhandler->render();
+		}
+		else {
+			g_pdfrenderhandler->draw();
+		}
 	}
 	else {
 		//else there are new bitmaps to render that have been created by other threads
@@ -63,33 +68,24 @@ Renderer::Point<float> g_init_touch_pos = { 0, 0 };
 Renderer::Point<float> g_init_trans_pos = { 0, 0 };
 
 void callback_pointer_down(WindowHandler::PointerInfo p) {
-	Logger::log("Down");
-	Logger::print_to_debug();
 	g_main_window->invalidate_drawing_area();
 
 	// handle hand
 	if (p.type == WindowHandler::POINTER_TYPE::TOUCH) {
-		g_init_trans_pos = g_main_renderer->get_transform_pos() - g_main_renderer->inv_transform_point({ 0, 0 });
-		g_init_touch_pos = p.pos;
+		g_gesturehandler.start_gesture(p);
 	}
 }
 
 void callback_pointer_up(WindowHandler::PointerInfo p) {
-	Logger::log("Up");
-	Logger::print_to_debug();
-
+	if (p.type == WindowHandler::POINTER_TYPE::TOUCH) {
+		g_gesturehandler.end_gesture(p);
+	}
+	g_main_window->invalidate_drawing_area();
 }
 
 void callback_pointer_update(WindowHandler::PointerInfo p) {
 	if (p.type == WindowHandler::POINTER_TYPE::TOUCH) {
-		Logger::log(g_main_renderer->get_transform_scale());
-		Logger::print_to_debug();
-		auto offset = g_main_renderer->inv_transform_point((p.pos - g_init_touch_pos) / 2);
-		g_main_renderer->set_transform_matrix(offset + g_init_trans_pos);
-
-		g_init_trans_pos = g_main_renderer->get_transform_pos() - g_main_renderer->inv_transform_point({ 0, 0 });
-		g_init_touch_pos = p.pos;
-
+		g_gesturehandler.update_gesture(p);
 		g_main_window->invalidate_drawing_area();
 	}
 }
@@ -115,6 +111,7 @@ void main_window_loop_run(HINSTANCE h) {
 	auto default_text_format = g_main_renderer->create_text_format(L"Consolas", 20);
 	g_text_format = &default_text_format;
 
+	g_gesturehandler = GestureHandler(g_main_renderer.get());
 	g_mupdfcontext = std::shared_ptr<MuPDFHandler>(new MuPDFHandler);
 
 

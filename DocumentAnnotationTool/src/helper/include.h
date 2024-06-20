@@ -123,14 +123,14 @@ public:
 		return C(m_mutex, &m_item);
 	}
 
-	std::optional<C> try_get_item() {
-		// TODO DEBUG TO SEE IF IT WORKS
-		std::unique_lock<M> lock(m_mutex, std::defer_lock);
-		bool succ = lock.try_lock();
-		if (!succ)
-			return std::nullopt;
-		return C(lock, &m_item);
-	}
+	//std::optional<C> try_get_item() {
+	//	// TODO FIX IT
+	//	std::unique_lock<M> lock(m_mutex, std::defer_lock);
+	//	bool succ = lock.try_lock();
+	//	if (!succ)
+	//		return std::nullopt;
+	//	return C(m_mutex, &m_item);
+	//}
 
 	ThreadSafeWrapper(const ThreadSafeWrapper& o) = delete;
 	ThreadSafeWrapper(ThreadSafeWrapper&& o) = delete;
@@ -259,7 +259,9 @@ namespace Renderer {
 			return std::to_wstring(x) + L", " + std::to_wstring(y);
 		}
 
-
+		T distance() const {
+			return std::sqrt(x * x + y * y);
+		}
 
 		Point<T> operator +(const Point<T>& p) const { 
 			return Point<T>(x + p.x, y + p.y); 
@@ -760,11 +762,14 @@ public:
 	void set_identity_transform_active();
 
 	void set_transform_matrix(Renderer::Point<float> p);
+	void set_transform_matrix(D2D1::Matrix3x2F m);
 	void add_transform_matrix(Renderer::Point<float> p);
 	void set_scale_matrix(float scale, Renderer::Point<float> center);
+	void set_scale_matrix(D2D1::Matrix3x2F m);
 	void add_scale_matrix(float scale, Renderer::Point<float> center);
 
 	float get_transform_scale() const;
+	D2D1::Matrix3x2F get_scale_matrix() const;
 	Renderer::Point<float> get_transform_pos() const;
 	/// <summary>
 	/// Will return the actual window size
@@ -1102,6 +1107,7 @@ public:
 	void render_preview();
 	void render_outline();
 	void render();
+	void draw();
 	/// <summary>
 	/// This HAS TO BE CALLED when multithreaded rendering is active
 	/// </summary>
@@ -1374,6 +1380,42 @@ public:
 	///  returns the window handle
 	/// </summary>
 	operator HWND() const { return m_hwnd; }
+};
+
+class GestureHandler {
+	// not owned by this class
+	Direct2DRenderer* m_renderer = nullptr;
+
+	struct GestureFinger {
+		UINT id = 0;
+		bool active = 0;
+		Renderer::Point<float> initial_position = { 0, 0 };
+		Renderer::Point<float> last_position = { 0, 0 };
+	};
+
+	std::array<GestureFinger, 5> m_gesturefinger;
+	Renderer::Point<float> m_initial_offset = { 0, 0 };
+
+	D2D1::Matrix3x2F m_initialScaleMatrix;
+	D2D1::Matrix3x2F m_initialScaleMatrixInv;
+	float m_initialScale = 1;
+
+public:
+	GestureHandler() {}
+	GestureHandler(Direct2DRenderer* renderer);
+	GestureHandler(GestureHandler&& a) noexcept;
+	GestureHandler& operator=(GestureHandler&& a) noexcept;
+
+	// no need for a copy constructor. Only one should exist
+	GestureHandler(const GestureHandler& o) = delete;
+	GestureHandler& operator=(const GestureHandler& o) = delete;
+
+	void start_gesture(const WindowHandler::PointerInfo& p);
+	void update_gesture(const WindowHandler::PointerInfo& p);
+	void end_gesture(const WindowHandler::PointerInfo& p);
+
+	byte amount_finger_active() const;
+	bool is_gesture_active() const;
 };
 
 //#ifndef NDEBUG
