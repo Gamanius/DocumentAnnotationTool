@@ -446,8 +446,6 @@ void PDFRenderHandler::remove_unused_queue_items() {
 			continue;
 		}
 
-		Logger::log("Removed item from queue");
-		Logger::print_to_debug();
 
 		if (queue_item->stat == RenderInfo::STATUS::IN_PROGRESS)
 			queue_item->cookie->abort = true;
@@ -687,11 +685,11 @@ void PDFRenderHandler::render_outline() {
 	// get the clip space.
 	auto clip_space = m_renderer->inv_transform_rect(m_renderer->get_window_size()); 
 
-	auto prev = m_preview_bitmaps->get_item();
-	for (size_t i = 0; i < prev->size(); i++) {
-		if (prev->at(i).dest.intersects(clip_space)) {
-			m_renderer->draw_rect_filled(prev->at(i).dest, {255, 255, 255});
-			m_renderer->draw_text(L"Loading page...", prev->at(i).dest.upperleft(), {255, 0, 0}, 20.0f);
+	auto dest = m_pagerec->get_item();
+	for (size_t i = 0; i < dest->size(); i++) { 
+		if (dest->at(i).intersects(clip_space)) {
+			m_renderer->draw_rect_filled(dest->at(i), {255, 255, 255});
+			m_renderer->draw_text(L"Loading page...", dest->at(i).upperleft(), {255, 0, 0}, 20.0f);
 		}
 	}
 
