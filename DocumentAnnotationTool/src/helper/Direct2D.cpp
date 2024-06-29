@@ -332,7 +332,7 @@ Direct2DRenderer::BitmapObject Direct2DRenderer::create_bitmap(const byte* const
 	prop.dpiX = dpi;
 	prop.dpiY = dpi;
 	prop.pixelFormat.alphaMode = D2D1_ALPHA_MODE_PREMULTIPLIED;
-	prop.pixelFormat.format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+	prop.pixelFormat.format = DXGI_FORMAT_R8G8B8A8_UNORM;
 	HRESULT res = m_renderTarget->CreateBitmap({ size.width, size.height }, data, stride, prop, &pBitmap);
 	ASSERT_WIN(res == S_OK, "Could not create bitmap!"); 
 

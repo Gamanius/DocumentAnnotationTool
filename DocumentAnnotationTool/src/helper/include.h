@@ -164,6 +164,22 @@ struct ContextWrapper : public ThreadSafeWrapper<fz_context*> {
 	~ContextWrapper();
 };
 
+struct PageWrapper {
+private:
+	std::shared_ptr<ContextWrapper> m_context;
+	fz_page* page = nullptr;
+public:
+	PageWrapper(std::shared_ptr<ContextWrapper> a, fz_page* p);
+
+	PageWrapper(PageWrapper&& t) noexcept;
+	PageWrapper& operator=(PageWrapper&& t) noexcept;
+
+	operator fz_page* () const;
+
+	fz_page* get_page() const;
+
+	~PageWrapper();
+};
 
 struct DocumentWrapper;
 typedef RawThreadSafeClass<fz_document*, std::recursive_mutex> ThreadSafeDocumentWrapper;
@@ -178,21 +194,6 @@ public:
 
 	~DocumentWrapper();
 };
-
-struct PageWrapper;
-typedef RawThreadSafeClass<fz_page*, std::recursive_mutex> ThreadSafePageWrapper;
-
-struct PageWrapper : public ThreadSafeWrapper<fz_page*> {
-private:
-	std::shared_ptr<ContextWrapper> m_context;
-public:
-	PageWrapper(std::shared_ptr<ContextWrapper> a, fz_page* p);
-
-	ThreadSafePageWrapper get_page();
-
-	~PageWrapper();
-};
-
 
 struct DisplayListWrapper;
 typedef RawThreadSafeClass<fz_display_list*, std::recursive_mutex> ThreadSafeDisplayListWrapper;
@@ -868,6 +869,8 @@ struct CachedBitmap {
 	Direct2DRenderer::BitmapObject bitmap;
 	// coordinates in clip space
 	Renderer::Rectangle<float> dest;
+	// coordinates in doc space
+	Renderer::Rectangle<float> doc_coords;
 	float dpi = MUPDF_DEFAULT_DPI;
 	size_t page = 0;
 
@@ -916,7 +919,6 @@ public:
 		// Pointer to the context from the MuPDFHandler
 		std::shared_ptr<ContextWrapper> m_ctx;
 		std::shared_ptr<DocumentWrapper> m_document;
-		std::vector<std::shared_ptr<PageWrapper>> m_pages;
 	public:
 
 		PDF() = default; 
@@ -934,8 +936,18 @@ public:
 		// the fz_context is not allowed to be droped here
 		~PDF();
 
-		ThreadSafePageWrapper get_page(size_t page) const;
 		ThreadSafeContextWrapper get_context() const;
+
+		ThreadSafeDocumentWrapper get_document() const;
+
+		/// <summary>
+		/// The document HAS TO outlive the page!! 
+		/// TODO put fz_pages into DocumentWrapper
+		/// </summary>
+		/// <param name="doc"></param>
+		/// <param name="page"></param>
+		/// <returns></returns>
+		PageWrapper get_page(fz_document* doc, size_t page);
 
 		std::shared_ptr<ContextWrapper> get_context_wrapper() const;
 
@@ -945,7 +957,7 @@ public:
 		/// <returns>Number of pages</returns>
 		size_t get_page_count() const;
 
-		Renderer::Rectangle<float> get_page_size(size_t page, float dpi = 72) const;
+		Renderer::Rectangle<float> get_page_size(size_t page, float dpi = 72);
 	};
 
 	MuPDFHandler();
@@ -965,16 +977,28 @@ class WindowHandler;
 class PDFRenderHandler {
 public:
 	struct RenderInfo {
+		enum STATUS {
+			WAITING,
+			IN_PROGRESS,
+			FINISHED,
+			ABORTED
+		};
 		size_t page = 0;
+		fz_cookie* cookie = nullptr;
+		STATUS stat = WAITING;
 		float dpi = MUPDF_DEFAULT_DPI;
 		Renderer::Rectangle<float> overlap_in_docspace;
 
 		RenderInfo() = default;
-		RenderInfo(size_t page, float dpi, Renderer::Rectangle<float> overlap) : page(page), dpi(dpi), overlap_in_docspace(overlap) {}
+		RenderInfo(size_t page, float dpi, Renderer::Rectangle<float> overlap) : page(page), dpi(dpi), overlap_in_docspace(overlap) {
+			cookie = new fz_cookie({ 0,0,0,0,0 });
+		}
 		// move constructor
 		RenderInfo(RenderInfo&& t) noexcept {
 			page = t.page;
 			dpi = t.dpi;
+			cookie = t.cookie; 
+			stat = t.stat;
 			overlap_in_docspace = t.overlap_in_docspace;
 		}
 		// move assignment
@@ -984,19 +1008,25 @@ public:
 			return *this;
 		}
 
-		RenderInfo(const RenderInfo& t) {
-			page = t.page;
-			dpi = t.dpi;
-			overlap_in_docspace = t.overlap_in_docspace;
-		}
-		RenderInfo& operator=(const RenderInfo& t) {
-			page = t.page;
-			dpi = t.dpi;
-			overlap_in_docspace = t.overlap_in_docspace;
-			return *this;
-		}
+		//RenderInfo(const RenderInfo& t) {
+		//	page = t.page;
+		//	dpi = t.dpi;
+		//	cookie = t.cookie;
+		//	stat = t.stat;
+		//	overlap_in_docspace = t.overlap_in_docspace;
+		//}
+		//RenderInfo& operator=(const RenderInfo& t) {
+		//	page = t.page;
+		//	dpi = t.dpi;
+		//	cookie = t.cookie;
+		//	stat = t.stat;
+		//	overlap_in_docspace = t.overlap_in_docspace;
+		//	return *this;
+		//}
 
-		~RenderInfo() {}
+		~RenderInfo() {
+			delete cookie;
+		}
 	};
 private:
 	/**
@@ -1021,7 +1051,7 @@ private:
 
 	// Preview rendering
 	// rendererd at half scale or otherwise specified 
-	std::shared_ptr<ThreadSafeVector<Direct2DRenderer::BitmapObject>> m_preview_bitmaps;
+	std::shared_ptr<ThreadSafeVector<CachedBitmap>> m_preview_bitmaps;
 	std::thread m_preview_bitmap_thread;
 	std::atomic_bool m_preview_bitmaps_processed = false;
 	std::atomic_bool m_display_list_processed    = false;
@@ -1036,7 +1066,7 @@ private:
 	std::atomic_bool m_should_threads_die = false;
 	std::atomic_bool m_render_jobs_available = false;
 	std::atomic_long m_amount_thread_running = 0;
-	std::shared_ptr<ThreadSafeDeque<RenderInfo>> m_render_queue = nullptr;
+	std::shared_ptr<ThreadSafeDeque<std::shared_ptr<RenderInfo>>> m_render_queue = nullptr;
 	std::mutex m_render_queue_mutex; 
 	std::condition_variable m_render_queue_condition_var;
 	std::vector<std::thread> m_render_threads;
@@ -1051,6 +1081,7 @@ private:
 	void render_high_res();
 
 	void remove_unused_queue_items();
+	void update_render_queue();
 	void async_render();
 
 	std::vector<Renderer::Rectangle<float>> render_job_splice_recs(Renderer::Rectangle<float>, const std::vector<size_t>& cashedBitmapindex);
@@ -1063,6 +1094,7 @@ private:
 	/// </summary>
 	/// <param name="max_memory">In Mega Bytes</param>
 	void reduce_cache_size(unsigned long long max_memory);
+
 
 public:
 	PDFRenderHandler() = default;

@@ -11,13 +11,14 @@ Direct2DRenderer::BitmapObject PDFRenderHandler::get_bitmap(Direct2DRenderer& re
 	Direct2DRenderer::BitmapObject obj;
 
 	auto ctx = m_pdf->get_context();
-	auto pag = m_pdf->get_page(page);
+	auto doc = m_pdf->get_document();
+	auto pag = m_pdf->get_page(*doc, page);
 
 	fz_try(*ctx) {
 		pixmap = fz_new_pixmap(*ctx, fz_device_rgb(*ctx), size.width, size.height, nullptr, 1);
 		fz_clear_pixmap_with_value(*ctx, pixmap, 0xff); // for the white background
 		drawdevice = fz_new_draw_device(*ctx, fz_identity, pixmap);
-		fz_run_page(*ctx, *pag, drawdevice, ctm, nullptr);
+		fz_run_page(*ctx, pag, drawdevice, ctm, nullptr);
 		fz_close_device(*ctx, drawdevice);
 		obj = renderer.create_bitmap((byte*)pixmap->samples, size, (unsigned int)pixmap->stride, 96); // default dpi of the pixmap
 	} fz_always(*ctx) {
@@ -43,13 +44,14 @@ Direct2DRenderer::BitmapObject PDFRenderHandler::get_bitmap(Direct2DRenderer& re
 	Direct2DRenderer::BitmapObject obj;
 
 	auto ctx = m_pdf->get_context();
-	auto pag = m_pdf->get_page(page);
+	auto doc = m_pdf->get_document();
+	auto pag = m_pdf->get_page(*doc, page);
 
 	fz_try(*ctx) {
 		pixmap = fz_new_pixmap_with_bbox(*ctx, fz_device_rgb(*ctx), bbox, nullptr, 1);
 		fz_clear_pixmap_with_value(*ctx, pixmap, 0xff); // for the white background
 		drawdevice = fz_new_draw_device(*ctx, fz_identity, pixmap);
-		fz_run_page(*ctx, *pag, drawdevice, ctm, nullptr);
+		fz_run_page(*ctx, pag, drawdevice, ctm, nullptr);
 		fz_close_device(*ctx, drawdevice);
 		obj = renderer.create_bitmap((byte*)pixmap->samples, rec, (unsigned int)pixmap->stride, 96); // default dpi of the pixmap
 	} fz_always(*ctx) {
@@ -74,13 +76,15 @@ Direct2DRenderer::BitmapObject PDFRenderHandler::get_bitmap(Direct2DRenderer& re
 	Direct2DRenderer::BitmapObject obj;
 
 	auto ctx = m_pdf->get_context();
-	auto pag = m_pdf->get_page(page);
+	auto doc = m_pdf->get_document();
+
+	auto pag = m_pdf->get_page(*doc, page); 
 
 	fz_try(*ctx) {
 		pixmap = fz_new_pixmap_with_bbox(*ctx, fz_device_rgb(*ctx), pixmap_size, nullptr, 1);
 		fz_clear_pixmap_with_value(*ctx, pixmap, 0xff); // for the white background
 		drawdevice = fz_new_draw_device(*ctx, fz_identity, pixmap);
-		fz_run_page(*ctx, *pag, drawdevice, fz_concat(transform, ctm), nullptr);
+		fz_run_page(*ctx, pag, drawdevice, fz_concat(transform, ctm), nullptr);
 		fz_close_device(*ctx, drawdevice);
 		obj = renderer.create_bitmap((byte*)pixmap->samples, pixmap_size, (unsigned int)pixmap->stride, dpi); // default dpi of the pixmap
 	} fz_always(*ctx) {
@@ -103,13 +107,14 @@ void PDFRenderHandler::create_display_list() {
 
 	for (size_t i = 0; i < m_pdf->get_page_count(); i++) {
 		// get the page that will be rendered
-		auto p = m_pdf->get_page(i);
+		auto doc = m_pdf->get_document();
+		auto p = m_pdf->get_page(*doc, i);
 		fz_try(*ctx) {
 			// create a display list with all the draw calls and so on
-			list = fz_new_display_list(*ctx, fz_bound_page(*ctx, *p));
+			list = fz_new_display_list(*ctx, fz_bound_page(*ctx, p));
 			dev = fz_new_list_device(*ctx, list);
 			// run the device
-			fz_run_page(*ctx, *p, dev, fz_identity, nullptr);
+			fz_run_page(*ctx, p, dev, fz_identity, nullptr);
 			// add list to array
 			display_list->push_back(std::shared_ptr<DisplayListWrapper>(new DisplayListWrapper(m_pdf->get_context_wrapper(), list)));
 		} fz_always(*ctx) {
@@ -133,19 +138,21 @@ void PDFRenderHandler::create_display_list_async() {
 		auto ctx = m_pdf->get_context();
 		copy_ctx = fz_clone_context(*ctx);
 	}
+
 	
 	// aquire the display list
 	auto display_list = m_display_list->get_item();
 
 	for (size_t i = 0; i < m_pdf->get_page_count(); i++) { 
 		// get the page that will be rendered
-		auto p = m_pdf->get_page(i);
+		auto doc = m_pdf->get_document();
+		auto p = fz_load_page(copy_ctx, *doc, i);
 		fz_try(copy_ctx) {
 			// create a display list with all the draw calls and so on
-			list = fz_new_display_list(copy_ctx, fz_bound_page(copy_ctx, *p));
+			list = fz_new_display_list(copy_ctx, fz_bound_page(copy_ctx, p));
 			dev = fz_new_list_device(copy_ctx, list);
 			// run the device
-			fz_run_page(copy_ctx, *p, dev, fz_identity, nullptr);
+			fz_run_page(copy_ctx, p, dev, fz_identity, nullptr);
 			// add list to array
 			display_list->push_back(std::shared_ptr<DisplayListWrapper>(new DisplayListWrapper(m_pdf->get_context_wrapper(), list)));
 		} fz_always(copy_ctx) {
@@ -155,6 +162,7 @@ void PDFRenderHandler::create_display_list_async() {
 		} fz_catch(copy_ctx) {
 			ASSERT(false, "Could not create display list"); 
 		}
+		fz_drop_page(copy_ctx, p);
 	}
 
 	fz_drop_context(copy_ctx);
@@ -169,14 +177,14 @@ PDFRenderHandler::PDFRenderHandler(MuPDFHandler::PDF* const pdf, Direct2DRendere
 	m_display_list = std::shared_ptr<ThreadSafeVector<std::shared_ptr<DisplayListWrapper>>>
 		(new ThreadSafeVector<std::shared_ptr<DisplayListWrapper>>(std::vector<std::shared_ptr<DisplayListWrapper>>()));
 
-	m_preview_bitmaps = std::shared_ptr<ThreadSafeVector<Direct2DRenderer::BitmapObject>>
-		(new ThreadSafeVector<Direct2DRenderer::BitmapObject>(std::vector<Direct2DRenderer::BitmapObject>()));
+	m_preview_bitmaps = std::shared_ptr<ThreadSafeVector<CachedBitmap>>
+		(new ThreadSafeVector<CachedBitmap>(std::vector<CachedBitmap>()));
 	
 	m_cachedBitmaps = std::shared_ptr<ThreadSafeDeque<CachedBitmap>>
 		(new ThreadSafeDeque<CachedBitmap>(std::deque<CachedBitmap>())); 
 
-	m_render_queue = std::shared_ptr<ThreadSafeDeque<RenderInfo>>
-		(new ThreadSafeDeque<RenderInfo>(std::deque<RenderInfo>()));
+	m_render_queue = std::shared_ptr<ThreadSafeDeque<std::shared_ptr<RenderInfo>>>
+		(new ThreadSafeDeque<std::shared_ptr<RenderInfo>>(std::deque<std::shared_ptr<RenderInfo>>())); 
 
 	m_pagerec = std::shared_ptr<ThreadSafeVector<Renderer::Rectangle<float>>>
 		(new ThreadSafeVector<Renderer::Rectangle<float>>(std::vector<Renderer::Rectangle<float>>()));
@@ -188,7 +196,7 @@ PDFRenderHandler::PDFRenderHandler(MuPDFHandler::PDF* const pdf, Direct2DRendere
 
 
 	m_display_list_thread = std::thread([this] { create_display_list_async(); });
-	m_preview_bitmap_thread = std::thread([this] { create_preview(1); });
+	m_preview_bitmap_thread = std::thread([this] { create_preview(0.1); });
 
 	for (size_t i = 0; i < amount_threads; i++) {
 		m_render_threads.push_back(std::thread([this] { async_render(); }));
@@ -202,23 +210,18 @@ void PDFRenderHandler::create_preview(float scale) {
 		prev->clear();
 	}
 
+	auto dpi = m_renderer->get_dpi();
+
 	for (size_t i = 0; i < m_pdf->get_page_count(); i++) {
 		{
 			auto prev = m_preview_bitmaps->get_item();
-			prev->push_back(get_bitmap(*m_renderer, i, m_renderer->get_dpi() * scale));
-		}
-		{
-			// add to the cached bitmaps
-			// we have to do this in this weird way since
-			// the items have to be acquired in the sequence
-			auto dest = m_pagerec->get_item();
-			auto prev = m_preview_bitmaps->get_item();
-			auto cached = m_cachedBitmaps->get_item();
-			CachedBitmap p;
-			p.bitmap = prev->back();
+			auto dest = m_pagerec->get_item(); 
+			CachedBitmap p; 
+			p.bitmap = get_bitmap(*m_renderer, i, dpi * scale);
 			p.dest = dest->at(i);
-			p.page = i;
-			cached->push_back(std::move(p)); 
+			p.page = i; 
+			p.dpi = dpi;
+			prev->push_back(std::move(p));
 		}
 		m_window->invalidate_drawing_area(); 
 	}
@@ -272,18 +275,27 @@ std::vector<Renderer::Rectangle<float>> PDFRenderHandler::render_job_splice_recs
 	return choppy; 
 } 
 
+void PDFRenderHandler::update_render_queue() {
+	// remove items that are finished
+	auto queue = m_render_queue->get_item();
+	for (int i = queue->size() - 1; i >= 0; i--) {
+		if (queue->at(i)->stat == RenderInfo::STATUS::FINISHED or queue->at(i)->stat == RenderInfo::STATUS::ABORTED)
+			queue->erase(queue->begin() + i); 
+	}
+}
+
 void PDFRenderHandler::render_high_res() {
 	// get the target dpi
 	auto dpi = m_renderer->get_dpi() * m_renderer->get_transform_scale();
 	// first check which pages intersect with the clip space
-	auto clip_space = m_renderer->inv_transform_rect(m_renderer->get_window_size());
+	auto clip_space = m_renderer->inv_transform_rect(m_renderer->get_window_size_normalized());
 
 	std::vector<std::tuple<size_t, Renderer::Rectangle<float>, std::vector<CachedBitmap*>>> clipped_documents;
 
 	reduce_cache_size(500);
 
 	// TODO
-	//update_render_queue();
+	update_render_queue();
 
 	auto lambda_add_stitch = [](Renderer::Rectangle<float>& r) {
 			r.x -= PDF_STITCH_THRESHOLD;
@@ -309,7 +321,7 @@ void PDFRenderHandler::render_high_res() {
 
 			queued_and_cached_bitmaps.reserve(render_queue->size());
 			for (size_t j = 0; j < render_queue->size(); j++) {
-				auto docspace = render_queue->at(j).overlap_in_docspace;
+				auto docspace = render_queue->at(j)->overlap_in_docspace;
 				docspace.x += dest->at(i).x;
 				docspace.y += dest->at(i).y;
 				queued_and_cached_bitmaps.push_back(docspace);
@@ -329,7 +341,7 @@ void PDFRenderHandler::render_high_res() {
 				overlap.y -= dest->at(i).y;
 
 				// add to the queue
-				render_queue->push_back({ i, dpi, overlap });
+				render_queue->push_back(std::shared_ptr<RenderInfo>(new RenderInfo({ i, dpi, overlap })));
 
 				continue;
 			}
@@ -351,7 +363,7 @@ void PDFRenderHandler::render_high_res() {
 				lambda_add_stitch(chopped_render_targets.at(j));
 
 				// add the chopped up recs to the queue
-				render_queue->push_back({ i, dpi, chopped_render_targets.at(j) });
+				render_queue->push_back(std::shared_ptr<RenderInfo>(new RenderInfo({ i, dpi, chopped_render_targets.at(j) })));
 			}
 
 			// add all bitmaps into an array so it can be send to the main window
@@ -378,8 +390,8 @@ void PDFRenderHandler::render_high_res() {
 	auto render_queue   = m_render_queue->get_item();
 	std::vector<CachedBitmap*> temp_cachedBitmaps; 
 	for (size_t i = 0; i < render_queue->size(); i++) {
-		auto page = render_queue->at(i).page;
-		auto overlap = render_queue->at(i).overlap_in_docspace;
+		auto page = render_queue->at(i)->page;
+		auto overlap = render_queue->at(i)->overlap_in_docspace;
 		auto butmap = get_bitmap(*m_renderer, page, overlap, dpi); 
 	
 		// transform from doc space to clip space
@@ -411,7 +423,6 @@ typedef struct {
 	unsigned int flags : 6;
 } fz_display_node;
 
-
 struct fz_display_list {
 	fz_storable storable;
 	fz_display_node* list;
@@ -421,24 +432,30 @@ struct fz_display_list {
 };
 
 void PDFRenderHandler::remove_unused_queue_items() {
-	auto clip_space   = m_renderer->inv_transform_rect(m_renderer->get_window_size());
+	auto clip_space   = m_renderer->inv_transform_rect(m_renderer->get_window_size_normalized());
 	auto page_rec     = m_pagerec->get_item();
 	auto render_queue = m_render_queue->get_item();
 	auto dpi		  = m_renderer->get_dpi() * m_renderer->get_transform_scale();
 
 	for (int i = render_queue->size() - 1; i >= 0; i--) {
-		auto queue_item = render_queue->at(i);
-		auto rec_docspace = queue_item.overlap_in_docspace;
-		rec_docspace.x += page_rec->at(queue_item.page).x;
-		rec_docspace.y += page_rec->at(queue_item.page).y;
-		if (rec_docspace.intersects(clip_space) and queue_item.dpi >= dpi) {
+		auto& queue_item = render_queue->at(i);
+		auto rec_docspace = queue_item->overlap_in_docspace;
+		rec_docspace.x += page_rec->at(queue_item->page).x;
+		rec_docspace.y += page_rec->at(queue_item->page).y;
+		if (rec_docspace.intersects(clip_space) and FLOAT_EQUAL(queue_item->dpi, dpi)) {
 			continue;
 		}
+
 		Logger::log("Removed item from queue");
 		Logger::print_to_debug();
-		render_queue->erase(render_queue->begin() + i);
+
+		if (queue_item->stat == RenderInfo::STATUS::IN_PROGRESS)
+			queue_item->cookie->abort = true;
+		else
+			render_queue->erase(render_queue->begin() + i);
 	}
 }
+
 
 void PDFRenderHandler::async_render() {
 	++m_amount_thread_running;
@@ -498,24 +515,34 @@ void PDFRenderHandler::async_render() {
 		}
 
 		// get the item out of the dequeue
-		RenderInfo info;
+		std::shared_ptr<RenderInfo> info = nullptr;  
 		{
 			auto queue = m_render_queue->get_item();
 			// continue waiting if the queue is empty
 			if (queue->size() == 0)
 				continue;
 
-			// get the item from the front
-			info = queue->front();
-			queue->pop_front();
+			// get the first item that need rendering
+			for (size_t i = 0; i < queue->size(); i++) {
+				if (queue->at(i)->stat == RenderInfo::STATUS::WAITING) {
+					info = queue->at(i);
+					info->stat = RenderInfo::STATUS::IN_PROGRESS;
+					break;
+				}
+			}
+
+			// if nothing is found just wait again
+			if (info == nullptr)
+				continue;
 		}
+
 		
 		// now we can render it
 		fz_matrix ctm;
-		ctm = fz_scale((info.dpi / MUPDF_DEFAULT_DPI), (info.dpi / MUPDF_DEFAULT_DPI));
-		auto transform = fz_translate(-info.overlap_in_docspace.x, -info.overlap_in_docspace.y);
+		ctm = fz_scale((info->dpi / MUPDF_DEFAULT_DPI), (info->dpi / MUPDF_DEFAULT_DPI));
+		auto transform = fz_translate(-info->overlap_in_docspace.x, -info->overlap_in_docspace.y);
 		// this is to calculate the size of the pixmap using the source
-		auto pixmap_size = fz_round_rect(fz_transform_rect(fz_make_rect(0, 0, info.overlap_in_docspace.width, info.overlap_in_docspace.height), ctm));
+		auto pixmap_size = fz_round_rect(fz_transform_rect(fz_make_rect(0, 0, info->overlap_in_docspace.width, info->overlap_in_docspace.height), ctm));
 
 		fz_pixmap* pixmap = nullptr;
 		fz_device* drawdevice = nullptr;
@@ -529,25 +556,36 @@ void PDFRenderHandler::async_render() {
 			drawdevice = fz_new_draw_device(ctx, fz_concat(transform, ctm), pixmap);
 			// render to draw device
 			// TODO maybe add a cookie so the rendering can be aborted at any time
-			fz_run_display_list(ctx, cloned_lists.at(info.page), drawdevice, fz_identity, info.overlap_in_docspace, nullptr);
+			fz_run_display_list(ctx, cloned_lists.at(info->page), drawdevice, fz_identity, info->overlap_in_docspace, info->cookie);
+			
+			// check if the rendering was aborted
+			if (info->cookie->abort == 1) {
+				info->stat = RenderInfo::STATUS::ABORTED; 
+				break;
+			}
+			
 			fz_close_device(ctx, drawdevice);
+
 
 			// ___---___ Bitmap creatin and display part ___---___
 			// create the bitmap
 			auto dest = m_pagerec->get_item();
 
-			auto obj = m_renderer->create_bitmap((byte*)pixmap->samples, pixmap_size, (unsigned int)pixmap->stride, info.dpi); // default dpi of the pixmap
+			auto obj = m_renderer->create_bitmap((byte*)pixmap->samples, pixmap_size, (unsigned int)pixmap->stride, info->dpi); // default dpi of the pixmap
 			
 			CachedBitmap bitmap;
 			bitmap.bitmap = std::move(obj);
-			bitmap.dpi = info.dpi;
+			bitmap.dpi = info->dpi;
 
-			info.overlap_in_docspace.x += dest->at(info.page).x;
-			info.overlap_in_docspace.y += dest->at(info.page).y;
-			bitmap.dest = info.overlap_in_docspace;
+			info->overlap_in_docspace.x += dest->at(info->page).x;
+			info->overlap_in_docspace.y += dest->at(info->page).y;
+			bitmap.dest = info->overlap_in_docspace;
 
 			auto bitmaps_list = m_cachedBitmaps->get_item();
 			bitmaps_list->push_back(std::move(bitmap));
+
+			// update info only after no members are called from info 
+			info->stat = RenderInfo::STATUS::FINISHED;
 
 			// We have to do a non blocking call since the main thread could be busy waiting for the cached bitmaps
 			PostMessage(m_window->get_hwnd(), WM_PAINT, (WPARAM)nullptr, (LPARAM)nullptr);
@@ -557,7 +595,8 @@ void PDFRenderHandler::async_render() {
 			fz_drop_device(ctx, drawdevice);
 			fz_drop_pixmap(ctx, pixmap);
 		} fz_catch(ctx) {
-			return;
+			__debugbreak();
+			//return;
 		}
 
 	}
@@ -636,7 +675,7 @@ void PDFRenderHandler::render_preview() {
 	auto clip_space = m_renderer->inv_transform_rect(m_renderer->get_window_size());
 	for (size_t i = 0; i < m_pdf->get_page_count(); i++) {
 		if (dest->at(i).intersects(clip_space)) {
-			m_renderer->draw_bitmap(prev->at(i), dest->at(i), Direct2DRenderer::INTERPOLATION_MODE::LINEAR);
+			m_renderer->draw_bitmap(prev->at(i).bitmap, dest->at(i), Direct2DRenderer::INTERPOLATION_MODE::LINEAR);
 		}
 	}
 	m_renderer->end_draw();
@@ -648,11 +687,11 @@ void PDFRenderHandler::render_outline() {
 	// get the clip space.
 	auto clip_space = m_renderer->inv_transform_rect(m_renderer->get_window_size()); 
 
-	auto dest = m_pagerec->get_item();
-	for (size_t i = 0; i < dest->size(); i++) {
-		if (dest->at(i).intersects(clip_space)) {
-			m_renderer->draw_rect_filled(dest->at(i), { 255, 255, 255 });
-			m_renderer->draw_text(L"Loading page...", dest->at(i).upperleft(), {255, 0, 0}, 20.0f);
+	auto prev = m_preview_bitmaps->get_item();
+	for (size_t i = 0; i < prev->size(); i++) {
+		if (prev->at(i).dest.intersects(clip_space)) {
+			m_renderer->draw_rect_filled(prev->at(i).dest, {255, 255, 255});
+			m_renderer->draw_text(L"Loading page...", prev->at(i).dest.upperleft(), {255, 0, 0}, 20.0f);
 		}
 	}
 
@@ -660,10 +699,10 @@ void PDFRenderHandler::render_outline() {
 	std::vector<CachedBitmap*> temp;
 	{
 		// access to cached bitmaps
-		auto cached = m_cachedBitmaps->get_item();
-		for (size_t i = 0; i < cached->size(); i++) {
-			if (cached->at(i).dest.intersects(clip_space)) {
-				temp.push_back(&cached->at(i));
+		auto prev = m_preview_bitmaps->get_item();
+		for (size_t i = 0; i < prev->size(); i++) {
+			if (prev->at(i).dest.intersects(clip_space)) {
+				temp.push_back(&prev->at(i));
 			}
 		}
 

@@ -95,19 +95,12 @@ MuPDFHandler::PDF::PDF(std::shared_ptr<ContextWrapper> ctx, std::shared_ptr<Docu
 	auto c = ctx->get_item();
 	// and document
 	auto d = doc->get_document();
-
-	for (size_t i = 0; i < get_page_count(); i++) { 
-		auto page = fz_load_page(*c, *d, i);
-		m_pages.push_back(std::shared_ptr<PageWrapper>(new PageWrapper(ctx, page))); 
-	}
 }
 
 MuPDFHandler::PDF::PDF(PDF&& t) noexcept {
 	m_document = std::move(t.m_document);
 
 	m_ctx = std::move(t.m_ctx);
-
-	m_pages = std::move(t.m_pages);
 
 	data = t.data;
 	t.data = nullptr;
@@ -125,13 +118,18 @@ MuPDFHandler::PDF::~PDF() {
 	// pages are going to be deleted by the wrapper
 	// so there is nothing ot be deleted
 }
-
-ThreadSafePageWrapper MuPDFHandler::PDF::get_page(size_t page) const {
-	return m_pages.at(page)->get_page();
-}
-
 ThreadSafeContextWrapper MuPDFHandler::PDF::get_context() const {
 	return m_ctx->get_item();
+}
+
+ThreadSafeDocumentWrapper MuPDFHandler::PDF::get_document() const {
+	return m_document->get_item();
+}
+
+PageWrapper MuPDFHandler::PDF::get_page(fz_document* doc, size_t page) {
+	auto ctx = m_ctx->get_context();
+	PageWrapper w(get_context_wrapper(), fz_load_page(*ctx, doc, (int)page));
+	return std::move(w);
 }
 
 std::shared_ptr<ContextWrapper> MuPDFHandler::PDF::get_context_wrapper() const {
@@ -144,11 +142,12 @@ size_t MuPDFHandler::PDF::get_page_count() const {
 	return fz_count_pages(*c, *d);
 }
 
-Renderer::Rectangle<float> MuPDFHandler::PDF::get_page_size(size_t page, float dpi) const {
+Renderer::Rectangle<float> MuPDFHandler::PDF::get_page_size(size_t page, float dpi) { 
 	auto c = m_ctx->get_context();
-	auto p = m_pages.at(page)->get_page();
+	auto d = m_document->get_document();
+	auto p = get_page(*d, page);
 
 	Renderer::Rectangle<float> rect;
-	rect = fz_bound_page(*c, *p);
+	rect = fz_bound_page(*c, p);
 	return Renderer::Rectangle<float>(0, 0, rect.width * (dpi/ MUPDF_DEFAULT_DPI), rect.height * (dpi/ MUPDF_DEFAULT_DPI));
 }
