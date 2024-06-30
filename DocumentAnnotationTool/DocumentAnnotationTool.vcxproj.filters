@@ -53,6 +53,9 @@
     <ClInclude Include="src\MainWindow.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\helper\ReadWriteRecursiveMutex.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="rsc\ENR6.3-9.slow.rendering.pdf" />

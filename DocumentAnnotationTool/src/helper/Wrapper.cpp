@@ -1,6 +1,6 @@
 #include "include.h"
 
-ContextWrapper::ContextWrapper(fz_context* c) : ThreadSafeWrapper<fz_context*>(std::move(c)) {}
+ContextWrapper::ContextWrapper(fz_context* c) : ThreadSafeClass<fz_context*>(std::move(c)) {}
 
 ThreadSafeContextWrapper ContextWrapper::get_context() {
 	return this->get_item();
@@ -13,7 +13,7 @@ ContextWrapper::~ContextWrapper() {
 }
 
 
-DocumentWrapper::DocumentWrapper(std::shared_ptr<ContextWrapper> a, fz_document* d) : ThreadSafeWrapper<fz_document*>(std::move(d)) {
+DocumentWrapper::DocumentWrapper(std::shared_ptr<ContextWrapper> a, fz_document* d) : ThreadSafeClass<fz_document*>(std::move(d)) {
 	m_context = a;
 }
 
@@ -61,7 +61,7 @@ PageWrapper::~PageWrapper() {
 	fz_drop_page(*ctx, page);
 }
 
-DisplayListWrapper::DisplayListWrapper(std::shared_ptr<ContextWrapper> a, fz_display_list* l) : ThreadSafeWrapper<fz_display_list*>(std::move(l)) {
+DisplayListWrapper::DisplayListWrapper(std::shared_ptr<ContextWrapper> a, fz_display_list* l) : ThreadSafeClass<fz_display_list*>(std::move(l)) {
 	m_context = a;
 }
 

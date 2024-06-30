@@ -19,6 +19,7 @@
 #include <atomic>
 #include <mupdf/fitz/crypt.h>
 #include <deque>
+#include "ReadWriteRecursiveMutex.h"
 
 /// <summary>
 /// ID of the main thread. All other thread should use an ID > 1. ID = 0 is reserved 
@@ -40,82 +41,48 @@ inline void SafeRelease(IUnknown* ptr) {
 	}
 }
 
-template <typename T>
-class ThreadSafeClass {
-	std::shared_ptr<T> obj;
-	std::unique_lock<std::mutex> lock;
-
-public:
-	ThreadSafeClass(std::pair<std::mutex, std::shared_ptr<T>>& p) : lock(p.first) {
-		obj = std::shared_ptr<T>(p.second);
-	}
-
-	ThreadSafeClass(std::mutex& m, std::shared_ptr<T> p) : lock(m) {
-		obj = std::shared_ptr<T>(p);
-	}
-
-	ThreadSafeClass(ThreadSafeClass&& a) noexcept {
-		obj = std::move(a.obj);
-		a.lock.swap(lock);
-	}
-
-	ThreadSafeClass& operator=(ThreadSafeClass&& t) noexcept {
-		this->~ThreadSafeClass();
-		new(this) ThreadSafeClass(std::move(t));
-		return *this;
-	}
-
-	T* operator->()const { return obj.get(); }
-	T& operator*() const { return *obj; }
-
-	~ThreadSafeClass() {
-		lock.unlock();
-	}
-};
-
-
 template <typename T, typename M>
-class RawThreadSafeClass {
+class RawSafeClass {
 	T* obj = nullptr;
 	std::unique_lock<M> lock;
 
 public:
-	RawThreadSafeClass(M& m, T* p) : lock(m) {
+	RawSafeClass(M& m, T* p) : lock(m) {
 		obj = p;
 	}
 
-	RawThreadSafeClass(std::unique_lock<M>& l, T* p) {
+	RawSafeClass(std::unique_lock<M>& l, T* p) {
 		std::swap(l, lock);
 		obj = p;
 	}
 
-	RawThreadSafeClass(RawThreadSafeClass&& a) noexcept {
+	RawSafeClass(RawSafeClass&& a) noexcept {
 		obj = a.obj;
 		a.lock.swap(lock);
 	}
 
-	RawThreadSafeClass& operator=(RawThreadSafeClass&& t) noexcept {
-		this->~RawThreadSafeClass();
-		new(this) RawThreadSafeClass(std::move(t));
+	RawSafeClass& operator=(RawSafeClass&& t) noexcept {
+		this->~RawSafeClass();
+		new(this) RawSafeClass(std::move(t));
 		return *this;
 	}
 
 	T* operator->()const { return obj; }
 	T& operator*() const { return *obj; }
 
-	~RawThreadSafeClass() {
+	~RawSafeClass() {
 		// will not delete pointer since it is not owning it
 		lock.unlock(); 
 	}
 };
 
-template<typename T, typename M = std::recursive_mutex, typename C = RawThreadSafeClass<T, M>>
-struct ThreadSafeWrapper {
+template<typename T, typename M = std::recursive_mutex, typename C = RawSafeClass<T, M>>
+struct ThreadSafeClass {
 private:
 	T m_item;
 	M m_mutex;
 public:
-	ThreadSafeWrapper(T&& item) {
+	ThreadSafeClass(T&& item) {
 		m_item = std::move(item);
 	}
 
@@ -132,13 +99,13 @@ public:
 	//	return C(m_mutex, &m_item);
 	//}
 
-	ThreadSafeWrapper(const ThreadSafeWrapper& o) = delete;
-	ThreadSafeWrapper(ThreadSafeWrapper&& o) = delete;
-	ThreadSafeWrapper& operator=(const ThreadSafeWrapper& t) = delete;
-	ThreadSafeWrapper& operator=(ThreadSafeWrapper&& t) = delete;
+	ThreadSafeClass(const ThreadSafeClass& o) = delete;
+	ThreadSafeClass(ThreadSafeClass&& o) = delete;
+	ThreadSafeClass& operator=(const ThreadSafeClass& t) = delete;
+	ThreadSafeClass& operator=(ThreadSafeClass&& t) = delete;
 
 
-	~ThreadSafeWrapper() {
+	~ThreadSafeClass() {
 		// make sure mutex is not used
 		get_item();
 	}
@@ -146,13 +113,13 @@ public:
 
 
 template <typename T>
-using ThreadSafeVector = ThreadSafeWrapper<std::vector<T>>;
+using ThreadSafeVector = ReadWriteThreadSafeClass<std::vector<T>>;
 
 template <typename T>
-using ThreadSafeDeque = ThreadSafeWrapper<std::deque<T>>;
+using ThreadSafeDeque = ReadWriteThreadSafeClass<std::deque<T>>; 
 
-typedef RawThreadSafeClass<fz_context*, std::recursive_mutex> ThreadSafeContextWrapper;
-struct ContextWrapper : public ThreadSafeWrapper<fz_context*> {
+typedef RawSafeClass<fz_context*, std::recursive_mutex> ThreadSafeContextWrapper;
+struct ContextWrapper : public ThreadSafeClass<fz_context*> {
 	ContextWrapper(fz_context* c);
 
 	/// <summary>
@@ -182,9 +149,9 @@ public:
 };
 
 struct DocumentWrapper;
-typedef RawThreadSafeClass<fz_document*, std::recursive_mutex> ThreadSafeDocumentWrapper;
+typedef RawSafeClass<fz_document*, std::recursive_mutex> ThreadSafeDocumentWrapper;
 
-struct DocumentWrapper : public ThreadSafeWrapper<fz_document*> {
+struct DocumentWrapper : public ThreadSafeClass<fz_document*> {
 private:
 	std::shared_ptr<ContextWrapper> m_context;
 public:
@@ -196,9 +163,9 @@ public:
 };
 
 struct DisplayListWrapper;
-typedef RawThreadSafeClass<fz_display_list*, std::recursive_mutex> ThreadSafeDisplayListWrapper;
+typedef RawSafeClass<fz_display_list*, std::recursive_mutex> ThreadSafeDisplayListWrapper;
 
-struct DisplayListWrapper : public ThreadSafeWrapper<fz_display_list*> {
+struct DisplayListWrapper : public ThreadSafeClass<fz_display_list*> {
 private:
 	std::shared_ptr<ContextWrapper> m_context;
 public:
