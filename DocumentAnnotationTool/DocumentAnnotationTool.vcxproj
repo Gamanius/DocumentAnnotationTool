@@ -186,6 +186,7 @@
     <None Include="rsc\Ghent_PDF_Output_Suite_V50_Testpages\PR_Ghent-PDF-Output-Suite-5-Conformance-Certification.pdf" />
     <None Include="rsc\Physikpraktikum_1-4.pdf" />
     <None Include="rsc\second_measurement_red_sensor_HEAVY.pdf" />
+    <None Include="TODO.md" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

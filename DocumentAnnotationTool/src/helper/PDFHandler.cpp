@@ -292,7 +292,7 @@ void PDFRenderHandler::render_high_res() {
 
 	std::vector<std::tuple<size_t, Renderer::Rectangle<float>, std::vector<CachedBitmap*>>> clipped_documents;
 
-	reduce_cache_size(500);
+	reduce_cache_size(200);
 
 	// TODO
 	update_render_queue();
@@ -685,11 +685,13 @@ void PDFRenderHandler::render_outline() {
 	// get the clip space.
 	auto clip_space = m_renderer->inv_transform_rect(m_renderer->get_window_size()); 
 
-	auto dest = m_pagerec->get_item();
-	for (size_t i = 0; i < dest->size(); i++) { 
-		if (dest->at(i).intersects(clip_space)) {
-			m_renderer->draw_rect_filled(dest->at(i), {255, 255, 255});
-			m_renderer->draw_text(L"Loading page...", dest->at(i).upperleft(), {255, 0, 0}, 20.0f);
+	{
+		auto dest = m_pagerec->get_item();
+		for (size_t i = 0; i < dest->size(); i++) {
+			if (dest->at(i).intersects(clip_space)) {
+				m_renderer->draw_rect_filled(dest->at(i), { 255, 255, 255 });
+				m_renderer->draw_text(L"Loading page...", dest->at(i).upperleft(), { 255, 0, 0 }, 20.0f);
+			}
 		}
 	}
 
