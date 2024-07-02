@@ -95,6 +95,11 @@ MuPDFHandler::PDF::PDF(std::shared_ptr<ContextWrapper> ctx, std::shared_ptr<Docu
 	auto c = ctx->get_item();
 	// and document
 	auto d = doc->get_document();
+
+	m_pagerec = std::shared_ptr<ThreadSafeVector<Renderer::Rectangle<float>>>
+		(new ThreadSafeVector<Renderer::Rectangle<float>>(std::vector<Renderer::Rectangle<float>>()));
+
+	sort_page_positions();
 }
 
 MuPDFHandler::PDF::PDF(PDF&& t) noexcept {
@@ -104,6 +109,12 @@ MuPDFHandler::PDF::PDF(PDF&& t) noexcept {
 
 	data = t.data;
 	t.data = nullptr;
+
+	m_seperation_distance = t.m_seperation_distance;
+	t.m_seperation_distance = 0;
+
+	m_pagerec = std::move(t.m_pagerec);
+
 }
 
 
@@ -126,10 +137,13 @@ ThreadSafeDocumentWrapper MuPDFHandler::PDF::get_document() const {
 	return m_document->get_item();
 }
 
+std::shared_ptr<ThreadSafeVector<Renderer::Rectangle<float>>> MuPDFHandler::PDF::get_pagerec() {
+	return m_pagerec;
+}
+
 PageWrapper MuPDFHandler::PDF::get_page(fz_document* doc, size_t page) {
 	auto ctx = m_ctx->get_context();
-	PageWrapper w(get_context_wrapper(), fz_load_page(*ctx, doc, (int)page));
-	return std::move(w);
+	return std::move(PageWrapper(get_context_wrapper(), fz_load_page(*ctx, doc, (int)page)));
 }
 
 std::shared_ptr<ContextWrapper> MuPDFHandler::PDF::get_context_wrapper() const {
@@ -150,4 +164,17 @@ Renderer::Rectangle<float> MuPDFHandler::PDF::get_page_size(size_t page, float d
 	Renderer::Rectangle<float> rect;
 	rect = fz_bound_page(*c, p);
 	return Renderer::Rectangle<float>(0, 0, rect.width * (dpi/ MUPDF_DEFAULT_DPI), rect.height * (dpi/ MUPDF_DEFAULT_DPI));
+}
+
+
+void MuPDFHandler::PDF::sort_page_positions() {
+	auto dest = m_pagerec->get_write();
+	dest->clear();
+	double height = 0;
+	for (size_t i = 0; i < get_page_count(); i++) {
+		auto size = get_page_size(i);
+		dest->push_back(Renderer::Rectangle<double>(0, height, size.width, size.height));
+		height += get_page_size(i).height;
+		height += m_seperation_distance;
+	}
 }

@@ -1,13 +1,22 @@
 #include "include.h"
 
-GestureHandler::GestureHandler(Direct2DRenderer* renderer) {
+GestureHandler::GestureHandler(Direct2DRenderer* renderer, MuPDFHandler::PDF* pdf) {
 	this->m_renderer = renderer;
+	this->m_pdf = pdf;
 }
 
 GestureHandler::GestureHandler(GestureHandler&& a) noexcept {
 	m_renderer = a.m_renderer;
+	m_pdf = a.m_pdf;
+
 	m_gesturefinger = std::move(a.m_gesturefinger);
 	m_initial_offset = a.m_initial_offset;
+
+	m_initialScaleMatrix = a.m_initialScaleMatrix;
+	m_initialScaleMatrixInv = a.m_initialScaleMatrixInv;
+	m_initialScale = a.m_initialScale;
+
+	m_selected_page = std::move(a.m_selected_page);
 }
 
 GestureHandler& GestureHandler::operator=(GestureHandler&& a) noexcept {
@@ -158,6 +167,63 @@ void GestureHandler::end_gesture(const WindowHandler::PointerInfo& p) {
 	}
 }
 
+void GestureHandler::update_mouse(short delta, bool hwheel, Renderer::Point<int> center) {
+	if (is_gesture_active()) { 
+		return;
+	}
+
+	double offset = (double)delta / m_renderer->get_transform_scale();
+	if (WindowHandler::is_key_pressed(WindowHandler::LEFT_CONTROL)) {
+		m_renderer->add_scale_matrix(delta > 0 ? 1.25 : 0.8, center);
+	}
+	else if (WindowHandler::is_key_pressed(WindowHandler::LEFT_SHIFT) or hwheel)
+		m_renderer->add_transform_matrix({ (float)offset, 0 });
+	else
+		m_renderer->add_transform_matrix({ 0, (float)offset });
+}
+
+void GestureHandler::start_select_page(const WindowHandler::PointerInfo& p) {
+	if (m_selected_page != std::nullopt) {
+		return;
+	}
+
+	auto recs = m_pdf->get_pagerec()->get_read();
+	auto mouse_pos = m_renderer->inv_transform_point(p.pos);
+
+	for (size_t i = 0; i < recs->size(); i++) {
+		if (recs->at(i).intersects(mouse_pos)) {
+			m_selected_page = std::make_pair(i, Renderer::Point<float>(p.pos));
+			return;
+		}
+	}
+}
+
+void GestureHandler::update_select_page(const WindowHandler::PointerInfo& p) {
+	if (m_selected_page == std::nullopt) {
+		return;
+	}
+
+	auto recs = m_pdf->get_pagerec()->get_write(); 
+	auto delta = m_renderer->inv_transform_point(p.pos) - m_renderer->inv_transform_point(m_selected_page.value().second);
+
+	recs->at(m_selected_page.value().first).x += delta.x;
+	recs->at(m_selected_page.value().first).y += delta.y;
+
+	m_selected_page.value().second = p.pos;
+}
+
+void GestureHandler::stop_select_page(const WindowHandler::PointerInfo& p) {
+	m_selected_page = std::nullopt;
+}
+
+std::optional<size_t> GestureHandler::get_selected_page() const {
+	if (m_selected_page == std::nullopt) {
+		return std::nullopt;
+	}
+
+	return m_selected_page.value().first;
+}
+
 byte GestureHandler::amount_finger_active() const {
 	byte a = 0;
 
@@ -168,5 +234,5 @@ byte GestureHandler::amount_finger_active() const {
 }
 
 bool GestureHandler::is_gesture_active() const {
-	return amount_finger_active() > 0;
+	return amount_finger_active() > 0 or m_selected_page != std::nullopt;
 }

@@ -6,10 +6,12 @@
 
 std::shared_ptr<std::vector<std::wstring>> all_messages = std::make_shared<std::vector<std::wstring>>();
 HANDLE consoleHandle = nullptr;
+std::recursive_mutex log_recursive_mutex;
 
 namespace Logger {
 
 	void log(const std::wstring& msg, MsgLevel lvl) {
+		std::unique_lock<std::recursive_mutex>(log_recursive_mutex);
 		all_messages->push_back(msg);
 	}
 
@@ -110,6 +112,7 @@ namespace Logger {
 		// TODO actually awfully slow 
 		const wchar_t* new_line = L"\n";
 
+		std::unique_lock<std::recursive_mutex>(log_recursive_mutex);
 		for (size_t i = 0; i < all_messages->size(); i++) {
 			std::wstring& temp = all_messages->at(i);
 			WriteConsoleW(consoleHandle, (void*)temp.c_str(), (DWORD)temp.length(), nullptr, nullptr);
@@ -120,6 +123,7 @@ namespace Logger {
 	}
 
 	void print_to_debug(bool clear) {
+		std::unique_lock<std::recursive_mutex>(log_recursive_mutex);
 		for (size_t i = 0; i < all_messages->size(); i++) {
 			OutputDebugString(L"\n");
 			OutputDebugString(all_messages->at(i).c_str());
@@ -130,6 +134,7 @@ namespace Logger {
 	}
 
 	void clear() {
+		std::unique_lock<std::recursive_mutex>(log_recursive_mutex);
 		all_messages->clear();
 	}
 

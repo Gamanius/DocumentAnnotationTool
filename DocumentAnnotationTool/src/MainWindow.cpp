@@ -33,11 +33,25 @@ void callback_draw(std::optional<std::vector<CachedBitmap*>*> highres_bitmaps) {
 	else {
 		//else there are new bitmaps to render that have been created by other threads
 		auto bitmaps = highres_bitmaps.value(); 
-		for (auto& i : *bitmaps) {
-			if (g_main_renderer->inv_transform_rect(g_main_renderer->get_window_size()).intersects(i->dest))
-				g_main_renderer->draw_bitmap(i->bitmap, i->dest, Direct2DRenderer::INTERPOLATION_MODE::LINEAR);
+		for (size_t i = 0; i < bitmaps->size(); i++) {
+			auto rec = g_pdf->get_pagerec()->get_read(); 
+			auto pagerec = bitmaps->at(i)->doc_coords + rec->at(bitmaps->at(i)->page).upperleft();
+			if (g_main_renderer->inv_transform_rect(g_main_renderer->get_window_size())
+				.intersects(pagerec)) {
+				g_main_renderer->draw_bitmap(bitmaps->at(i)->bitmap, pagerec, Direct2DRenderer::INTERPOLATION_MODE::LINEAR);
+			}
+
 		}
 	}
+
+
+	g_main_renderer->set_current_transform_active(); 
+	auto selected_page = g_gesturehandler.get_selected_page();
+	if (selected_page != std::nullopt) {
+		auto rec = g_pdf->get_pagerec()->get_read();
+		g_main_renderer->draw_rect(rec->at(selected_page.value()), { 0, 0, 255 }, 5);
+	}
+
 	// draw ui elements
 	g_main_renderer->set_identity_transform_active();
 	g_main_renderer->draw_text(L"DOCANTO ALPHA VERSION 0", Renderer::Point<float>(0, 0), *g_text_format, *g_brush);
@@ -47,7 +61,6 @@ void callback_draw(std::optional<std::vector<CachedBitmap*>*> highres_bitmaps) {
 void callback_size(Renderer::Rectangle<long> r) {
 	g_main_renderer->resize(r);
 }
-
 
 void callback_key_up(WindowHandler::VK k) {
 	if (WindowHandler::is_key_pressed(WindowHandler::LEFT_CONTROL)) {
@@ -68,15 +81,22 @@ Renderer::Point<float> g_init_touch_pos = { 0, 0 };
 Renderer::Point<float> g_init_trans_pos = { 0, 0 };
 
 void callback_pointer_down(WindowHandler::PointerInfo p) {
-	g_main_window->invalidate_drawing_area();
-
+	if (p.type == WindowHandler::POINTER_TYPE::MOUSE and p.button3pressed) {
+		g_gesturehandler.start_select_page(p);
+	}
 	// handle hand
 	if (p.type == WindowHandler::POINTER_TYPE::TOUCH) {
 		g_gesturehandler.start_gesture(p);
 	}
+
+	g_main_window->invalidate_drawing_area();
 }
 
 void callback_pointer_up(WindowHandler::PointerInfo p) {
+	if (p.type == WindowHandler::POINTER_TYPE::MOUSE and not p.button3pressed) { 
+		g_gesturehandler.stop_select_page(p); 
+	}
+
 	if (p.type == WindowHandler::POINTER_TYPE::TOUCH) {
 		g_gesturehandler.end_gesture(p);
 	}
@@ -84,6 +104,11 @@ void callback_pointer_up(WindowHandler::PointerInfo p) {
 }
 
 void callback_pointer_update(WindowHandler::PointerInfo p) {
+	if (p.type == WindowHandler::POINTER_TYPE::MOUSE and p.button3pressed) {
+		g_gesturehandler.update_select_page(p);
+		g_main_window->invalidate_drawing_area();
+	}
+
 	if (p.type == WindowHandler::POINTER_TYPE::TOUCH) {
 		g_gesturehandler.update_gesture(p);
 		g_main_window->invalidate_drawing_area();
@@ -91,14 +116,7 @@ void callback_pointer_update(WindowHandler::PointerInfo p) {
 }
 
 void callback_mousewheel(short delta, bool hwheel, Renderer::Point<int> center) {
-	delta *= 1/g_main_renderer->get_transform_scale();
-	if (WindowHandler::is_key_pressed(WindowHandler::LEFT_CONTROL)) {
-		g_main_renderer->add_scale_matrix(delta > 0 ? 1.25 : 0.8, center);
-	}
-	else if (WindowHandler::is_key_pressed(WindowHandler::LEFT_SHIFT) or hwheel)
-		g_main_renderer->add_transform_matrix({ (float)delta, 0});
-	else
-		g_main_renderer->add_transform_matrix({ 0, (float)delta }); 
+	g_gesturehandler.update_mouse(delta, hwheel, center);
 	g_main_window->invalidate_drawing_area();
 }
 
@@ -111,7 +129,6 @@ void main_window_loop_run(HINSTANCE h) {
 	auto default_text_format = g_main_renderer->create_text_format(L"Consolas", 20);
 	g_text_format = &default_text_format;
 
-	g_gesturehandler = GestureHandler(g_main_renderer.get());
 	g_mupdfcontext = std::shared_ptr<MuPDFHandler>(new MuPDFHandler);
 
 
@@ -122,6 +139,7 @@ void main_window_loop_run(HINSTANCE h) {
 	}
 	auto pdf = g_mupdfcontext->load_pdf(path.value());
 	g_pdf = &pdf.value();
+	g_gesturehandler = GestureHandler(g_main_renderer.get(), &pdf.value());
 
 	auto pdf_handler = PDFRenderHandler(g_pdf, g_main_renderer.get(), g_main_window.get(), 2); 
 	g_pdfrenderhandler = &pdf_handler;

@@ -20,7 +20,7 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 	//Logger::set_console_handle(create_console());
 	init();
 	
-	main_window_loop_run(hInstance);
+	main_window_loop_run(hInstance); 
 	
 	Logger::print_to_debug();
 	Logger::clear();

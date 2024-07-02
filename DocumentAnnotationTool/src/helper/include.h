@@ -234,6 +234,7 @@ namespace Renderer {
 		Point<T> operator +(const Point<T>& p) const { 
 			return Point<T>(x + p.x, y + p.y); 
 		}
+
 		Point<T> operator -(const Point<T>& p) const {
 			return Point<T>(x - p.x, y - p.y);
 		}
@@ -282,6 +283,29 @@ namespace Renderer {
 		Point<T> upperright() const { return { right(), y }; }
 		Point<T> lowerleft() const { return { x, bottom() }; }
 		Point<T> lowerright() const { return { right(), bottom() }; }
+
+		Rectangle<T> operator+(const Point<T>& p) const { 
+			return Rectangle<T>(x + p.x, y + p.y, width, height); 
+		}
+
+		Rectangle<T> operator-(const Point<T>& p) const {
+			return Rectangle<T>(x - p.x, y - p.y, width, height);
+		}
+
+		Rectangle<T>& operator+=(const Point<T>& p) {
+			x += p.x;
+			y += p.y;
+
+			return *this;
+		}
+
+		Rectangle<T>& operator-=(const Point<T>& p) {
+			x -= p.x;
+			y -= p.y;
+
+			return *this;
+		}
+
 
 		operator RECT() const { 
 			return { x, y, right(), bottom() };
@@ -834,8 +858,6 @@ class PDFRenderHandler;
 
 struct CachedBitmap {
 	Direct2DRenderer::BitmapObject bitmap;
-	// coordinates in clip space
-	Renderer::Rectangle<float> dest;
 	// coordinates in doc space
 	Renderer::Rectangle<float> doc_coords;
 	float dpi = MUPDF_DEFAULT_DPI;
@@ -845,11 +867,11 @@ struct CachedBitmap {
 	size_t used = false;
 
 	CachedBitmap() = default;
-	CachedBitmap(Direct2DRenderer::BitmapObject bitmap, Renderer::Rectangle<float> dest, float dpi = MUPDF_DEFAULT_DPI) : bitmap(bitmap), dest(dest), dpi(dpi) {}
-	CachedBitmap(Direct2DRenderer::BitmapObject bitmap, Renderer::Rectangle<float> dest, float dpi = MUPDF_DEFAULT_DPI, size_t used = 0) : bitmap(bitmap), dest(dest), dpi(dpi), used(used) {}
+	CachedBitmap(Direct2DRenderer::BitmapObject bitmap, Renderer::Rectangle<float> dest, float dpi = MUPDF_DEFAULT_DPI) : bitmap(bitmap), doc_coords(doc_coords), dpi(dpi) {}
+	CachedBitmap(Direct2DRenderer::BitmapObject bitmap, Renderer::Rectangle<float> dest, float dpi = MUPDF_DEFAULT_DPI, size_t used = 0) : bitmap(bitmap), doc_coords(doc_coords), dpi(dpi), used(used) {}
 	CachedBitmap(CachedBitmap&& cachedbitmap) noexcept {
 		bitmap = std::move(cachedbitmap.bitmap);
-		dest = cachedbitmap.dest;
+		doc_coords = cachedbitmap.doc_coords;
 		dpi = cachedbitmap.dpi;
 		used = cachedbitmap.used;
 		page = cachedbitmap.page;
@@ -886,6 +908,11 @@ public:
 		// Pointer to the context from the MuPDFHandler
 		std::shared_ptr<ContextWrapper> m_ctx;
 		std::shared_ptr<DocumentWrapper> m_document;
+
+		// Position and dimensions of the pages 
+		std::shared_ptr<ThreadSafeVector<Renderer::Rectangle<float>>> m_pagerec;
+		float m_seperation_distance = 10;
+
 	public:
 
 		PDF() = default; 
@@ -907,6 +934,8 @@ public:
 
 		ThreadSafeDocumentWrapper get_document() const;
 
+		std::shared_ptr<ThreadSafeVector<Renderer::Rectangle<float>>> get_pagerec();
+
 		/// <summary>
 		/// The document HAS TO outlive the page!! 
 		/// TODO put fz_pages into DocumentWrapper
@@ -915,6 +944,8 @@ public:
 		/// <param name="page"></param>
 		/// <returns></returns>
 		PageWrapper get_page(fz_document* doc, size_t page);
+
+		void sort_page_positions();
 
 		std::shared_ptr<ContextWrapper> get_context_wrapper() const;
 
@@ -975,22 +1006,6 @@ public:
 			return *this;
 		}
 
-		//RenderInfo(const RenderInfo& t) {
-		//	page = t.page;
-		//	dpi = t.dpi;
-		//	cookie = t.cookie;
-		//	stat = t.stat;
-		//	overlap_in_docspace = t.overlap_in_docspace;
-		//}
-		//RenderInfo& operator=(const RenderInfo& t) {
-		//	page = t.page;
-		//	dpi = t.dpi;
-		//	cookie = t.cookie;
-		//	stat = t.stat;
-		//	overlap_in_docspace = t.overlap_in_docspace;
-		//	return *this;
-		//}
-
 		~RenderInfo() {
 			delete cookie;
 		}
@@ -1012,9 +1027,6 @@ private:
 	Direct2DRenderer* const m_renderer = nullptr;
 	// not owned by this class!
 	WindowHandler* const m_window = nullptr;
-
-	// Position and dimensions of the pages 
-	std::shared_ptr<ThreadSafeVector<Renderer::Rectangle<float>>> m_pagerec;
 
 	// Preview rendering
 	// rendererd at half scale or otherwise specified 
@@ -1038,7 +1050,6 @@ private:
 	std::condition_variable m_render_queue_condition_var;
 	std::vector<std::thread> m_render_threads;
 
-	float m_seperation_distance = 10;
 	float m_preview_scale = 0.5; 
 
 	void create_preview(float scale = 0.5);
@@ -1112,7 +1123,8 @@ public:
 	/// </summary>
 	//void stop_rendering(HWND callbackwindow);
 	void debug_render();
-	void sort_page_positions();
+
+	Renderer::Rectangle<float> get_bounds() const;
 
 	unsigned long long get_cache_memory_usage() const;
 };
@@ -1384,6 +1396,8 @@ public:
 class GestureHandler {
 	// not owned by this class
 	Direct2DRenderer* m_renderer = nullptr;
+	// not owned by this class
+	MuPDFHandler::PDF* m_pdf = nullptr;
 
 	struct GestureFinger {
 		UINT id = 0;
@@ -1399,9 +1413,11 @@ class GestureHandler {
 	D2D1::Matrix3x2F m_initialScaleMatrixInv;
 	float m_initialScale = 1;
 
+	std::optional<std::pair<size_t, Renderer::Point<float>>> m_selected_page = std::nullopt; 
+
 public:
 	GestureHandler() {}
-	GestureHandler(Direct2DRenderer* renderer);
+	GestureHandler(Direct2DRenderer* renderer, MuPDFHandler::PDF* pdf);
 	GestureHandler(GestureHandler&& a) noexcept;
 	GestureHandler& operator=(GestureHandler&& a) noexcept;
 
@@ -1412,6 +1428,14 @@ public:
 	void start_gesture(const WindowHandler::PointerInfo& p);
 	void update_gesture(const WindowHandler::PointerInfo& p);
 	void end_gesture(const WindowHandler::PointerInfo& p);
+
+	// scrolling with mouse
+	void update_mouse(short delta, bool hwheel, Renderer::Point<int> center);
+
+	void start_select_page(const WindowHandler::PointerInfo& p);
+	void update_select_page(const WindowHandler::PointerInfo& p);
+	void stop_select_page(const WindowHandler::PointerInfo& p);
+	std::optional<size_t> get_selected_page() const;
 
 	byte amount_finger_active() const;
 	bool is_gesture_active() const;

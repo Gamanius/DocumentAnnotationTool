@@ -186,11 +186,8 @@ PDFRenderHandler::PDFRenderHandler(MuPDFHandler::PDF* const pdf, Direct2DRendere
 	m_render_queue = std::shared_ptr<ThreadSafeDeque<std::shared_ptr<RenderInfo>>>
 		(new ThreadSafeDeque<std::shared_ptr<RenderInfo>>(std::deque<std::shared_ptr<RenderInfo>>())); 
 
-	m_pagerec = std::shared_ptr<ThreadSafeVector<Renderer::Rectangle<float>>>
-		(new ThreadSafeVector<Renderer::Rectangle<float>>(std::vector<Renderer::Rectangle<float>>()));
 
-	// init of m_pagerec
-	sort_page_positions();
+	// init of m_pdf->get_pagerec()
 	// init of m_previewBitmaps
 	//create_preview(1); // create preview with default scale
 
@@ -203,7 +200,6 @@ PDFRenderHandler::PDFRenderHandler(MuPDFHandler::PDF* const pdf, Direct2DRendere
 	}
 }
 
-
 void PDFRenderHandler::create_preview(float scale) {
 	{
 		auto prev = m_preview_bitmaps->get_write();
@@ -214,10 +210,11 @@ void PDFRenderHandler::create_preview(float scale) {
 
 	for (size_t i = 0; i < m_pdf->get_page_count(); i++) {
 		{
-			auto dest = m_pagerec->get_read(); 
+			auto dest = m_pdf->get_pagerec()->get_read();
 			CachedBitmap p; 
 			p.bitmap = get_bitmap(*m_renderer, i, dpi * scale);
-			p.dest = dest->at(i);
+			p.doc_coords.width = dest->at(i).width;
+			p.doc_coords.height = dest->at(i).height;
 			p.page = i; 
 			p.dpi = dpi;
 			{ 
@@ -244,12 +241,14 @@ void remove_small_rects(std::vector <Renderer::Rectangle<T>>& rects, float thres
 
 std::vector<size_t> PDFRenderHandler::render_job_clipped_cashed_bitmaps(Renderer::Rectangle<float> overlap_clip_space, float dpi) {
 	auto cached_bitmap = m_cachedBitmaps->get_read();
+	auto page_rec = m_pdf->get_pagerec()->get_read();
+
 	std::vector<size_t> return_value;
 	for (size_t i = 0; i < cached_bitmap->size(); i++) {
 		// check if the dpi is high enough
 		if (cached_bitmap->at(i).dpi < dpi and FLOAT_EQUAL(cached_bitmap->at(i).dpi, dpi) == false)
 			continue;
-		if (overlap_clip_space.intersects(cached_bitmap->at(i).dest) == false)
+		if (overlap_clip_space.intersects(page_rec->at(cached_bitmap->at(i).page)) == false)
 			continue;
 
 		return_value.push_back(i);
@@ -259,11 +258,13 @@ std::vector<size_t> PDFRenderHandler::render_job_clipped_cashed_bitmaps(Renderer
 
 std::vector<Renderer::Rectangle<float>> PDFRenderHandler::render_job_splice_recs(Renderer::Rectangle<float> overlap, const std::vector<size_t>& cashedBitmapindex) {
 	std::vector<Renderer::Rectangle<float>> other;	
+
 	auto cached_bitmaps = m_cachedBitmaps->get_read();
+	auto page_rec = m_pdf->get_pagerec()->get_read(); 
 
 	other.reserve(cashedBitmapindex.size());
 	for (size_t i = 0; i < cashedBitmapindex.size(); i++) {
-		other.push_back(cached_bitmaps->at(cashedBitmapindex.at(i)).dest);
+		other.push_back(page_rec->at(cached_bitmaps->at(cashedBitmapindex.at(i)).page)); 
 	}
 
 	std::vector<Renderer::Rectangle<float>> choppy = splice_rect(overlap, other);
@@ -308,7 +309,7 @@ void PDFRenderHandler::render_high_res() {
 	
 	for (size_t i = 0; i < m_pdf->get_page_count(); i++) {
 		// first check if they intersect
-		auto dest = m_pagerec->get_read();
+		auto dest = m_pdf->get_pagerec()->get_read();
 		if (dest->at(i).intersects(clip_space)) {
 			// this is the overlap in the clip space
 			auto overlap = clip_space.calculate_overlap(dest->at(i)); 
@@ -324,13 +325,12 @@ void PDFRenderHandler::render_high_res() {
 			queued_and_cached_bitmaps.reserve(render_queue->size());
 			for (size_t j = 0; j < render_queue->size(); j++) {
 				auto docspace = render_queue->at(j)->overlap_in_docspace;
-				docspace.x += dest->at(i).x;
-				docspace.y += dest->at(i).y;
+				docspace += dest->at(render_queue->at(j)->page).upperleft();
 				queued_and_cached_bitmaps.push_back(docspace);
 			}
 
 			for (size_t j = 0; j < cached_bitmap_index.size(); j++) { 
-				queued_and_cached_bitmaps.push_back(cached_bitmaps->at(cached_bitmap_index.at(j)).dest);
+				queued_and_cached_bitmaps.push_back(cached_bitmaps->at(cached_bitmap_index.at(j)).doc_coords + dest->at(cached_bitmaps->at(cached_bitmap_index.at(j)).page).upperleft());
 			}
 
 			// if there are no cached bitmaps we have to render everything
@@ -339,8 +339,7 @@ void PDFRenderHandler::render_high_res() {
 				lambda_add_stitch(overlap);
 
 				// need to transfom into doc space
-				overlap.x -= dest->at(i).x;
-				overlap.y -= dest->at(i).y;
+				overlap -= dest->at(i).upperleft();
 
 				// add to the queue
 				render_queue->push_back(std::shared_ptr<RenderInfo>(new RenderInfo({ i, dpi, overlap })));
@@ -358,8 +357,7 @@ void PDFRenderHandler::render_high_res() {
 
 			for (size_t j = 0; j < chopped_render_targets.size(); j++) {
 				// transform into doc space
-				chopped_render_targets.at(j).x -= dest->at(i).x;
-				chopped_render_targets.at(j).y -= dest->at(i).y;
+				chopped_render_targets.at(j) -= dest->at(i).upperleft();
 
 				// make choppy bigger so the are no stitch lines
 				lambda_add_stitch(chopped_render_targets.at(j));
@@ -388,7 +386,7 @@ void PDFRenderHandler::render_high_res() {
 	} 
 
 	// ___---___ NON multithreaded solution ___---___ 
-	auto dest		    = m_pagerec->get_read(); 
+	auto dest		    = m_pdf->get_pagerec()->get_read(); 
 	auto cached_bitmaps = m_cachedBitmaps->get_write();
 	auto render_queue   = m_render_queue->get_write();
 	std::vector<CachedBitmap*> temp_cachedBitmaps; 
@@ -396,10 +394,6 @@ void PDFRenderHandler::render_high_res() {
 		auto page = render_queue->at(i)->page;
 		auto overlap = render_queue->at(i)->overlap_in_docspace;
 		auto butmap = get_bitmap(*m_renderer, page, overlap, dpi); 
-	
-		// transform from doc space to clip space
-		overlap.x += dest->at(page).x;
-		overlap.y += dest->at(page).y;
 	
 		// add all bitmaps to the cache
 		cached_bitmaps->push_back({ std::move(butmap), overlap, dpi, 0 });
@@ -436,7 +430,7 @@ struct fz_display_list {
 
 void PDFRenderHandler::remove_unused_queue_items() {
 	auto clip_space   = m_renderer->inv_transform_rect(m_renderer->get_window_size_normalized());
-	auto page_rec     = m_pagerec->get_read();
+	auto page_rec     = m_pdf->get_pagerec()->get_read();
 	auto render_queue = m_render_queue->get_write();
 	auto dpi		  = m_renderer->get_dpi() * m_renderer->get_transform_scale();
 
@@ -570,17 +564,15 @@ void PDFRenderHandler::async_render() {
 
 			// ___---___ Bitmap creatin and display part ___---___
 			// create the bitmap
-			auto dest = m_pagerec->get_read();
+			auto dest = m_pdf->get_pagerec()->get_read();
 
 			auto obj = m_renderer->create_bitmap((byte*)pixmap->samples, pixmap_size, (unsigned int)pixmap->stride, info->dpi); // default dpi of the pixmap
 			
 			CachedBitmap bitmap;
 			bitmap.bitmap = std::move(obj);
 			bitmap.dpi = info->dpi;
-
-			info->overlap_in_docspace.x += dest->at(info->page).x;
-			info->overlap_in_docspace.y += dest->at(info->page).y;
-			bitmap.dest = info->overlap_in_docspace;
+			bitmap.doc_coords = info->overlap_in_docspace;
+			bitmap.page = info->page;
 
 			auto bitmaps_list = m_cachedBitmaps->get_write();
 			bitmaps_list->push_back(std::move(bitmap));
@@ -623,7 +615,7 @@ void PDFRenderHandler::remove_small_cached_bitmaps(float treshold) {
 		return;
 
 	for (int i = cached_bitmaps->size() - 1; i >= 0; i--) {
-		if ((cached_bitmaps->at(i).dest.width < treshold or cached_bitmaps->at(i).dest.height < treshold) and cached_bitmaps->at(i).used == 0) {
+		if ((cached_bitmaps->at(i).doc_coords.width < treshold or cached_bitmaps->at(i).doc_coords.height < treshold) and cached_bitmaps->at(i).used == 0) {
 			cached_bitmaps->erase(cached_bitmaps->begin() + i);
 		}
 	}
@@ -647,16 +639,10 @@ PDFRenderHandler::PDFRenderHandler(PDFRenderHandler&& t) noexcept : m_renderer(t
 
 	m_preview_scale = t.m_preview_scale;
 	t.m_preview_scale = 0;
-
-	m_seperation_distance = t.m_seperation_distance;
-	t.m_seperation_distance = 0;
-
 	// High res rendering
 	m_display_list = std::move(t.m_display_list);
 	m_display_list_thread = std::move(t.m_display_list_thread);
 	m_cachedBitmaps = std::move(t.m_cachedBitmaps);
-
-	m_pagerec = std::move(t.m_pagerec);
 }
 
 PDFRenderHandler& PDFRenderHandler::operator=(PDFRenderHandler&& t) noexcept {
@@ -667,7 +653,7 @@ PDFRenderHandler& PDFRenderHandler::operator=(PDFRenderHandler&& t) noexcept {
 }
 
 void PDFRenderHandler::render_preview() {
-	auto dest = m_pagerec->get_read();
+	auto dest = m_pdf->get_pagerec()->get_read();
 	auto prev = m_preview_bitmaps->get_write();
 	// check for intersection. if it intersects than do the rendering
 	m_renderer->begin_draw();
@@ -689,7 +675,7 @@ void PDFRenderHandler::render_outline() {
 	auto clip_space = m_renderer->inv_transform_rect(m_renderer->get_window_size()); 
 
 	{
-		auto dest = m_pagerec->get_read();
+		auto dest = m_pdf->get_pagerec()->get_read();
 		for (size_t i = 0; i < dest->size(); i++) {
 			if (dest->at(i).intersects(clip_space)) {
 				m_renderer->draw_rect_filled(dest->at(i), { 255, 255, 255 });
@@ -703,8 +689,9 @@ void PDFRenderHandler::render_outline() {
 	{
 		// access to cached bitmaps
 		auto prev = m_preview_bitmaps->get_write();
+		auto pagerec = m_pdf->get_pagerec()->get_read();
 		for (size_t i = 0; i < prev->size(); i++) {
-			if (prev->at(i).dest.intersects(clip_space)) {
+			if ((prev->at(i).doc_coords + pagerec->at(i).upperleft()).intersects(clip_space)) {
 				temp.push_back(&prev->at(i));
 			}
 		}
@@ -749,16 +736,21 @@ void PDFRenderHandler::debug_render() {
 	auto scale = m_renderer->get_transform_scale();
 }
 
-void PDFRenderHandler::sort_page_positions() {
-	auto dest = m_pagerec->get_write();
-	dest->clear();
-	double height = 0;
-	for (size_t i = 0; i < m_pdf->get_page_count(); i++) {
-		auto size = m_pdf->get_page_size(i);
-		dest->push_back(Renderer::Rectangle<double>(0, height, size.width, size.height));
-		height += m_pdf->get_page_size(i).height; 
-		height += m_seperation_distance; 
+
+Renderer::Rectangle<float> PDFRenderHandler::get_bounds() const {
+	auto write = m_pdf->get_pagerec()->get_read();
+
+	float up = 0, down = 0, left = 0, right = 0;
+
+	for (size_t i = 0; i < write->size(); i++) {
+		auto& r = write->at(i);
+		left  = min(left, r.x);
+		up    = min(up, r.y);
+		right = max(right, r.right());
+		down  = max(down, r.bottom());
 	}
+
+	return Renderer::Rectangle<float>(up, left, left + right, up + down);
 }
 
 unsigned long long PDFRenderHandler::get_cache_memory_usage() const {
