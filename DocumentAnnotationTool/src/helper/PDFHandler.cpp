@@ -737,21 +737,7 @@ void PDFRenderHandler::debug_render() {
 }
 
 
-Renderer::Rectangle<float> PDFRenderHandler::get_bounds() const {
-	auto write = m_pdf->get_pagerec()->get_read();
 
-	float up = 0, down = 0, left = 0, right = 0;
-
-	for (size_t i = 0; i < write->size(); i++) {
-		auto& r = write->at(i);
-		left  = min(left, r.x);
-		up    = min(up, r.y);
-		right = max(right, r.right());
-		down  = max(down, r.bottom());
-	}
-
-	return Renderer::Rectangle<float>(up, left, left + right, up + down);
-}
 
 unsigned long long PDFRenderHandler::get_cache_memory_usage() const {
 	auto cached_bitmaps = m_cachedBitmaps->get_write();

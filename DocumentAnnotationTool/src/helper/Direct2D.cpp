@@ -148,7 +148,6 @@ void Direct2DRenderer::set_identity_transform_active() {
 }
 
 void Direct2DRenderer::set_transform_matrix(Renderer::Point<float> p) {
-	m_transformPos = p;
 	m_transformPosMatrix = D2D1::Matrix3x2F::Translation(p.x, p.y);
 }
 
@@ -157,28 +156,18 @@ void Direct2DRenderer::set_transform_matrix(D2D1::Matrix3x2F m) {
 }
 
 void Direct2DRenderer::add_transform_matrix(Renderer::Point<float> p) {
-	m_transformPos += p;
 	m_transformPosMatrix = D2D1::Matrix3x2F::Translation(p.x, p.y) * m_transformPosMatrix;
 }
 
 void Direct2DRenderer::set_scale_matrix(float scale, Renderer::Point<float> center) {
-	m_transformScale = scale;
-	m_transformScaleCenter = center;
-
 	m_transformScaleMatrix = D2D1::Matrix3x2F::Scale({ scale, scale }, center);
 }
 
 void Direct2DRenderer::set_scale_matrix(D2D1::Matrix3x2F m) {
-	m_transformScale = m.m11;
-	// TODO: do this
-	//m_transformScaleCenter = m.
 	m_transformScaleMatrix = m;
 }
 
 void Direct2DRenderer::add_scale_matrix(float scale, Renderer::Point<float> center) {
-	m_transformScale *= scale;
-	m_transformScaleCenter = center;
-
 	// calc the new scale matrix
 	// boi i wish i would know how this works again...
 	auto mat = D2D1::Matrix3x2F(m_transformScaleMatrix);
@@ -188,15 +177,23 @@ void Direct2DRenderer::add_scale_matrix(float scale, Renderer::Point<float> cent
 }
 
 float Direct2DRenderer::get_transform_scale() const {
-	return m_transformScale;
+	return m_transformScaleMatrix._11;
 }
 
 D2D1::Matrix3x2F Direct2DRenderer::get_scale_matrix() const {
 	return m_transformScaleMatrix;
 }
 
+Renderer::Point<float> Direct2DRenderer::get_zoom_center() const {
+	if (FLOAT_EQUAL(m_transformScaleMatrix._11, 1)) {
+		return { m_transformScaleMatrix._31, m_transformScaleMatrix._32 };
+	}
+	return { m_transformScaleMatrix._31 / (1 - m_transformScaleMatrix._11),
+		m_transformScaleMatrix._32 / (1 - m_transformScaleMatrix._11), };
+}
+
 Renderer::Point<float> Direct2DRenderer::get_transform_pos() const {
-	return m_transformPos;
+	return { m_transformPosMatrix._31, m_transformPosMatrix._32 };
 }
 
 Renderer::Rectangle<long> Direct2DRenderer::get_window_size() const {

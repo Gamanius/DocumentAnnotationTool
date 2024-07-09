@@ -403,6 +403,16 @@ namespace Renderer {
 	};
 }
 
+template <typename T>
+Renderer::Point<T> operator*(Renderer::Point<T> p , T f) {
+	return { p.x * f, p.y * f };
+}
+
+template <typename T>
+Renderer::Point<T> operator*(T f, Renderer::Point<T> p) {
+	return { p.x * f, p.y * f };
+}
+
 /// <summary>
 /// Given two rectangles r1 and r2 it will first remove the overlapping area of r2 from r1. The now non rectangle r1 will be split up into a maximum of
 /// 4 rectangles and returned in an array. The array will be filled with std::nullopt if the rectangle does not exist. It will not return any rectangles
@@ -677,8 +687,6 @@ class Direct2DRenderer : public Renderer::RenderHandler {
 	ID2D1HwndRenderTarget* m_renderTarget = nullptr;
 	
 	D2D1::Matrix3x2F m_transformPosMatrix = D2D1::Matrix3x2F::Identity(), m_transformScaleMatrix = D2D1::Matrix3x2F::Identity();
-	float m_transformScale = 1.0f;
-	Renderer::Point<float> m_transformPos, m_transformScaleCenter;
 
 	std::atomic<UINT32> m_isRenderinProgress = 0;
 	std::mutex draw_lock;
@@ -762,6 +770,7 @@ public:
 
 	float get_transform_scale() const;
 	D2D1::Matrix3x2F get_scale_matrix() const;
+	Renderer::Point<float> get_zoom_center() const;
 	Renderer::Point<float> get_transform_pos() const;
 	/// <summary>
 	/// Will return the actual window size
@@ -867,8 +876,8 @@ struct CachedBitmap {
 	size_t used = false;
 
 	CachedBitmap() = default;
-	CachedBitmap(Direct2DRenderer::BitmapObject bitmap, Renderer::Rectangle<float> dest, float dpi = MUPDF_DEFAULT_DPI) : bitmap(bitmap), doc_coords(doc_coords), dpi(dpi) {}
-	CachedBitmap(Direct2DRenderer::BitmapObject bitmap, Renderer::Rectangle<float> dest, float dpi = MUPDF_DEFAULT_DPI, size_t used = 0) : bitmap(bitmap), doc_coords(doc_coords), dpi(dpi), used(used) {}
+	CachedBitmap(Direct2DRenderer::BitmapObject bitmap, Renderer::Rectangle<float> dest, float dpi = MUPDF_DEFAULT_DPI) : bitmap(bitmap), doc_coords(dest), dpi(dpi) {}
+	CachedBitmap(Direct2DRenderer::BitmapObject bitmap, Renderer::Rectangle<float> dest, float dpi = MUPDF_DEFAULT_DPI, size_t used = 0) : bitmap(bitmap), doc_coords(dest), dpi(dpi), used(used) {}
 	CachedBitmap(CachedBitmap&& cachedbitmap) noexcept {
 		bitmap = std::move(cachedbitmap.bitmap);
 		doc_coords = cachedbitmap.doc_coords;
@@ -956,6 +965,7 @@ public:
 		size_t get_page_count() const;
 
 		Renderer::Rectangle<float> get_page_size(size_t page, float dpi = 72);
+		Renderer::Rectangle<float> get_bounds() const;
 	};
 
 	MuPDFHandler();
@@ -1124,7 +1134,6 @@ public:
 	//void stop_rendering(HWND callbackwindow);
 	void debug_render();
 
-	Renderer::Rectangle<float> get_bounds() const;
 
 	unsigned long long get_cache_memory_usage() const;
 };
@@ -1415,6 +1424,7 @@ class GestureHandler {
 
 	std::optional<std::pair<size_t, Renderer::Point<float>>> m_selected_page = std::nullopt; 
 
+
 public:
 	GestureHandler() {}
 	GestureHandler(Direct2DRenderer* renderer, MuPDFHandler::PDF* pdf);
@@ -1439,6 +1449,7 @@ public:
 
 	byte amount_finger_active() const;
 	bool is_gesture_active() const;
+	void check_bounds();
 };
 
 //#ifndef NDEBUG

@@ -44,7 +44,7 @@ void callback_draw(std::optional<std::vector<CachedBitmap*>*> highres_bitmaps) {
 		}
 	}
 
-
+	// selected page
 	g_main_renderer->set_current_transform_active(); 
 	auto selected_page = g_gesturehandler.get_selected_page();
 	if (selected_page != std::nullopt) {
@@ -52,14 +52,23 @@ void callback_draw(std::optional<std::vector<CachedBitmap*>*> highres_bitmaps) {
 		g_main_renderer->draw_rect(rec->at(selected_page.value()), { 0, 0, 255 }, 5);
 	}
 
+
+
 	// draw ui elements
 	g_main_renderer->set_identity_transform_active();
+	
+	//// this draws a cross
+	//auto r = g_main_renderer->get_window_size_normalized();
+	//g_main_renderer->draw_rect({ 0, (float)(r.bottom() / 2 - 2), (float)r.right(), 4 }, { 255, 100, 255 });
+	//g_main_renderer->draw_rect({ (float)(r.right() / 2 - 2), 0, 4, (float)r.bottom() }, { 255, 100, 255 });
+	
 	g_main_renderer->draw_text(L"DOCANTO ALPHA VERSION 0", Renderer::Point<float>(0, 0), *g_text_format, *g_brush);
 	g_main_renderer->end_draw();
 }
 
 void callback_size(Renderer::Rectangle<long> r) {
 	g_main_renderer->resize(r);
+	g_gesturehandler.check_bounds();
 }
 
 void callback_key_up(WindowHandler::VK k) {

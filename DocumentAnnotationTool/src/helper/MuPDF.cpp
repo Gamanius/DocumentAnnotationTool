@@ -166,6 +166,23 @@ Renderer::Rectangle<float> MuPDFHandler::PDF::get_page_size(size_t page, float d
 	return Renderer::Rectangle<float>(0, 0, rect.width * (dpi/ MUPDF_DEFAULT_DPI), rect.height * (dpi/ MUPDF_DEFAULT_DPI));
 }
 
+Renderer::Rectangle<float> MuPDFHandler::PDF::get_bounds() const {
+	auto write = m_pagerec->get_read();
+
+	auto d = write->at(0);
+	float up = d.y, down = d.bottom(), left = d.x, right = d.right();
+
+	for (size_t i = 0; i < write->size(); i++) {
+		auto& r = write->at(i);
+		left = min(left, r.x);
+		up = min(up, r.y);
+		right = max(right, r.right());
+		down = max(down, r.bottom());
+	}
+
+	return Renderer::Rectangle<float>(left, up, right - left, down - up); 
+} 
+
 
 void MuPDFHandler::PDF::sort_page_positions() {
 	auto dest = m_pagerec->get_write();

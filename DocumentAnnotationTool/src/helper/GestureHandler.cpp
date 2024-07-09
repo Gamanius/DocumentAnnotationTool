@@ -1,4 +1,45 @@
 #include "include.h"
+#include "cmath"
+
+void GestureHandler::check_bounds() {
+	auto bounds     = m_pdf->get_bounds(); 
+	auto clip_space = m_renderer->inv_transform_rect(m_renderer->get_window_size_normalized());
+	auto origin     = m_renderer->get_transform_pos() - m_renderer->inv_transform_point({ 0, 0 }); 
+	// half the size of the clipspace since we want half of it filled with any pdf
+	auto half_width  = clip_space.width / 2;
+	auto half_height = clip_space.height / 2;
+
+	auto offset_pos = m_renderer->get_transform_pos();
+
+	if (std::isnan(offset_pos.x) or std::isnan(offset_pos.y)) {
+		m_renderer->set_transform_matrix({ 0, 0 });
+		m_renderer->set_scale_matrix(1, {0, 0});
+		Logger::warn("Page was out of bounds");
+	}
+	
+	// check for bottom of clipspace
+	auto zoom_mat = m_renderer->get_scale_matrix();
+	auto scale = zoom_mat._11;
+	if (clip_space.bottom() - half_height < bounds.y) {
+		m_renderer->set_transform_matrix({ offset_pos.x, -zoom_mat._32/ scale + half_height });
+		clip_space = m_renderer->inv_transform_rect(m_renderer->get_window_size_normalized());
+		offset_pos = m_renderer->get_transform_pos();
+	}
+	if (clip_space.y + half_height > bounds.height) {
+		m_renderer->set_transform_matrix({ offset_pos.x, -zoom_mat._32/scale - bounds.height + half_height }); 
+		clip_space = m_renderer->inv_transform_rect(m_renderer->get_window_size_normalized());
+		offset_pos = m_renderer->get_transform_pos();
+	}
+	if (clip_space.right() - half_width < bounds.x) { 
+		m_renderer->set_transform_matrix({ -zoom_mat._31/ scale + half_width , offset_pos.y }); 
+		clip_space = m_renderer->inv_transform_rect(m_renderer->get_window_size_normalized()); 
+		offset_pos = m_renderer->get_transform_pos();
+	}
+	
+	if (clip_space.x + half_width > bounds.right()) { 
+		m_renderer->set_transform_matrix({ -zoom_mat._31 / scale - bounds.width + half_width, offset_pos.y });
+	}
+}
 
 GestureHandler::GestureHandler(Direct2DRenderer* renderer, MuPDFHandler::PDF* pdf) {
 	this->m_renderer = renderer;
@@ -44,7 +85,7 @@ void GestureHandler::start_gesture(const WindowHandler::PointerInfo& p) {
 	switch (amount_finger) {
 	case 1: 
 	{
-		m_initial_offset = m_renderer->get_transform_pos() - m_renderer->inv_transform_point({ 0, 0 });
+		m_initial_offset = m_renderer->get_transform_pos();// - m_renderer->inv_transform_point({ 0, 0 });
 		return;
 	};
 	case 2:
@@ -87,13 +128,20 @@ void GestureHandler::update_gesture(const WindowHandler::PointerInfo& p) {
 			if (!m_gesturefinger.at(i).active) {
 				continue;
 			}
-			auto pos = m_renderer->inv_transform_point(m_gesturefinger.at(i).last_position - m_gesturefinger.at(i).initial_position);
-			m_renderer->set_transform_matrix(pos + m_initial_offset);
+			auto& finger = m_gesturefinger.at(i);
 
-			m_initial_offset = m_renderer->get_transform_pos() - m_renderer->inv_transform_point({ 0, 0 });
-			m_gesturefinger.at(i).initial_position = m_gesturefinger.at(i).last_position; 
+			auto scale = m_renderer->get_transform_scale();
+			Renderer::Point<float> new_pos = (1 / scale) * (finger.last_position - finger.initial_position);
+			m_renderer->set_transform_matrix(new_pos + m_initial_offset); 
 
+			//auto pos = m_renderer->inv_transform_point(m_gesturefinger.at(i).last_position - m_gesturefinger.at(i).initial_position);
+			//m_renderer->set_transform_matrix(pos + m_initial_offset);
+			//
+			//m_initial_offset = m_renderer->get_transform_pos() - m_renderer->inv_transform_point({ 0, 0 });
+			//m_gesturefinger.at(i).initial_position = m_gesturefinger.at(i).last_position; 
 		}
+
+		check_bounds(); 
 		return;
 	};
 	case 2:
@@ -135,6 +183,8 @@ void GestureHandler::update_gesture(const WindowHandler::PointerInfo& p) {
 		auto translation = (transformedCenter - transformedInitialCenter);
 		m_renderer->set_transform_matrix(m_initial_offset + translation);
 		
+
+		check_bounds();
 		return;
 
 	};
@@ -180,6 +230,8 @@ void GestureHandler::update_mouse(short delta, bool hwheel, Renderer::Point<int>
 		m_renderer->add_transform_matrix({ (float)offset, 0 });
 	else
 		m_renderer->add_transform_matrix({ 0, (float)offset });
+
+	check_bounds();
 }
 
 void GestureHandler::start_select_page(const WindowHandler::PointerInfo& p) {
@@ -210,6 +262,8 @@ void GestureHandler::update_select_page(const WindowHandler::PointerInfo& p) {
 	recs->at(m_selected_page.value().first).y += delta.y;
 
 	m_selected_page.value().second = p.pos;
+
+	check_bounds();
 }
 
 void GestureHandler::stop_select_page(const WindowHandler::PointerInfo& p) {
