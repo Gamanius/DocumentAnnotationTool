@@ -41,6 +41,33 @@ void GestureHandler::check_bounds() {
 	}
 }
 
+void GestureHandler::process_one_finger(GestureFinger& finger) {
+	auto scale = m_renderer->get_transform_scale();
+	Renderer::Point<float> new_pos = (1 / scale) * (finger.last_position - finger.initial_position);
+	m_renderer->set_transform_matrix(new_pos + m_initial_offset);
+}
+
+void GestureHandler::process_two_finger(GestureFinger& firstfinger, GestureFinger& secondfinger) {
+	// calculate the scaling factor
+	float distance = (firstfinger.last_position - secondfinger.last_position).distance();
+	float initialDistance = (firstfinger.initial_position - secondfinger.initial_position).distance();
+	float scale = distance / initialDistance;
+
+	// calculate the center
+	auto lastcenter = (firstfinger.last_position + secondfinger.last_position) / 2.0f;
+	auto initialCenter = (firstfinger.initial_position + secondfinger.initial_position) / 2.0f;
+
+	// set the matrix scale offset
+	auto newscale= D2D1::Matrix3x2F::Scale({ (float)(scale), (float)(scale) }, m_initialScaleMatrixInv.TransformPoint(initialCenter)); 
+	m_renderer->set_scale_matrix(newscale * m_initialScaleMatrix);  
+
+	// and set the translation offset
+	auto translation = (1 / m_renderer->get_transform_scale()) * (lastcenter - initialCenter);
+	m_renderer->set_transform_matrix(m_initial_offset + translation);
+
+
+}
+
 GestureHandler::GestureHandler(Direct2DRenderer* renderer, MuPDFHandler::PDF* pdf) {
 	this->m_renderer = renderer;
 	this->m_pdf = pdf;
@@ -55,7 +82,6 @@ GestureHandler::GestureHandler(GestureHandler&& a) noexcept {
 
 	m_initialScaleMatrix = a.m_initialScaleMatrix;
 	m_initialScaleMatrixInv = a.m_initialScaleMatrixInv;
-	m_initialScale = a.m_initialScale;
 
 	m_selected_page = std::move(a.m_selected_page);
 }
@@ -90,20 +116,19 @@ void GestureHandler::start_gesture(const WindowHandler::PointerInfo& p) {
 	};
 	case 2:
 	{
-		for (size_t i = 0; i < m_gesturefinger.size(); i++) {
-			if (i == just_active or !m_gesturefinger.at(i).active) {
-				continue;
-			}
-
-			m_renderer->set_transform_matrix(m_renderer->inv_transform_point(m_gesturefinger.at(i).last_position - m_gesturefinger.at(i).initial_position) + m_initial_offset);
-			m_gesturefinger.at(i).last_position = m_gesturefinger.at(i).initial_position;
-		}
-
 		m_initial_offset = m_renderer->get_transform_pos();
 		m_initialScaleMatrix = m_renderer->get_scale_matrix();
 		
 		m_initialScaleMatrixInv = m_initialScaleMatrix;
 		m_initialScaleMatrixInv.Invert();
+
+		for (size_t i = 0; i < m_gesturefinger.size(); i++) {
+			if (!m_gesturefinger.at(i).active) {
+				continue;
+			}
+			m_gesturefinger.at(i).initial_position = m_gesturefinger.at(i).last_position;
+		}
+
 		return;
 	};
 	}
@@ -114,10 +139,10 @@ void GestureHandler::update_gesture(const WindowHandler::PointerInfo& p) {
 	for (size_t i = 0; i < m_gesturefinger.size(); i++) {
 		if (m_gesturefinger.at(i).id == p.id) {
 			m_gesturefinger.at(i).last_position = p.pos;
+			break;
 		}
 	}
-
-
+	
 	// do one finger
 	byte amount_finer = amount_finger_active();
 
@@ -128,17 +153,8 @@ void GestureHandler::update_gesture(const WindowHandler::PointerInfo& p) {
 			if (!m_gesturefinger.at(i).active) {
 				continue;
 			}
-			auto& finger = m_gesturefinger.at(i);
-
-			auto scale = m_renderer->get_transform_scale();
-			Renderer::Point<float> new_pos = (1 / scale) * (finger.last_position - finger.initial_position);
-			m_renderer->set_transform_matrix(new_pos + m_initial_offset); 
-
-			//auto pos = m_renderer->inv_transform_point(m_gesturefinger.at(i).last_position - m_gesturefinger.at(i).initial_position);
-			//m_renderer->set_transform_matrix(pos + m_initial_offset);
-			//
-			//m_initial_offset = m_renderer->get_transform_pos() - m_renderer->inv_transform_point({ 0, 0 });
-			//m_gesturefinger.at(i).initial_position = m_gesturefinger.at(i).last_position; 
+			process_one_finger(m_gesturefinger.at(i));
+			break;
 		}
 
 		check_bounds(); 
@@ -162,31 +178,10 @@ void GestureHandler::update_gesture(const WindowHandler::PointerInfo& p) {
 			break;
 		}
 
-		// calculate the scaling factor
-		float distance = (firstfinger.last_position- secondfinger.last_position).distance();
-		float initialDistance = (firstfinger.initial_position- secondfinger.initial_position).distance();
-		float scale = distance / initialDistance; 
-
-		// calculate the center
-		auto center = (firstfinger.last_position + secondfinger.last_position) / 2.0f;
-		auto initialCenter = (firstfinger.initial_position+ secondfinger.initial_position) / 2.0f;
-
-		// set the matrix scale offset
-		auto mat = D2D1::Matrix3x2F::Scale({ (float)(scale), (float)(scale) }, m_initialScaleMatrixInv.TransformPoint(initialCenter));
-		//m_initialScaleMatrix = mat * m_initialScaleMatrix;
-
-		m_renderer->set_scale_matrix(mat * m_initialScaleMatrix); 
-		//m_renderContext->setMatrixScaleOffset(m_initialScale * scale, initialCenter);
-		// calculate the new scaled points and the translation
-		auto transformedInitialCenter = m_renderer->inv_transform_point(initialCenter);  
-		auto transformedCenter = m_renderer->inv_transform_point(center); 
-		auto translation = (transformedCenter - transformedInitialCenter);
-		m_renderer->set_transform_matrix(m_initial_offset + translation);
-		
+		process_two_finger(firstfinger, secondfinger);
 
 		check_bounds();
 		return;
-
 	};
 	}
 
@@ -208,7 +203,7 @@ void GestureHandler::end_gesture(const WindowHandler::PointerInfo& p) {
 	};
 	}
 
-	m_initial_offset = m_renderer->get_transform_pos() - m_renderer->inv_transform_point({ 0, 0 });
+	m_initial_offset = m_renderer->get_transform_pos();
 
 	for (size_t i = 0; i < m_gesturefinger.size(); i++) {
 		if (m_gesturefinger.at(i).id == p.id) {

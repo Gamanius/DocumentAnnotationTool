@@ -1420,10 +1420,11 @@ class GestureHandler {
 
 	D2D1::Matrix3x2F m_initialScaleMatrix;
 	D2D1::Matrix3x2F m_initialScaleMatrixInv;
-	float m_initialScale = 1;
 
 	std::optional<std::pair<size_t, Renderer::Point<float>>> m_selected_page = std::nullopt; 
 
+	void process_one_finger(GestureFinger& finger);
+	void process_two_finger(GestureFinger& finger1, GestureFinger& finger2);
 
 public:
 	GestureHandler() {}

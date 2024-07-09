@@ -170,12 +170,14 @@ void main_window_loop_run(HINSTANCE h) {
 	while(!g_main_window->close_request()) {
 		g_main_window->get_window_messages(true);
 	}
-
+	
+	// this is creating a 1 byte memory leak
 	std::thread t([] {
 		std::this_thread::sleep_for(std::chrono::seconds(5));
 		// abort if normal cleanup is not possible
 		abort();
 	});
 	t.detach();
+
 	//pdf_handler.stop_rendering(*g_main_window);
 }
