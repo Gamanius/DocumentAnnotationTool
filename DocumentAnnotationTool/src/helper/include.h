@@ -33,6 +33,10 @@ constexpr size_t MAIN_THREAD_ID = 1;
 
 /// Custom WM_APP message to signal that the bitmap is ready to be drawn
 #define WM_PDF_BITMAP_READY (WM_APP + 0x0BAD /*Magic number (rolled by fair dice)*/)
+#define WM_CUSTOM_MESSAGE (WM_APP + 0x0BAD + 1)
+enum CUSTOM_WM_MESSAGE {
+	PDF_HANDLER_DISPLAY_LIST_UPDATE
+};
 
 inline void SafeRelease(IUnknown* ptr) {
 	if (ptr) {
@@ -905,14 +909,6 @@ class MuPDFHandler {
 public:
 
 	struct PDF : public FileHandler::File {
-		struct PDFRenderInfoStruct {
-			Direct2DRenderer* renderer = nullptr;
-			size_t page = 0;
-			Renderer::Rectangle<float> source;
-			Renderer::Rectangle<float> dest;
-			float dpi = MUPDF_DEFAULT_DPI;
-		};
-
 	private:
 		// Pointer to the context from the MuPDFHandler
 		std::shared_ptr<ContextWrapper> m_ctx;
@@ -952,7 +948,8 @@ public:
 		/// <param name="doc"></param>
 		/// <param name="page"></param>
 		/// <returns></returns>
-		PageWrapper get_page(fz_document* doc, size_t page);
+		PageWrapper get_page(size_t page);
+		PageWrapper get_page(fz_document* doc, size_t page); 
 
 		void sort_page_positions();
 
@@ -984,6 +981,16 @@ class WindowHandler;
 /// </summary>
 class PDFRenderHandler {
 public:
+	struct RenderInstructions {
+		bool render_content = true;
+		bool render_widgets = true;
+		bool render_annots = true;
+
+		bool render_highres = true;
+		bool render_preview = true;
+		bool render_outline = true;
+	};
+
 	struct RenderInfo {
 		enum STATUS {
 			WAITING,
@@ -996,9 +1003,13 @@ public:
 		STATUS stat = WAITING;
 		float dpi = MUPDF_DEFAULT_DPI;
 		Renderer::Rectangle<float> overlap_in_docspace;
+		RenderInstructions instructions;
 
 		RenderInfo() = default;
 		RenderInfo(size_t page, float dpi, Renderer::Rectangle<float> overlap) : page(page), dpi(dpi), overlap_in_docspace(overlap) {
+			cookie = new fz_cookie({ 0,0,0,0,0 });
+		}		
+		RenderInfo(size_t page, float dpi, Renderer::Rectangle<float> overlap, RenderInstructions instruction) : page(page), dpi(dpi), overlap_in_docspace(overlap), instructions(instruction) { 
 			cookie = new fz_cookie({ 0,0,0,0,0 });
 		}
 		// move constructor
@@ -1008,6 +1019,7 @@ public:
 			cookie = t.cookie; 
 			stat = t.stat;
 			overlap_in_docspace = t.overlap_in_docspace;
+			instructions = t.instructions;
 		}
 		// move assignment
 		RenderInfo& operator=(RenderInfo&& t) noexcept {
@@ -1020,7 +1032,13 @@ public:
 			delete cookie;
 		}
 	};
+
+
+
 private:
+	struct DisplayListContent {
+		std::shared_ptr<DisplayListWrapper> m_page_content, m_page_annots, m_page_widgets;
+	};
 	/**
 	* List by which ThreadSafeItems should be acquired
 	* 1. m_pdf member
@@ -1044,11 +1062,13 @@ private:
 	std::thread m_preview_bitmap_thread;
 	std::atomic_bool m_preview_bitmaps_processed = false;
 	std::atomic_bool m_display_list_processed    = false;
+	std::atomic_uint m_display_list_amount_processed = 0; 
+	std::atomic_uint m_display_list_amount_processed_total = 0;
 
 	// High res rendering
-	std::shared_ptr<ThreadSafeVector<std::shared_ptr<DisplayListWrapper>>> m_display_list;
+	std::shared_ptr<ThreadSafeVector<DisplayListContent>> m_display_list;
 	std::thread m_display_list_thread;
-
+	// this array hold all high res bitmaps 
 	std::shared_ptr<ThreadSafeDeque<CachedBitmap>> m_cachedBitmaps = nullptr; 
 
 	// For Multithreading
@@ -1064,8 +1084,8 @@ private:
 
 	void create_preview(float scale = 0.5);
 	void create_display_list();
-	void create_display_list_async();
 
+	void render_high_res(RenderInstructions r); 
 	void render_high_res();
 
 	void remove_unused_queue_items();
@@ -1127,12 +1147,31 @@ public:
 	void render_preview();
 	void render_outline();
 	void render();
-	void draw();
 	/// <summary>
-	/// This HAS TO BE CALLED when multithreaded rendering is active
+	/// Will render out the pdf page with the given instructions.
+	/// <para>
+	/// Notes: Due to limitations of the implementation, the render_preview will always render 
+	/// the whole page as if render_content, render_widget and render_annot is true
+	/// </para>
 	/// </summary>
-	//void stop_rendering(HWND callbackwindow);
-	void debug_render();
+	/// <param name="instruct"></param>
+	void render(RenderInstructions instruct);
+	/// <summary>
+	/// This function should be called if the following render instructions change
+	/// <para>
+	/// 1. render_content
+	/// </para>
+	/// <para>
+	/// 2. render_widgets
+	/// </para>
+	/// <para>
+	/// 3. render_annots 
+	/// </para>
+	/// It will force to rerender the whole pdf
+	/// </summary>
+	void clear_render_cache();
+	float get_display_list_progress();
+
 
 
 	unsigned long long get_cache_memory_usage() const;
@@ -1321,6 +1360,7 @@ public:
 
 private:
 	std::function<void(std::optional<std::vector<CachedBitmap*>*>)> m_callback_paint;
+	std::function<void(CUSTOM_WM_MESSAGE)> m_callback_cutom_msg;
 	std::function<void(Renderer::Rectangle<long>)> m_callback_size;
 	std::function<void(PointerInfo)> m_callback_pointer_down;
 	std::function<void(PointerInfo)> m_callback_pointer_up;
@@ -1343,6 +1383,7 @@ public:
 	void set_state(WINDOW_STATE state);
 
 	void set_callback_paint(std::function<void(std::optional<std::vector<CachedBitmap*>*>)> callback);
+	void set_callback_custom_msg(std::function<void(CUSTOM_WM_MESSAGE)> callback);
 	void set_callback_size(std::function<void(Renderer::Rectangle<long>)> callback);
 	void set_callback_pointer_down(std::function<void(PointerInfo)> callback);
 	void set_callback_pointer_up(std::function<void(PointerInfo)> callback);
@@ -1362,6 +1403,8 @@ public:
 
 	// Returns the DPI of the window
 	UINT get_dpi() const;
+
+	void set_window_title(const std::wstring& s);
 
 	/// <summary>
 	/// Converts the given pixel to DIPs (device independent pixels)

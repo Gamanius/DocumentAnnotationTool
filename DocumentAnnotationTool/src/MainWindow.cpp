@@ -14,20 +14,25 @@ PDFRenderHandler* g_pdfrenderhandler = nullptr;
 
 GestureHandler g_gesturehandler;
 
+bool g_draw_annots = true;
+
 void callback_draw(std::optional<std::vector<CachedBitmap*>*> highres_bitmaps) {
 	// draw scaled elements
 	g_main_renderer->set_current_transform_active();
 	g_main_renderer->begin_draw();
+	PDFRenderHandler::RenderInstructions instructions;
+	instructions.render_annots = g_draw_annots;
 
 	if (highres_bitmaps.has_value() == false) {
-		g_main_renderer->clear(Renderer::Color(50, 50, 50));
+		g_main_renderer->clear(Renderer::Color(50, 50, 50)); 
 		// when the highres_bitmaps arg is nullopt then it is a normal draw call from windows
 		// but only call when no gesture is in progress
 		if (g_gesturehandler.is_gesture_active() == false) {
-			g_pdfrenderhandler->render();
+			g_pdfrenderhandler->render(instructions);
 		}
 		else {
-			g_pdfrenderhandler->draw();
+			instructions.render_highres = false;
+			g_pdfrenderhandler->render(instructions);
 		}
 	}
 	else {
@@ -43,7 +48,6 @@ void callback_draw(std::optional<std::vector<CachedBitmap*>*> highres_bitmaps) {
 
 		}
 	}
-
 	// selected page
 	g_main_renderer->set_current_transform_active(); 
 	auto selected_page = g_gesturehandler.get_selected_page();
@@ -64,6 +68,16 @@ void callback_draw(std::optional<std::vector<CachedBitmap*>*> highres_bitmaps) {
 	g_main_renderer->end_draw();
 }
 
+void custom_msg(CUSTOM_WM_MESSAGE msg) {
+	auto progress = g_pdfrenderhandler->get_display_list_progress();
+	if (FLOAT_EQUAL(progress, 1)) {
+		g_main_window->set_window_title(APPLICATION_NAME);
+	}
+	else {
+		g_main_window->set_window_title(APPLICATION_NAME + std::wstring(L"Parsing pages: ") + std::to_wstring(progress * 100) + L" % ");
+	}
+}
+
 void callback_size(Renderer::Rectangle<long> r) {
 	g_main_renderer->resize(r);
 	g_gesturehandler.check_bounds();
@@ -79,6 +93,16 @@ void callback_key_up(WindowHandler::VK k) {
 			g_main_renderer->add_scale_matrix(0.8, mouse_pos);
 
 		}
+	}
+
+	if (k == WindowHandler::VK::F5) { 
+		// refresh
+		g_pdfrenderhandler->clear_render_cache();
+	}
+
+	if (k == WindowHandler::VK::F3) {
+		g_draw_annots = not g_draw_annots;
+		g_pdfrenderhandler->clear_render_cache();
 	}
 
 	g_main_window->invalidate_drawing_area();
@@ -154,6 +178,7 @@ void main_window_loop_run(HINSTANCE h) {
 	// do the callbacks
 	g_main_window->set_callback_paint(callback_draw);
 	g_main_window->set_callback_size(callback_size);
+	g_main_window->set_callback_custom_msg(custom_msg); 
 
 	g_main_window->set_callback_pointer_down(callback_pointer_down);
 	g_main_window->set_callback_pointer_update(callback_pointer_update);
@@ -171,7 +196,7 @@ void main_window_loop_run(HINSTANCE h) {
 	
 	// this is creating a 1 byte memory leak
 	std::thread t([] {
-		std::this_thread::sleep_for(std::chrono::seconds(5));
+		std::this_thread::sleep_for(std::chrono::seconds(2));
 		// abort if normal cleanup is not possible
 		abort();
 	});

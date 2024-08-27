@@ -141,10 +141,17 @@ std::shared_ptr<ThreadSafeVector<Renderer::Rectangle<float>>> MuPDFHandler::PDF:
 	return m_pagerec;
 }
 
+PageWrapper MuPDFHandler::PDF::get_page(size_t page) {
+	auto ctx = m_ctx->get_context();
+	auto doc = m_document->get_item();
+	return std::move(PageWrapper(get_context_wrapper(), fz_load_page(*ctx, *doc, (int)page))); 
+}
+
 PageWrapper MuPDFHandler::PDF::get_page(fz_document* doc, size_t page) {
 	auto ctx = m_ctx->get_context();
 	return std::move(PageWrapper(get_context_wrapper(), fz_load_page(*ctx, doc, (int)page)));
 }
+
 
 std::shared_ptr<ContextWrapper> MuPDFHandler::PDF::get_context_wrapper() const {
 	return m_ctx;

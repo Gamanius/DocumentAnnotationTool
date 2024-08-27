@@ -66,5 +66,6 @@
     <None Include="rsc\Ghent_PDF_Output_Suite_V50_Testpages\Ghent_PDF-Output-Test-V50_ALL_X4.pdf" />
     <None Include="rsc\Ghent_PDF_Output_Suite_V50_Testpages\GhentPDFOutputSuite50_ReadMes.pdf" />
     <None Include="TODO.md" />
+    <None Include="rsc\Annotation pdf.pdf" />
   </ItemGroup>
 </Project>

@@ -180,6 +180,7 @@
     <ClInclude Include="src\MainWindow.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="rsc\Annotation pdf.pdf" />
     <None Include="rsc\ENR6.3-9.slow.rendering.pdf" />
     <None Include="rsc\Ghent_PDF_Output_Suite_V50_Testpages\GhentPDFOutputSuite50_ReadMes.pdf" />
     <None Include="rsc\Ghent_PDF_Output_Suite_V50_Testpages\Ghent_PDF-Output-Test-V50_ALL_REFERENCE.pdf" />

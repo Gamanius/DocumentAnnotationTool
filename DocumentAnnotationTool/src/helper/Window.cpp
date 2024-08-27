@@ -450,6 +450,13 @@ LRESULT WindowHandler::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam
 		ValidateRect(currentInstance->m_hwnd, NULL);
 		return NULL;
 	}
+	case WM_CUSTOM_MESSAGE:
+	{
+		if (currentInstance->m_callback_cutom_msg) {
+			currentInstance->m_callback_cutom_msg((CUSTOM_WM_MESSAGE)lParam); 
+		}
+		return NULL; 
+	}
 	}
 	return DefWindowProc(hWnd, uMsg, wParam, lParam);
 }
@@ -477,6 +484,10 @@ UINT WindowHandler::get_dpi() const {
 	return m_dpi;
 }
 
+void WindowHandler::set_window_title(const std::wstring& s) {
+	SetWindowText(m_hwnd, s.c_str()); 
+}
+
 Renderer::Rectangle<long> WindowHandler::get_size() const {
 	RECT r;
 	GetClientRect(m_hwnd, &r);
@@ -501,6 +512,10 @@ Renderer::Point<long> WindowHandler::get_mouse_pos() const {
 
 void WindowHandler::set_callback_paint(std::function<void(std::optional<std::vector<CachedBitmap*>*>)> callback) {
 	m_callback_paint = callback;
+}
+
+void WindowHandler::set_callback_custom_msg(std::function<void(CUSTOM_WM_MESSAGE)> callback) {
+	m_callback_cutom_msg = callback;
 }
 
 void WindowHandler::set_callback_size(std::function<void(Renderer::Rectangle<long>)> callback) {

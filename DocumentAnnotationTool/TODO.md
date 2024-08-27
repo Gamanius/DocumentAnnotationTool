@@ -1,2 +1,2 @@
 ## Possible features
-1. Work on the ThreadSafeClasses so they support shared recursive mutexes
+1. Improve the readibility of the Threadsafe class
