@@ -1453,7 +1453,7 @@ public:
 	void check_bounds();
 };
 
-//#ifndef NDEBUG
+#ifndef NDEBUG
 #define ASSERT(x, y) if (!(x)) { Logger::assert_msg(y, __FILE__, __LINE__); __debugbreak(); }
 #define ASSERT_WIN(x,y) if (!(x)) { Logger::assert_msg_win(y, __FILE__, __LINE__); __debugbreak(); }
 #define ASSERT_WITH_STATEMENT(x, y, z) if (!(x)) { Logger::assert_msg(y, __FILE__, __LINE__); __debugbreak(); z; }
@@ -1461,6 +1461,12 @@ public:
 #define ASSERT_WIN_RETURN_FALSE(x,y)  if (!(x)) { Logger::assert_msg_win(y, __FILE__, __LINE__); __debugbreak(); return false; }
 #define ASSERT_RETURN_NULLOPT(x,y) if (!(x)) { Logger::assert_msg(y, __FILE__, __LINE__); __debugbreak(); return std::nullopt; }
 #define ASSERT_WIN_RETURN_NULLOPT(x,y)  if (!(x)) { Logger::assert_msg_win(y, __FILE__, __LINE__); __debugbreak(); return std::nullopt; }
-//#else
-//#define ASSERT(x, y)
-//#endif // !NDEBUG
+#else
+#define ASSERT(x, y)
+#define ASSERT_WIN(x,y) 
+#define ASSERT_WITH_STATEMENT(x, y, z) if (!(x)) { z; }
+#define ASSERT_WIN_WITH_STATEMENT(x, y, z) if (!(x)) {  z; }
+#define ASSERT_WIN_RETURN_FALSE(x,y)  if (!(x)) { return false; }
+#define ASSERT_RETURN_NULLOPT(x,y) if (!(x)) { return std::nullopt; }
+#define ASSERT_WIN_RETURN_NULLOPT(x,y)  if (!(x)) { return std::nullopt; }
+#endif // !NDEBUG
