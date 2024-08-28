@@ -162,7 +162,6 @@ void main_window_loop_run(HINSTANCE h) {
 
 	g_mupdfcontext = std::shared_ptr<MuPDFHandler>(new MuPDFHandler);
 
-
 	auto path = FileHandler::open_file_dialog(L"PDF\0*.pdf\0\0", *g_main_window);
 
 	if (!path.has_value()) {

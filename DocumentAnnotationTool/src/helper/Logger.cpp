@@ -1,18 +1,24 @@
 #pragma once
 
 #include "include.h"
+#include <sstream>
 #include <locale>
 #include <codecvt>
+#include <chrono>
 
-std::shared_ptr<std::vector<std::wstring>> all_messages = std::make_shared<std::vector<std::wstring>>();
+std::wstringstream log_stream;
 HANDLE consoleHandle = nullptr;
 std::recursive_mutex log_recursive_mutex;
+
+std::wstring get_current_time() {
+	auto now = std::chrono::system_clock::now();
+}
 
 namespace Logger {
 
 	void log(const std::wstring& msg, MsgLevel lvl) {
 		std::unique_lock<std::recursive_mutex>(log_recursive_mutex);
-		all_messages->push_back(msg);
+		
 	}
 
 	void log(const std::string& msg, MsgLevel lvl) {
@@ -109,36 +115,19 @@ namespace Logger {
 		if (consoleHandle == nullptr)
 			return;
 
-		// TODO actually awfully slow 
-		const wchar_t* new_line = L"\n";
 
-		std::unique_lock<std::recursive_mutex>(log_recursive_mutex);
-		for (size_t i = 0; i < all_messages->size(); i++) {
-			std::wstring& temp = all_messages->at(i);
-			WriteConsoleW(consoleHandle, (void*)temp.c_str(), (DWORD)temp.length(), nullptr, nullptr);
-			WriteConsoleW(consoleHandle, (void*)new_line, 1, nullptr, nullptr);
-		}
-		if (clear)
-			all_messages->clear();
 	}
 
 	void print_to_debug(bool clear) {
-		std::unique_lock<std::recursive_mutex>(log_recursive_mutex);
-		for (size_t i = 0; i < all_messages->size(); i++) {
-			OutputDebugString(L"\n");
-			OutputDebugString(all_messages->at(i).c_str());
-		}
-		OutputDebugString(L"\n\n");
-		if (clear)
-			all_messages->clear();
+
 	}
 
 	void clear() {
 		std::unique_lock<std::recursive_mutex>(log_recursive_mutex);
-		all_messages->clear();
+		log_stream.str(L"");
 	}
 
-	const std::weak_ptr<std::vector<std::wstring>> get_all_msg() {
-		return all_messages;
+	const std::wstring get_all_msg() {
+		return log_stream.str();
 	}
 }

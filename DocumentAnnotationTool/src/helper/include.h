@@ -1,25 +1,31 @@
 #pragma once
 
 #include <Windows.h>
-#include <string>
-#include <map>
-#include <vector>
-#include <memory>
+
+#include <array>
+#include <atomic>
+#include <crtdbg.h>
+#include <d2d1.h>
+#include <deque>
+#include <dwrite_3.h>
 #include <functional>
 #include <iostream>
-#include <d2d1.h>
-#include <dwrite_3.h>
-#include <optional>
-#include <tuple>
-#include <crtdbg.h>
-#include <array>
-#include "mupdf/fitz.h"
-#include <mutex>
-#include <thread>
-#include <atomic>
+#include <map>
+#include <memory>
 #include <mupdf/fitz/crypt.h>
-#include <deque>
+#include <mutex>
+#include <optional>
+#include <string>
+#include <thread>
+#include <tuple>
+#include <vector>
+
+// dependencies
+#define MAGIC_ENUM_RANGE_MIN 0
+#define MAGIC_ENUM_RANGE_MAX 256
+#include "../dependecies/magic_enum/magic_enum.hpp"
 #include "ReadWriteRecursiveMutex.h"
+#include "mupdf/fitz.h"
 
 /// <summary>
 /// ID of the main thread. All other thread should use an ID > 1. ID = 0 is reserved 
@@ -208,7 +214,7 @@ namespace Logger {
 
 	void clear();
 
-	const std::weak_ptr<std::vector<std::wstring>> get_all_msg();
+	const std::wstring get_all_msg();
 }
 
 namespace Renderer { 
@@ -1497,19 +1503,19 @@ public:
 };
 
 #ifndef NDEBUG
-#define ASSERT(x, y) if (!(x)) { Logger::assert_msg(y, __FILE__, __LINE__); __debugbreak(); }
-#define ASSERT_WIN(x,y) if (!(x)) { Logger::assert_msg_win(y, __FILE__, __LINE__); __debugbreak(); }
-#define ASSERT_WITH_STATEMENT(x, y, z) if (!(x)) { Logger::assert_msg(y, __FILE__, __LINE__); __debugbreak(); z; }
+#define ASSERT(x, y)                       if (!(x)) { Logger::assert_msg(y, __FILE__, __LINE__); __debugbreak(); }
+#define ASSERT_WIN(x,y)                    if (!(x)) { Logger::assert_msg_win(y, __FILE__, __LINE__); __debugbreak(); }
+#define ASSERT_WITH_STATEMENT(x, y, z)     if (!(x)) { Logger::assert_msg(y, __FILE__, __LINE__); __debugbreak(); z; }
 #define ASSERT_WIN_WITH_STATEMENT(x, y, z) if (!(x)) { Logger::assert_msg_win(y, __FILE__, __LINE__); __debugbreak(); z; }
-#define ASSERT_WIN_RETURN_FALSE(x,y)  if (!(x)) { Logger::assert_msg_win(y, __FILE__, __LINE__); __debugbreak(); return false; }
-#define ASSERT_RETURN_NULLOPT(x,y) if (!(x)) { Logger::assert_msg(y, __FILE__, __LINE__); __debugbreak(); return std::nullopt; }
-#define ASSERT_WIN_RETURN_NULLOPT(x,y)  if (!(x)) { Logger::assert_msg_win(y, __FILE__, __LINE__); __debugbreak(); return std::nullopt; }
+#define ASSERT_WIN_RETURN_FALSE(x,y)       if (!(x)) { Logger::assert_msg_win(y, __FILE__, __LINE__); __debugbreak(); return false; }
+#define ASSERT_RETURN_NULLOPT(x,y)         if (!(x)) { Logger::assert_msg(y, __FILE__, __LINE__); __debugbreak(); return std::nullopt; }
+#define ASSERT_WIN_RETURN_NULLOPT(x,y)     if (!(x)) { Logger::assert_msg_win(y, __FILE__, __LINE__); __debugbreak(); return std::nullopt; }
 #else
 #define ASSERT(x, y)
 #define ASSERT_WIN(x,y) 
-#define ASSERT_WITH_STATEMENT(x, y, z) if (!(x)) { z; }
-#define ASSERT_WIN_WITH_STATEMENT(x, y, z) if (!(x)) {  z; }
-#define ASSERT_WIN_RETURN_FALSE(x,y)  if (!(x)) { return false; }
-#define ASSERT_RETURN_NULLOPT(x,y) if (!(x)) { return std::nullopt; }
-#define ASSERT_WIN_RETURN_NULLOPT(x,y)  if (!(x)) { return std::nullopt; }
+#define ASSERT_WITH_STATEMENT(x, y, z)     if (!(x)) { z; }
+#define ASSERT_WIN_WITH_STATEMENT(x, y, z) if (!(x)) { z; }
+#define ASSERT_WIN_RETURN_FALSE(x,y)       if (!(x)) { return false; }
+#define ASSERT_RETURN_NULLOPT(x,y)         if (!(x)) { return std::nullopt; }
+#define ASSERT_WIN_RETURN_NULLOPT(x,y)     if (!(x)) { return std::nullopt; }
 #endif // !NDEBUG
