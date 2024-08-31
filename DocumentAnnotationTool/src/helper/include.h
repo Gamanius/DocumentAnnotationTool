@@ -10,6 +10,7 @@
 #include <d2d1.h>
 #include <deque>
 #include <dwrite_3.h>
+#include <filesystem>
 #include <functional>
 #include <iostream>
 #include <locale>
@@ -567,6 +568,17 @@ namespace Renderer {
 		}
 
 
+		template <typename F> 
+		Point<T> operator / (const F& f) const {
+			return Point<T>(x / static_cast<T>(f), y / static_cast<T>(f));
+		}
+
+		template <typename F> 
+		Point<T> operator *(const F& f) const {
+			return Point<T>(x * static_cast<T>(f), y * static_cast<T>(f));
+		}
+
+
 		Point<T>& operator /= (const T& f) {
 			x /= f;
 			y /= f;
@@ -579,6 +591,16 @@ namespace Renderer {
 			return *this;
 		}
 	};
+
+	template <typename T, typename W>
+	Point<T> operator*(Point<T> p, W f) {
+		return { p.x * static_cast<T>(f), p.y * static_cast<T>(f) };
+	}
+
+	template <typename T, typename W>
+	Point<T> operator*(W f, Point<T> p) {
+		return { p.x * static_cast<T>(f), p.y * static_cast<T>(f) };
+	}
 
 	template <typename T>
 	struct Rectangle {
@@ -718,6 +740,61 @@ namespace Renderer {
 		}
 	};
 
+	// https://www.quantstart.com/articles/Tridiagonal-Matrix-Algorithm-Thomas-Algorithm-in-C/
+	inline void solveTridiagonal(std::vector<float>& a,
+		std::vector<float>& b,
+		std::vector<float>& c,
+		std::vector<Renderer::Point<float>>& d,
+		std::vector<Renderer::Point<float>>& x) {
+		for (size_t i = 1; i < d.size(); i++) {
+			auto w = a[i - 1] / b[i - 1];
+			b[i] = b[i] - w * c[i - 1];
+			d[i] = d[i] - w * d[i - 1];
+		}
+
+		x[d.size() - 1] = d[d.size() - 1] / b[d.size() - 1];
+		for (long i = static_cast<long>(d.size() - 2); i >= 0; i--) {
+			x[i] = (d[i] - c[i] * x[i + 1]) / b[i];
+		}
+	}
+
+	//https://omaraflak.medium.com/b%C3%A9zier-interpolation-8033e9a262c2
+	inline void calcBezierPoints(const std::vector<Renderer::Point<float>>& points, std::vector<Renderer::Point<float>>& a, std::vector<Renderer::Point<float>>& b) {
+		//create the vectos
+		auto n = points.size() - 1;
+		std::vector<Renderer::Point<float>> p(n);
+
+		p[0] = points[0] + 2 * points[1];
+		for (size_t i = 1; i < n - 1; i++) {
+			p[i] = 2 * (2 * points[i] + points[i + 1]);
+		}
+		p[n - 1] = 8 * points[n - 1] + points[n];
+
+		// matrix
+		std::vector<float> m_a(n - 1, 1);
+		std::vector<float> m_b(n, 4);
+		std::vector<float> m_c(n - 1, 1);
+		m_a[n - 2] = 2;
+		m_b[0] = 2;
+		m_b[n - 1] = 7;
+
+		solveTridiagonal(m_a, m_b, m_c, p, a);
+
+		b[n - 1] = (a[n - 1] + points[n]) / 2.0;
+		for (size_t i = 0; i < n - 1; i++) {
+			b[i] = 2 * points[i + 1] - a[i + 1];
+		}
+	}
+
+	template <typename T, size_t N> 
+	struct BezierGeometry {
+		std::vector<Point<T>> points;
+		std::array<std::vector<Point<T>>, N> control_points;
+	};
+
+	using CubicBezierGeometry = BezierGeometry<float, 2>; 
+
+	CubicBezierGeometry create_bezier_geometry(const std::vector<Point<float>>& points);
 
 	struct RenderHandler {
 		RenderHandler() = default;
@@ -739,15 +816,6 @@ auto& operator<<(std::wstringstream& s, const Renderer::Rectangle<T>& rect) {
 }
 
 
-template <typename T>
-Renderer::Point<T> operator*(Renderer::Point<T> p , T f) {
-	return { p.x * f, p.y * f };
-}
-
-template <typename T>
-Renderer::Point<T> operator*(T f, Renderer::Point<T> p) {
-	return { p.x * f, p.y * f };
-}
 
 /// <summary>
 /// Given two rectangles r1 and r2 it will first remove the overlapping area of r2 from r1. The now non rectangle r1 will be split up into a maximum of
@@ -1068,6 +1136,7 @@ public:
 	typedef RenderObject<ID2D1SolidColorBrush> BrushObject;
 	typedef RenderObject<ID2D1Bitmap> BitmapObject;
 	typedef RenderObject<IDWriteTextFormat> TextFormatObject;
+	typedef RenderObject<ID2D1PathGeometry> PathObject;
 
 	enum INTERPOLATION_MODE {
 		NEAREST_NEIGHBOR,
@@ -1088,6 +1157,12 @@ public:
 
 	void draw_text(const std::wstring& text, Renderer::Point<float> pos, TextFormatObject& format, BrushObject& brush);
 	void draw_text(const std::wstring& text, Renderer::Point<float> pos, Renderer::Color c, float size);
+
+	void draw_line(Renderer::Point<float> p1, Renderer::Point<float> p2, BrushObject& brush, float thick);
+	void draw_line(Renderer::Point<float> p1, Renderer::Point<float> p2, Renderer::Color c, float thick);
+
+	void draw_path(PathObject& obj, BrushObject& brush, float thick);
+	void draw_path(PathObject& obj, Renderer::Color c, float thick);
 
 	void draw_rect(Renderer::Rectangle<float> rec, BrushObject& brush, float thick);
 	void draw_rect(Renderer::Rectangle<float> rec, BrushObject& brush);
@@ -1197,6 +1272,7 @@ public:
 	BrushObject create_brush(Renderer::Color c);
 	BitmapObject create_bitmap(const std::wstring& path);
 	BitmapObject create_bitmap(const byte* const data, Renderer::Rectangle<unsigned int> size, unsigned int stride, float dpi);
+	PathObject create_bezier_path(const Renderer::CubicBezierGeometry& cub);
 };
 
 namespace FileHandler {
@@ -1242,12 +1318,17 @@ namespace FileHandler {
 	/// <param name="windowhandle">Optional windowhandle</param>
 	/// <returns>If succeful it will return the path of the file that was selected</returns>
 	std::optional<std::wstring> open_file_dialog(const wchar_t* filter, HWND windowhandle = NULL);
+
+	std::optional<std::wstring> save_file_dialog(const wchar_t* filter, HWND windowhandle = NULL); 
+
 	/// <summary>
 	/// Will read the contents of the file specified by the path
 	/// </summary>
 	/// <param name="path">Filepath of the file</param>
 	/// <returns>If succefull it will return a file struct with the data</returns>
 	std::optional<File> open_file(const std::wstring& path);
+
+	bool write_file(byte* data, size_t amount, const std::wstring& path, bool overwrite = true);
 
 	/// <summary>
 	/// Returns size of the bitmap
@@ -1353,6 +1434,8 @@ public:
 		/// <returns>Number of pages</returns>
 		size_t get_page_count() const;
 
+		void save_pdf(const std::wstring& path);
+
 		Renderer::Rectangle<float> get_page_size(size_t page, float dpi = 72);
 		Renderer::Rectangle<float> get_bounds() const;
 	};
@@ -1424,8 +1507,6 @@ public:
 			delete cookie;
 		}
 	};
-
-
 
 private:
 	struct DisplayListContent {
@@ -1839,6 +1920,65 @@ public:
 	operator HWND() const { return m_hwnd; }
 };
 
+
+class StrokeHandler {
+	struct Stroke {
+		std::vector<Renderer::Point<float>> points;
+		Renderer::CubicBezierGeometry geometry;
+		Direct2DRenderer::PathObject path;
+		float thickness = 1.0f;
+		Renderer::Color color = { 0, 0, 0 };  
+
+
+		Stroke() = default;
+		Stroke(const Stroke& s) = delete;
+		Stroke(Stroke&& s) noexcept;
+		Stroke& operator=(Stroke s) noexcept;
+
+		friend void swap(Stroke& first, Stroke& second) {
+			using std::swap;
+
+			swap(first.points, second.points);
+			swap(first.thickness, second.thickness); 
+			swap(first.color, second.color); 
+			swap(first.path, second.path);
+			swap(first.geometry, second.geometry);
+		}
+	};
+
+	std::vector<Stroke> m_strokes;
+	std::map<UINT, Stroke> m_active_strokes;
+	// not owned by this class
+	MuPDFHandler::PDF* m_pdf = nullptr;
+	// not owned by this class!
+	Direct2DRenderer* m_renderer = nullptr;
+	// not owned by this class!
+	WindowHandler* m_window = nullptr;
+
+public:
+	StrokeHandler() = default;
+
+	StrokeHandler(MuPDFHandler::PDF* const pdf, Direct2DRenderer* const renderer, WindowHandler* const window);
+	StrokeHandler(const StrokeHandler& t) = delete;
+
+	// move constructor
+	StrokeHandler(StrokeHandler&& t) noexcept;
+	// move assignment
+	StrokeHandler& operator=(StrokeHandler t) noexcept;
+
+	~StrokeHandler();
+
+	void start_stroke(const WindowHandler::PointerInfo& p);
+	void update_stroke(const WindowHandler::PointerInfo& p);
+	void end_stroke(const WindowHandler::PointerInfo& p);
+
+	void render_strokes();
+
+
+	friend void swap(StrokeHandler& first, StrokeHandler& second);
+
+};
+
 class GestureHandler {
 	// not owned by this class
 	Direct2DRenderer* m_renderer = nullptr;
@@ -1892,7 +2032,7 @@ public:
 
 
 #define WIN_ERROR_MSG(...) Logger::error(__VA_ARGS__, " with Windows Error: \"", get_win_msg(), "\" in File:\"", __FILE__, "\" Line: ", __LINE__, " in ", __func__);
-#define ERROR_MSG(...)     Logger::error(__VA_ARGS__, "in File:\"", __FILE__, "\" Line: ", __LINE__, " in ", __func__);
+#define ERROR_MSG(...)     Logger::error(__VA_ARGS__, " in File:\"", __FILE__, "\" Line: ", __LINE__, " in ", __func__);
 #define ASSERT(x, ...)                       if (!(x)) {  ERROR_MSG(__VA_ARGS__);     __debugbreak(); } 
 #define ASSERT_WIN(x,...)                    if (!(x)) {  WIN_ERROR_MSG(__VA_ARGS__); __debugbreak(); }
 #define ASSERT_WITH_STATEMENT(x, y, ...)     if (!(x)) {  ERROR_MSG(__VA_ARGS__);     __debugbreak(); y; }

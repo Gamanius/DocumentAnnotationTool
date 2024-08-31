@@ -11,6 +11,7 @@ Direct2DRenderer::BrushObject* g_brush;
 MuPDFHandler::PDF* g_pdf;
 std::shared_ptr<MuPDFHandler> g_mupdfcontext;
 PDFRenderHandler* g_pdfrenderhandler = nullptr;
+StrokeHandler* g_strokehandler = nullptr;
 
 GestureHandler g_gesturehandler;
 
@@ -45,9 +46,11 @@ void callback_draw(std::optional<std::vector<CachedBitmap*>*> highres_bitmaps) {
 				.intersects(pagerec)) {
 				g_main_renderer->draw_bitmap(bitmaps->at(i)->bitmap, pagerec, Direct2DRenderer::INTERPOLATION_MODE::LINEAR);
 			}
-
+	
 		}
 	}
+	g_strokehandler->render_strokes();
+
 	// selected page
 	g_main_renderer->set_current_transform_active(); 
 	auto selected_page = g_gesturehandler.get_selected_page();
@@ -75,6 +78,21 @@ void custom_msg(CUSTOM_WM_MESSAGE msg) {
 void callback_size(Renderer::Rectangle<long> r) {
 	g_main_renderer->resize(r);
 	g_gesturehandler.check_bounds();
+}
+
+void callback_key_down(WindowHandler::VK key) {
+	if (WindowHandler::is_key_pressed(WindowHandler::LEFT_CONTROL)) {
+		if (key == WindowHandler::VK::S) {
+			auto path = FileHandler::save_file_dialog(L"PDF\0*.pdf\0\0", *g_main_window);
+			if (path == std::nullopt)
+				return;
+			if (std::filesystem::path(path.value()).extension() != ".pdf") {
+				path.value().append(L".pdf");
+			}
+			g_pdf->save_pdf(path.value()); 
+			Logger::success("Saved PDF to ", path.value());
+		}
+	}
 }
 
 void callback_key_up(WindowHandler::VK k) {
@@ -113,6 +131,10 @@ void callback_pointer_down(WindowHandler::PointerInfo p) {
 	if (p.type == WindowHandler::POINTER_TYPE::TOUCH) {
 		g_gesturehandler.start_gesture(p);
 	}
+	// handle everything related to the pen
+	if (p.type == WindowHandler::POINTER_TYPE::STYLUS) {
+		g_strokehandler->start_stroke(p);
+	}
 
 	g_main_window->invalidate_drawing_area();
 }
@@ -125,19 +147,29 @@ void callback_pointer_up(WindowHandler::PointerInfo p) {
 	if (p.type == WindowHandler::POINTER_TYPE::TOUCH) {
 		g_gesturehandler.end_gesture(p);
 	}
+
+	// handle everything related to the pen
+	if (p.type == WindowHandler::POINTER_TYPE::STYLUS) {
+		g_strokehandler->end_stroke(p);
+	}
+
 	g_main_window->invalidate_drawing_area();
 }
 
 void callback_pointer_update(WindowHandler::PointerInfo p) {
 	if (p.type == WindowHandler::POINTER_TYPE::MOUSE and p.button3pressed) {
 		g_gesturehandler.update_select_page(p);
-		g_main_window->invalidate_drawing_area();
 	}
 
 	if (p.type == WindowHandler::POINTER_TYPE::TOUCH) {
 		g_gesturehandler.update_gesture(p);
-		g_main_window->invalidate_drawing_area();
 	}
+
+	// handle everything related to the pen
+	if (p.type == WindowHandler::POINTER_TYPE::STYLUS) {
+		g_strokehandler->update_stroke(p);
+	}
+	g_main_window->invalidate_drawing_area();
 }
 
 void callback_mousewheel(short delta, bool hwheel, Renderer::Point<int> center) {
@@ -169,8 +201,12 @@ void main_window_loop_run(HINSTANCE h) {
 	g_pdf = &pdf.value();
 	g_gesturehandler = GestureHandler(g_main_renderer.get(), &pdf.value());
 
-	auto pdf_handler = PDFRenderHandler(g_pdf, g_main_renderer.get(), g_main_window.get(), 2); 
+	auto pdf_handler = PDFRenderHandler(g_pdf, g_main_renderer.get(), g_main_window.get(), 2);
 	g_pdfrenderhandler = &pdf_handler;
+
+	auto strok_handler = StrokeHandler(g_pdf, g_main_renderer.get(), g_main_window.get());
+	g_strokehandler = &strok_handler;
+
 	Logger::success("Loaded PDF file in ", time);
 
 	// do the callbacks
@@ -183,7 +219,7 @@ void main_window_loop_run(HINSTANCE h) {
 	g_main_window->set_callback_pointer_up(callback_pointer_up);
 
 	g_main_window->set_callback_mousewheel(callback_mousewheel);
-	//g_main_window->set_callback_key_down(callback_key_down);
+	g_main_window->set_callback_key_down(callback_key_down);
 	g_main_window->set_callback_key_up(callback_key_up);
 
 	g_main_window->set_state(WindowHandler::WINDOW_STATE::NORMAL);

@@ -115,6 +115,32 @@ void Direct2DRenderer::draw_text(const std::wstring& text, Renderer::Point<float
 	draw_text(text, pos, format, brush);
 }
 
+void Direct2DRenderer::draw_line(Renderer::Point<float> p1, Renderer::Point<float> p2, BrushObject& brush, float thick) {
+	begin_draw();
+	m_renderTarget->DrawLine(p1, p2, brush.m_object, thick);
+	end_draw();
+}
+
+void Direct2DRenderer::draw_line(Renderer::Point<float> p1, Renderer::Point<float> p2, Renderer::Color c, float thick) {
+	begin_draw();
+	auto brush = create_brush(c);
+	draw_line(p1, p2, brush, thick);
+	end_draw();
+}
+
+void Direct2DRenderer::draw_path(PathObject& obj, BrushObject& brush, float thick) {
+	begin_draw();
+	m_renderTarget->DrawGeometry(obj.m_object, brush.m_object, thick); 
+	end_draw();
+}
+
+void Direct2DRenderer::draw_path(PathObject& obj, Renderer::Color c, float thick) {
+	begin_draw();
+	auto brush = create_brush(c);
+	draw_path(obj, brush, thick);
+	end_draw();
+}
+
 void Direct2DRenderer::draw_rect(Renderer::Rectangle<float> rec, BrushObject& brush, float thicc) {
 	begin_draw();
 	m_renderTarget->DrawRectangle(PxToDp(rec), brush.m_object, thicc);
@@ -344,4 +370,28 @@ Direct2DRenderer::BitmapObject Direct2DRenderer::create_bitmap(const byte* const
 	obj.m_object = pBitmap;
 
 	return std::move(obj);
+}
+
+
+
+Direct2DRenderer::PathObject Direct2DRenderer::create_bezier_path(const Renderer::CubicBezierGeometry& cub) {
+	ID2D1PathGeometry* path = nullptr;
+	ID2D1GeometrySink* sink = nullptr;
+	auto res = m_factory->CreatePathGeometry(&path);
+	ASSERT_WIN(res == S_OK, "Could not create path geometry!");
+	path->Open(&sink);
+
+	sink->BeginFigure(cub.points[0], D2D1_FIGURE_BEGIN_FILLED); 
+	D2D1_BEZIER_SEGMENT segment;
+	for (size_t i = 0; i < cub.points.size() - 1; i++) {
+		segment.point1 = cub.control_points[0].at(i);
+		segment.point2 = cub.control_points[1].at(i);
+		segment.point3 = cub.points.at(i + 1);
+		sink->AddBezier(segment); 
+	}
+	sink->EndFigure(D2D1_FIGURE_END_OPEN);
+	sink->Close();
+
+	SafeRelease(sink);
+	return std::move(PathObject(path)); 
 }

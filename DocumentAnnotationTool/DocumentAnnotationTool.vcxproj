@@ -180,11 +180,13 @@
     <ClCompile Include="src\helper\GestureHandler.cpp" />
     <ClCompile Include="src\helper\MuPDF.cpp" />
     <ClCompile Include="src\helper\PDFHandler.cpp" />
+    <ClCompile Include="src\helper\Renderer.cpp" />
     <ClCompile Include="src\helper\Timer.cpp" />
     <ClCompile Include="src\helper\Window.cpp" />
     <ClCompile Include="src\helper\Wrapper.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\MainWindow.cpp" />
+    <ClCompile Include="src\helper\StrokeHandler.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\dependecies\magic_enum\magic_enum.hpp" />

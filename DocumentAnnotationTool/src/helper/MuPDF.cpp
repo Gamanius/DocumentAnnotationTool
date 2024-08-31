@@ -133,6 +133,30 @@ size_t MuPDFHandler::PDF::get_page_count() const {
 	return fz_count_pages(*c, *d);
 }
 
+void MuPDFHandler::PDF::save_pdf(const std::wstring& path) {
+	auto ctx = m_ctx->get_context();
+	auto doc = m_document->get_document(); 
+
+	fz_try(*ctx) {
+		pdf_write_options opt = {0};
+		opt.permissions = ~0;
+		opt.do_compress_images = 0;
+		opt.do_compress = 0;
+
+		fz_buffer* buffer = fz_new_buffer(*ctx, 0); 
+		fz_output* output = fz_new_output_with_buffer(*ctx, buffer);
+		pdf_write_document(*ctx, reinterpret_cast<pdf_document*>(*doc), output, &opt);
+
+		ASSERT_WIN(FileHandler::write_file(buffer->data, buffer->len, path), "Could not write pdf to file");
+
+		fz_close_output(*ctx, output);
+		fz_drop_output(*ctx, output);
+		fz_drop_buffer(*ctx, buffer);
+	} fz_catch(*ctx) {
+		fz_report_error(*ctx);
+	}
+}
+
 Renderer::Rectangle<float> MuPDFHandler::PDF::get_page_size(size_t page, float dpi) { 
 	auto c = m_ctx->get_context();
 	auto d = m_document->get_document();

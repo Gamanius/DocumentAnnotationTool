@@ -587,7 +587,7 @@ void PDFRenderHandler::async_render() {
 			// check if the rendering was aborted
 			if (info->cookie->abort == 1) {
 				info->stat = RenderInfo::STATUS::ABORTED; 
-				break;
+				//break;
 			}
 			
 			fz_close_device(ctx, drawdevice);
@@ -624,7 +624,12 @@ void PDFRenderHandler::async_render() {
 			fz_drop_device(ctx, drawdevice);
 			fz_drop_pixmap(ctx, pixmap);
 		} fz_catch(ctx) {
-			__debugbreak();
+			if (info->stat == RenderInfo::STATUS::ABORTED) {
+				fz_ignore_error(ctx);
+			}
+			else {
+				ASSERT(false, "MUPdf Error: ", fz_convert_error(ctx, &ctx->error.errcode));
+			}
 			//return;
 		}
 
