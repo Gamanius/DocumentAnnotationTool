@@ -56,15 +56,9 @@ void callback_draw(std::optional<std::vector<CachedBitmap*>*> highres_bitmaps) {
 		g_main_renderer->draw_rect(rec->at(selected_page.value()), { 0, 0, 255 }, 5);
 	}
 
-
 	// draw ui elements
 	g_main_renderer->set_identity_transform_active();
 	
-	
-#ifndef NDEBUG 
-	g_main_renderer->draw_text(L"DOCANTO ALPHA VERSION 0", Renderer::Point<float>(0, 0), *g_text_format, *g_brush);
-#endif // NDEBUG 
-
 	g_main_renderer->end_draw();
 }
 
@@ -74,7 +68,7 @@ void custom_msg(CUSTOM_WM_MESSAGE msg) {
 		g_main_window->set_window_title(APPLICATION_NAME);
 	}
 	else {
-		g_main_window->set_window_title(APPLICATION_NAME + std::wstring(L"Parsing pages: ") + std::to_wstring(progress * 100) + L" % ");
+		g_main_window->set_window_title(APPLICATION_NAME + std::wstring(L" | Parsing pages: ") + std::to_wstring(progress * 100) + L" % ");
 	}
 }
 
@@ -147,7 +141,7 @@ void callback_pointer_update(WindowHandler::PointerInfo p) {
 }
 
 void callback_mousewheel(short delta, bool hwheel, Renderer::Point<int> center) {
-	g_gesturehandler.update_mouse(delta, hwheel, center);
+	g_gesturehandler.update_mouse(static_cast<float>(delta)/2.0f, hwheel, center);
 	g_main_window->invalidate_drawing_area();
 }
 
@@ -158,23 +152,26 @@ void main_window_loop_run(HINSTANCE h) {
 	g_main_renderer = std::make_unique<Direct2DRenderer>(*g_main_window.get());
 	auto default_brush = g_main_renderer->create_brush(Renderer::Color(255, 0, 0));
 	g_brush = &default_brush;
-	auto default_text_format = g_main_renderer->create_text_format(L"Consolas", 20);
+	auto default_text_format = g_main_renderer->create_text_format(L"Consolas", 100);
 	g_text_format = &default_text_format;
 
 	g_mupdfcontext = std::shared_ptr<MuPDFHandler>(new MuPDFHandler);
 
 	auto path = FileHandler::open_file_dialog(L"PDF\0*.pdf\0\0", *g_main_window);
 	Logger::log(L"Trying to open ", path);
+	Timer time;
 
 	if (!path.has_value()) {
 		return;
 	}
+
 	auto pdf = g_mupdfcontext->load_pdf(path.value());
 	g_pdf = &pdf.value();
 	g_gesturehandler = GestureHandler(g_main_renderer.get(), &pdf.value());
 
 	auto pdf_handler = PDFRenderHandler(g_pdf, g_main_renderer.get(), g_main_window.get(), 2); 
 	g_pdfrenderhandler = &pdf_handler;
+	Logger::success("Loaded PDF file in ", time);
 
 	// do the callbacks
 	g_main_window->set_callback_paint(callback_draw);

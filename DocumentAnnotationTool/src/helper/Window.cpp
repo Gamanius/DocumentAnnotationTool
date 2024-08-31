@@ -429,7 +429,7 @@ LRESULT WindowHandler::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam
 	case WM_SIZING:
 	{
 		if (currentInstance->m_callback_size) {
-			currentInstance->m_callback_size(currentInstance->get_size());
+			currentInstance->m_callback_size(currentInstance->get_window_size());
 		}
 		return DefWindowProc(hWnd, uMsg, wParam, lParam);
 	}
@@ -445,9 +445,11 @@ LRESULT WindowHandler::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam
 	}
 	case WM_DPICHANGED:
 	{
-		Logger::log("DPI changed to ", HIWORD(wParam));
-		
-		break;
+		RECT* const prcNewWindow = (RECT*)lParam;
+		auto newrec = Renderer::Rectangle(*prcNewWindow);
+		Logger::log("DPI changed to ", HIWORD(wParam), ". Using new window dimensions ", newrec);
+		currentInstance->set_window_size(newrec);
+		return 0;
 	}
 	// custom messages
 	case WM_PDF_BITMAP_READY:
@@ -488,17 +490,21 @@ HDC WindowHandler::get_hdc() const {
 }
 
 UINT WindowHandler::get_dpi() const {
-	return m_dpi;
+	return GetDpiForWindow(m_hwnd);
 }
 
 void WindowHandler::set_window_title(const std::wstring& s) {
 	SetWindowText(m_hwnd, s.c_str()); 
 }
 
-Renderer::Rectangle<long> WindowHandler::get_size() const {
+Renderer::Rectangle<long> WindowHandler::get_window_size() const {
 	RECT r;
 	GetClientRect(m_hwnd, &r);
 	return Renderer::Rectangle<long>(r.left, r.top, r.right - r.left, r.bottom - r.top);
+}
+
+void WindowHandler::set_window_size(Renderer::Rectangle<long> r) {
+	SetWindowPos(m_hwnd, HWND_TOP, r.x, r.y, r.width, r.height, SWP_NOZORDER); 
 }
 
 bool WindowHandler::close_request() const {
@@ -583,7 +589,8 @@ void WindowHandler::get_window_messages(bool blocking) {
 bool WindowHandler::init(std::wstring windowName, HINSTANCE instance) {
 	if (m_allWindowInstances == nullptr) {
 		m_allWindowInstances = std::make_unique<std::map<HWND, WindowHandler*>>();
-		ASSERT(SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2), "Could not set DPI awereness");
+		//ASSERT_WIN(SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_UNAWARE), "Could not set DPI awereness"); 
+		ASSERT_WIN(SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2), "Could not set DPI awereness"); 
 		//std::atexit(WindowHandler::cleanup);
 	}
 
@@ -606,13 +613,6 @@ bool WindowHandler::init(std::wstring windowName, HINSTANCE instance) {
 
 	bool temp = EnableMouseInPointer(true);
 	ASSERT_WIN_RETURN_FALSE(temp, "Couldn't add Mouse input into Pointer Input Stack API");
-
-	m_dpi = GetDpiForWindow(m_hwnd);
-	if (m_dpi == 0) {
-		m_dpi = 96;
-		//Logger::warn("Could not retrieve DPI");
-	}
-	//Logger::log("Retrieved DPI: " + std::to_string(m_dpi));
 
 	// add this windows to the window stack
 	m_allWindowInstances->operator[](m_hwnd) = this;

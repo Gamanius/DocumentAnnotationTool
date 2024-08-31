@@ -57,36 +57,6 @@ ThreadSafeContextWrapper MuPDFHandler::get_context() {
 
 MuPDFHandler::~MuPDFHandler() {}
 
-// PDF CODE //
-
-//void MuPDFHandler::PDF::create_display_list() {
-//	// for each rec create a display list
-//	fz_display_list* list = nullptr;
-//	fz_device* dev = nullptr;
-//
-//	m_display_lists = new std::vector<fz_display_list*>();
-//
-//	for (size_t i = 0; i < get_page_count(); i++) {
-//		// get the page that will be rendered
-//		auto p = get_page(i);
-//		fz_try(m_ctx) {
-//			// create a display list with all the draw calls and so on
-//			list = fz_new_display_list(m_ctx, fz_bound_page(m_ctx, p)); 
-//			dev = fz_new_list_device(m_ctx, list); 
-//			// run the device
-//			fz_run_page(m_ctx, p, dev, fz_identity, nullptr); 
-//			// add list to array
-//			m_display_lists->push_back(list); 
-//		} fz_always(m_ctx) {
-//			// flush the device
-//			fz_close_device(m_ctx, dev);  
-//			fz_drop_device(m_ctx, dev);  
-//		} fz_catch(m_ctx) {
-//			ASSERT(false, "Could not create display list");
-//		}
-//	}
-//}
-
 MuPDFHandler::PDF::PDF(std::shared_ptr<ContextWrapper> ctx, std::shared_ptr<DocumentWrapper> doc) {
 	m_ctx = ctx;
 	m_document = doc; 

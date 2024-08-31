@@ -105,6 +105,9 @@
       <AdditionalDependencies>d2d1.lib;libmupdf.lib;dwrite.lib;Windowscodecs.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)mupdf\platform\win32\x64\$(ConfigurationName);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
+    <Manifest>
+      <EnableDpiAwareness>false</EnableDpiAwareness>
+    </Manifest>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -125,6 +128,9 @@
       <AdditionalDependencies>d2d1.lib;libmupdf.lib;dwrite.lib;Windowscodecs.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)mupdf\platform\win32\x64\$(ConfigurationName);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
+    <Manifest>
+      <EnableDpiAwareness>false</EnableDpiAwareness>
+    </Manifest>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -141,6 +147,9 @@
       <AdditionalDependencies>d2d1.lib;libmupdf.lib;dwrite.lib;Windowscodecs.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)mupdf\platform\win32\x64\$(ConfigurationName);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
+    <Manifest>
+      <EnableDpiAwareness>false</EnableDpiAwareness>
+    </Manifest>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -161,6 +170,9 @@
       <AdditionalDependencies>d2d1.lib;libmupdf.lib;dwrite.lib;Windowscodecs.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)mupdf\platform\win32\x64\$(ConfigurationName);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
+    <Manifest>
+      <EnableDpiAwareness>false</EnableDpiAwareness>
+    </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\helper\Direct2D.cpp" />
@@ -168,6 +180,7 @@
     <ClCompile Include="src\helper\GestureHandler.cpp" />
     <ClCompile Include="src\helper\MuPDF.cpp" />
     <ClCompile Include="src\helper\PDFHandler.cpp" />
+    <ClCompile Include="src\helper\Timer.cpp" />
     <ClCompile Include="src\helper\Window.cpp" />
     <ClCompile Include="src\helper\Wrapper.cpp" />
     <ClCompile Include="src\main.cpp" />

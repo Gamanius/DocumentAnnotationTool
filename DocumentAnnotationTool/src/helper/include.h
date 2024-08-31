@@ -200,12 +200,14 @@ public:
 	~DisplayListWrapper();
 };
 
+
 namespace Logger {
 	enum MSG_LEVEL {
 		_INFO = 0,
 		_WARNING = 1,
 		_ERROR = 2,
-		_NONE = 3
+		_SUCCESS = 3,
+		_NONE = 4
 	};
 
 	inline std::wstringstream process_msg_stream;
@@ -223,6 +225,9 @@ namespace Logger {
 
 	const std::wstring error_string = L"[Error|";
 	const std::wstring error_color = L"[\033[31mError\033[0m|";
+
+	const std::wstring success_string = L"[Success|";
+	const std::wstring success_color = L"[\033[32mSuccess\033[0m|";
 
 
 	template <typename T>
@@ -376,6 +381,10 @@ namespace Logger {
 			process_msg_stream << error_string;
 			temp_stream << error_string;
 			break;
+		case Logger::_SUCCESS:
+			process_msg_stream << success_string;
+			temp_stream << success_string;
+			break;
 		case Logger::_NONE: 
 			goto NO_FORMATING;
 			break;
@@ -476,7 +485,46 @@ namespace Logger {
 	void error(T first, Targ... args) {
 		create_msg(MSG_LEVEL::_ERROR, first, args...);
 	}
+
+	template<typename T, typename... Targ>
+	void success(T first, Targ... args) {
+		create_msg(MSG_LEVEL::_SUCCESS, first, args...);
+	}
 };
+
+class Timer {
+private:
+    std::chrono::time_point<std::chrono::steady_clock> start_time;
+public: 
+    Timer(); 
+    Timer(const Timer& other);
+    Timer(Timer&& other) noexcept;
+    Timer& operator=(Timer other);
+    Timer& operator=(Timer&& other) noexcept;
+    ~Timer(); 
+
+	template<typename T> 
+	long long delta() const {
+		auto now = std::chrono::high_resolution_clock::now();
+		return std::chrono::duration_cast<T>(now - start_time).count(); 
+	}
+
+    long long delta_ns() const;
+    long long delta_us() const;
+    long long delta_ms() const;
+    long long delta_s() const;
+    long long delta_m() const;
+    long long delta_h() const;
+
+	std::wostream& get_string_representation(std::wstringstream& s) const;
+
+	friend auto& operator<<(std::wstringstream& s, const Timer& p);
+	friend void swap(Timer& first, Timer& second);
+};
+
+inline auto& operator<<(std::wstringstream& s, const Timer& p) {
+	return p.get_string_representation(s);
+}
 
 namespace Renderer { 
 	template <typename T>
@@ -543,6 +591,7 @@ namespace Renderer {
 		Rectangle(Point<T> p1, Point<T> p2) : x(p1.x), y(p1.y), width(p2.x - p1.x), height(p2.y - p1.y) { }
 		Rectangle(fz_rect rect) : x(rect.x0), y(rect.y0), width(rect.x1 - rect.x0), height(rect.y1 - rect.y0) { }
 		Rectangle(fz_irect rect) : x(rect.x0), y(rect.y0), width(rect.x1 - rect.x0), height(rect.y1 - rect.y0) {  }
+        Rectangle(const RECT& rect) : x(rect.left), y(rect.top), width(rect.right - rect.left), height(rect.bottom - rect.top) { }
 
 		operator D2D1_SIZE_U() const {
 			return D2D1::SizeU((UINT32)width, (UINT32)height);
@@ -644,6 +693,10 @@ namespace Renderer {
 		}
 
 	};
+
+	// deduction guide for rectangle
+	Rectangle(const RECT&) -> Rectangle<long>;
+
 
 	struct Color {
 		byte r, g, b = 0;
@@ -1027,11 +1080,15 @@ public:
 	void begin_draw(); 
 	void end_draw();
 	void clear(Renderer::Color c) override;
+
 	void resize(Renderer::Rectangle<long> r);
+
 	void draw_bitmap(BitmapObject& bitmap, Renderer::Point<float> pos, INTERPOLATION_MODE mode = INTERPOLATION_MODE::NEAREST_NEIGHBOR, float opacity = 1.0f);
 	void draw_bitmap(BitmapObject& bitmap, Renderer::Rectangle<float> dest, INTERPOLATION_MODE mode = INTERPOLATION_MODE::NEAREST_NEIGHBOR, float opacity = 1.0f);
+
 	void draw_text(const std::wstring& text, Renderer::Point<float> pos, TextFormatObject& format, BrushObject& brush);
 	void draw_text(const std::wstring& text, Renderer::Point<float> pos, Renderer::Color c, float size);
+
 	void draw_rect(Renderer::Rectangle<float> rec, BrushObject& brush, float thick);
 	void draw_rect(Renderer::Rectangle<float> rec, BrushObject& brush);
 	void draw_rect_filled(Renderer::Rectangle<float> rec, BrushObject& brush);
@@ -1079,6 +1136,62 @@ public:
 	Renderer::Point<float> inv_transform_point(const Renderer::Point<float> p) const;
 
 	UINT get_dpi() const;
+
+	/// <summary>
+	/// Converts the given pixel to DIPs (device independent pixels)
+	/// </summary>
+	/// <param name="px">The pixels</param>
+	/// <returns>DIP</returns>
+	template <typename T>
+	T PxToDp(T px) const {
+		return px / (get_dpi() / 96.0f);
+	}
+
+	/// <summary>
+	/// Converts the DIP to on screen pixels
+	/// </summary>
+	/// <param name="dip">the dip</param>
+	/// <returns>Pixels in screen coordinates</returns>
+	template <typename T>
+	T DptoPx(T dip) const {
+		return dip * (get_dpi() / 96.0f);
+	}
+
+	template<typename T>
+	Renderer::Point<T> PxToDp(const Renderer::Point<T>& pxPoint) const {
+		Renderer::Point<T> dpPoint;
+		dpPoint.x = pxPoint.x / (get_dpi() / 96.0f);
+		dpPoint.y = pxPoint.y / (get_dpi() / 96.0f);
+		return dpPoint;
+	}
+
+	template<typename T>
+	Renderer::Point<T> DpToPx(const Renderer::Point<T>& dpPoint) const {
+		Renderer::Point<T> pxPoint;
+		pxPoint.x = dpPoint.x * (get_dpi() / 96.0f);
+		pxPoint.y = dpPoint.y * (get_dpi() / 96.0f);
+		return pxPoint;
+	}
+
+    template<typename T>
+    Renderer::Rectangle<T> PxToDp(const Renderer::Rectangle<T>& pxRect) const {
+		Renderer::Rectangle<T> dpRect;
+		dpRect.x = pxRect.x / (get_dpi() / 96.0f);
+		dpRect.y = pxRect.y / (get_dpi() / 96.0f);
+		dpRect.width = pxRect.width / (get_dpi() / 96.0f);
+		dpRect.height = pxRect.height / (get_dpi() / 96.0f);
+		return dpRect;
+    }
+
+    template<typename T>
+    Renderer::Rectangle<T> DpToPx(const Renderer::Rectangle<T>& dpRect) const {
+		Renderer::Rectangle<T> pxRect;
+		pxRect.x = dpRect.x * (get_dpi() / 96.0f);
+		pxRect.y = dpRect.y * (get_dpi() / 96.0f);
+		pxRect.width = dpRect.width * (get_dpi() / 96.0f);
+		pxRect.height = dpRect.height * (get_dpi() / 96.0f);
+		return pxRect;
+    }
 
 	TextFormatObject create_text_format(std::wstring font, float size);
 	BrushObject create_brush(Renderer::Color c);
@@ -1459,7 +1572,6 @@ public:
 class WindowHandler {
 	HWND m_hwnd = NULL;
 	HDC m_hdc = NULL;
-	UINT m_dpi = 96;
 
 	bool m_closeRequest = false;
 
@@ -1706,7 +1818,10 @@ public:
 	}
 
 	// Returns the window size
-	Renderer::Rectangle<long> get_size() const;
+	Renderer::Rectangle<long> get_window_size() const;
+
+	// Sets a new windowsize
+	void set_window_size(Renderer::Rectangle<long> r);
 
 	/// <summary>
 	/// Returns true if a close request has been sent to the window
@@ -1775,9 +1890,9 @@ public:
 	void check_bounds();
 };
 
-#ifndef NDEBUG
-#define WIN_ERROR_MSG(...) Logger::error(__VA_ARGS__, " with Windows Error: \"", get_win_msg(), "\" in File:\"", __FILE__, "\" Line: ", __LINE__);
-#define ERROR_MSG(...)     Logger::error(__VA_ARGS__, "in File:\"", __FILE__, "\" Line: ", __LINE__);
+
+#define WIN_ERROR_MSG(...) Logger::error(__VA_ARGS__, " with Windows Error: \"", get_win_msg(), "\" in File:\"", __FILE__, "\" Line: ", __LINE__, " in ", __func__);
+#define ERROR_MSG(...)     Logger::error(__VA_ARGS__, "in File:\"", __FILE__, "\" Line: ", __LINE__, " in ", __func__);
 #define ASSERT(x, ...)                       if (!(x)) {  ERROR_MSG(__VA_ARGS__);     __debugbreak(); } 
 #define ASSERT_WIN(x,...)                    if (!(x)) {  WIN_ERROR_MSG(__VA_ARGS__); __debugbreak(); }
 #define ASSERT_WITH_STATEMENT(x, y, ...)     if (!(x)) {  ERROR_MSG(__VA_ARGS__);     __debugbreak(); y; }
@@ -1786,12 +1901,3 @@ public:
 #define ASSERT_WIN_RETURN_FALSE(x, ...)      if (!(x)) {  WIN_ERROR_MSG(__VA_ARGS__); __debugbreak(); return false; }
 #define ASSERT_RETURN_NULLOPT(x,...)         if (!(x)) {  ERROR_MSG(__VA_ARGS__);     __debugbreak(); return std::nullopt; }
 #define ASSERT_WIN_RETURN_NULLOPT(x, ...)    if (!(x)) {  WIN_ERROR_MSG(__VA_ARGS__); __debugbreak(); return std::nullopt; }
-#else
-#define ASSERT(x, y)
-#define ASSERT_WIN(x,y) 
-#define ASSERT_WITH_STATEMENT(x, y, z)     if (!(x)) { z; }
-#define ASSERT_WIN_WITH_STATEMENT(x, y, z) if (!(x)) { z; }
-#define ASSERT_WIN_RETURN_FALSE(x,y)       if (!(x)) { return false; }
-#define ASSERT_RETURN_NULLOPT(x,y)         if (!(x)) { return std::nullopt; }
-#define ASSERT_WIN_RETURN_NULLOPT(x,y)     if (!(x)) { return std::nullopt; }
-#endif // !NDEBUG

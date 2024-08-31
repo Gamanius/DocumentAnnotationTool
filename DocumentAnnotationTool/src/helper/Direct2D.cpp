@@ -5,11 +5,10 @@
 ID2D1Factory* Direct2DRenderer::m_factory = nullptr;
 IDWriteFactory3* Direct2DRenderer::m_writeFactory = nullptr;
 
-
 Direct2DRenderer::Direct2DRenderer(const WindowHandler& w) {
 	m_hdc = w.get_hdc();
 	m_hwnd = w.get_hwnd();
-	m_window_size = w.get_size();
+	m_window_size = w.get_window_size();
 
 	D2D1_FACTORY_OPTIONS option{};
 
@@ -22,7 +21,7 @@ Direct2DRenderer::Direct2DRenderer(const WindowHandler& w) {
 	HRESULT result = S_OK;
 	if (m_factory == nullptr) {
 		result = D2D1CreateFactory(D2D1_FACTORY_TYPE_MULTI_THREADED, option, &m_factory);
-		ASSERT(result == S_OK, "Could not create Direct2D factory!");
+		ASSERT_WIN(result == S_OK, "Could not create Direct2D factory!");
 	}
 	else {
 		m_factory->AddRef(); 
@@ -31,7 +30,7 @@ Direct2DRenderer::Direct2DRenderer(const WindowHandler& w) {
 	// create some text rendering
 	if (m_writeFactory == nullptr) {
 		result = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory3), reinterpret_cast<IUnknown**>(&m_writeFactory));
-		ASSERT(result == S_OK, "Could not create DirectWrite factory!");
+		ASSERT_WIN(result == S_OK, "Could not create DirectWrite factory!");
 	}
 	else {
 		m_writeFactory->AddRef(); 
@@ -42,6 +41,9 @@ Direct2DRenderer::Direct2DRenderer(const WindowHandler& w) {
 		D2D1::HwndRenderTargetProperties(m_hwnd, m_window_size),
 		&m_renderTarget
 	);
+
+	m_renderTarget->SetAntialiasMode(D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+
 }
 
 Direct2DRenderer::~Direct2DRenderer() {
@@ -58,6 +60,12 @@ void Direct2DRenderer::clear(Renderer::Color c) {
 
 void Direct2DRenderer::resize(Renderer::Rectangle<long> r) {
 	m_renderTarget->Resize(r);
+
+	// we should also check if the dpi changed
+    UINT dpiX, dpiY;
+    dpiX = dpiY = GetDpiForWindow(m_hwnd);
+    m_renderTarget->SetDpi(static_cast<float>(dpiX), static_cast<float>(dpiY));
+
 	m_window_size = r;
 }
 
@@ -109,7 +117,7 @@ void Direct2DRenderer::draw_text(const std::wstring& text, Renderer::Point<float
 
 void Direct2DRenderer::draw_rect(Renderer::Rectangle<float> rec, BrushObject& brush, float thicc) {
 	begin_draw();
-	m_renderTarget->DrawRectangle(rec, brush.m_object, thicc);
+	m_renderTarget->DrawRectangle(PxToDp(rec), brush.m_object, thicc);
 	end_draw();
 }
 

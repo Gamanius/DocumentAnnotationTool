@@ -99,6 +99,7 @@ Direct2DRenderer::BitmapObject PDFRenderHandler::get_bitmap(Direct2DRenderer& re
 
 void PDFRenderHandler::create_display_list() {
 	Logger::log(L"Start creating Display List");
+	Timer time;
 	// for each rec create a display list
 	fz_display_list* list_annot   = nullptr;
 	fz_display_list* list_widget  = nullptr;
@@ -171,7 +172,7 @@ void PDFRenderHandler::create_display_list() {
 	m_render_queue_condition_var.notify_all(); 
 	PostMessage(m_window->get_hwnd(), WM_PAINT, (WPARAM)nullptr, (LPARAM) nullptr); 
 	PostMessage(m_window->get_hwnd(), WM_CUSTOM_MESSAGE, CUSTOM_WM_MESSAGE::PDF_HANDLER_DISPLAY_LIST_UPDATE, (LPARAM)nullptr); 
-	Logger::log(L"Finished Displaylist");
+	Logger::log(L"Finished Displaylist in ", time);
 }
 
 PDFRenderHandler::PDFRenderHandler(MuPDFHandler::PDF* const pdf, Direct2DRenderer* const renderer, WindowHandler* const window, size_t amount_threads) : m_pdf(pdf), m_renderer(renderer), m_window(window) {
@@ -191,6 +192,7 @@ PDFRenderHandler::PDFRenderHandler(MuPDFHandler::PDF* const pdf, Direct2DRendere
 	m_display_list_thread = std::thread([this] { create_display_list(); });
 	m_preview_bitmap_thread = std::thread([this] { create_preview(0.1f); });
 
+
 	for (size_t i = 0; i < amount_threads; i++) {
 		m_render_threads.push_back(std::thread([this] { async_render(); }));
 	}
@@ -198,6 +200,7 @@ PDFRenderHandler::PDFRenderHandler(MuPDFHandler::PDF* const pdf, Direct2DRendere
 
 void PDFRenderHandler::create_preview(float scale) {
 	Logger::log(L"Start creating Preview Bitmaps");
+	Timer time;
 	{
 		auto prev = m_preview_bitmaps->get_write();
 		prev->clear();
@@ -224,7 +227,7 @@ void PDFRenderHandler::create_preview(float scale) {
 
 	m_preview_scale = scale;
 	m_preview_bitmaps_processed = true;
-	Logger::log(L"Finished creating Preview Bitmaps");
+	Logger::log(L"Finished creating Preview Bitmaps in ", time);
 }
 
 template<typename T>
@@ -246,6 +249,10 @@ std::vector<size_t> PDFRenderHandler::render_job_clipped_cashed_bitmaps(Renderer
 		// check if the dpi is high enough
 		if (cached_bitmap->at(i).dpi < dpi and FLOAT_EQUAL(cached_bitmap->at(i).dpi, dpi) == false)
 			continue;
+		// also check if the dpi is too high
+		if (cached_bitmap->at(i).dpi > dpi * 2 /* Magic Number */)
+			continue;
+		// also check if it overlaps
 		if (overlap_clip_space.intersects(page_rec->at(cached_bitmap->at(i).page)) == false)
 			continue;
 
@@ -559,6 +566,7 @@ void PDFRenderHandler::async_render() {
 
 		fz_try(ctx) {
 			// ___---___ Rendering part ___---___
+			Timer time;
 			// create new pixmap
 			pixmap = fz_new_pixmap_with_bbox(ctx, fz_device_rgb(ctx), pixmap_size, nullptr, 1);
 			fz_clear_pixmap_with_value(ctx, pixmap, 0xff); // for the white background
@@ -602,6 +610,11 @@ void PDFRenderHandler::async_render() {
 
 			// update info only after no members are called from info 
 			info->stat = RenderInfo::STATUS::FINISHED;
+
+			// time it
+			if (time.delta_s() > 3) {
+				Logger::warn("Rendering page ", info->page + 1, " took ", time);
+			}
 
 			// We have to do a non blocking call since the main thread could be busy waiting for the cached bitmaps
 			PostMessage(m_window->get_hwnd(), WM_PAINT, (WPARAM)nullptr, (LPARAM)nullptr);
@@ -776,6 +789,8 @@ PDFRenderHandler::~PDFRenderHandler() {
 		m_render_threads.at(i).join();
 	}
 
-	m_display_list_thread.join();
-	m_preview_bitmap_thread.join();
+	if (m_display_list_thread.joinable())
+		m_display_list_thread.join();
+	if (m_preview_bitmap_thread.joinable())
+		m_preview_bitmap_thread.join();
 }
