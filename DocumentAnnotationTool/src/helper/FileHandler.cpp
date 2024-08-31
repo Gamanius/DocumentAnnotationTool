@@ -30,17 +30,17 @@ std::optional<FileHandler::File> FileHandler::open_file(const std::wstring& path
     ASSERT_WIN_RETURN_NULLOPT(hFile != INVALID_HANDLE_VALUE, "Could not open file " + std::string(path.begin(), path.end()));
 
     DWORD fileSize = GetFileSize(hFile, NULL); 
-    ASSERT_WIN_WITH_STATEMENT(fileSize != INVALID_FILE_SIZE, 
-        "Could not get file size of file " + std::string(path.begin(), path.end()), 
-        CloseHandle(hFile); return std::nullopt; );
+    ASSERT_WIN_WITH_STATEMENT(fileSize != INVALID_FILE_SIZE,
+        CloseHandle(hFile); return std::nullopt; ,
+        "Could not get file size of file ", path);
     
     File file; 
     file.data = new byte[fileSize]; 
     file.size = fileSize; 
 
-    ASSERT_WIN_WITH_STATEMENT(ReadFile(hFile, file.data, fileSize, NULL, NULL), 
-        		"Could not read file " + std::string(path.begin(), path.end()),  
-        		CloseHandle(hFile); delete file.data; return std::nullopt; ); 
+    ASSERT_WIN_WITH_STATEMENT(ReadFile(hFile, file.data, fileSize, NULL, NULL),
+        		CloseHandle(hFile); delete file.data; return std::nullopt;,
+                "Could not read file ", path );
 
     CloseHandle(hFile);
     return std::move(file); 
@@ -52,9 +52,9 @@ std::optional<Renderer::Rectangle<DWORD>> FileHandler::get_bitmap_size(const std
     ASSERT_WIN_RETURN_NULLOPT(hBitmap != NULL, "Could not load bitmap " + std::string(path.begin(), path.end()));
 
     BITMAP bm;
-    ASSERT_WIN_WITH_STATEMENT(GetObject(hBitmap, sizeof(bm), &bm), 
-        		"Could not get bitmap size of file " + std::string(path.begin(), path.end()),  
-        		DeleteObject(hBitmap); return std::nullopt; );
+    ASSERT_WIN_WITH_STATEMENT(GetObject(hBitmap, sizeof(bm), &bm),
+                DeleteObject(hBitmap); return std::nullopt;,
+                "Could not get bitmap size of file ", path);
 
     return Renderer::Rectangle<DWORD>(0, 0, bm.bmWidth, bm.bmHeight);
 }

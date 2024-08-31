@@ -1,309 +1,268 @@
-#include <thread>
+#include <sstream>
+#include <string>
+#define MAGIC_ENUM_USING_ALIAS_STRING_VIEW using string_view = std::wstring_view;
+#define MAGIC_ENUM_USING_ALIAS_STRING  using string = std::wstring;
 #include <iostream>
-#include <shared_mutex>
+#include <vector>
+#include <array>
+#include <Windows.h>
+#include <time.h>
+#include "enumhelpler/magic_enum.hpp"
+#include <chrono>
 #include <tuple>
-#include <condition_variable>
 #include <map>
-#include <optional>
-#include <syncstream>
 
 
-struct ThreadSafeClassReadMutexInfo {
-	std::mutex m;
-	std::map<std::thread::id, std::pair<size_t, std::shared_lock<std::shared_mutex>>> global_map;
+namespace Logger {
+	enum MSG_LEVEL {
+		_INFO = 0,
+		_WARNING = 1,
+		_ERROR = 2
+	};
 
-	bool write_request = false;
+	std::wstringstream process_msg_stream;
+	std::wstringstream intermediate_stream;
+	HANDLE io_handle = nullptr;
+	bool handle_supports_color = false;
 
-	std::unique_lock<std::shared_mutex> unique_lock;
-	std::condition_variable unique_shared_var;
-	size_t unique_counter = 0;
-	std::optional<std::thread::id> unique_id = std::nullopt; 
-};
+	const std::wstring info_string    = L"[Info|";
+	const std::wstring info_color     = L"[\033[36mInfo\033[0m|";
 
-template<typename T>
-class ReadSafeClass {
-	const T* obj;
-	std::shared_ptr<ThreadSafeClassReadMutexInfo> read_lock_info;
-public:
-	ReadSafeClass(const T* obj, std::shared_ptr<ThreadSafeClassReadMutexInfo> l, std::shared_mutex& shared_m) : read_lock_info(l), obj(obj) {
-		std::thread::id t_id = std::this_thread::get_id();
+	const std::wstring warning_string = L"[Warning|";
+	const std::wstring warning_color  = L"[\033[33mWarning\033[0m|";
 
-		// get acces to the info
+	const std::wstring error_string   = L"[Error|";
+	const std::wstring error_color    = L"[\033[31mError\033[0m|"; 
+
+
+	template <typename T> 
+	concept Streamable = (requires(std::wstringstream & s, T val) {
+		s << val;
+	} or std::convertible_to<T, std::string>) and !std::is_enum_v<T>;
+
+	template <typename T> 
+	concept StreamableContainer = requires(T arr) {
 		{
-			std::unique_lock<std::mutex> lock(read_lock_info->m);
+			arr.begin()
+		} -> std::same_as<typename T::iterator>; 
+		{
+			arr.end()
+		} -> std::same_as<typename T::iterator>;
+		{
+			arr.size()
+		} -> std::same_as<size_t>;
+	} and !std::convertible_to<T, std::wstring>;
 
-			// ___---___ Owns unique mutex ___---___
-			if (read_lock_info->unique_id.has_value() and read_lock_info->unique_id == t_id) {
-				// check if this thread has already a read lock
-				if (read_lock_info->global_map.find(t_id) != read_lock_info->global_map.end()) { 
-					// case if the lock was already acquired just increase the counter
-					read_lock_info->global_map.at(t_id).first++;
-					std::osyncstream(std::cout) << "Reaquired read " << t_id << "\n";
-					return;
-				} 
-				// we can defer lock the read since we know that there is a unique lock 
-				read_lock_info->global_map.emplace(t_id, std::make_pair(1, std::shared_lock<std::shared_mutex>(shared_m, std::defer_lock))); 
-				std::osyncstream(std::cout) << "Defer read " << t_id << "\n";
-				return;
-			}
+	/// <summary>
+	/// https://stackoverflow.com/questions/68443804/c20-concept-to-check-tuple-like-types
+	/// </summary>
+	template<class T, std::size_t N> 
+	concept has_tuple_element = requires(T t) {
+		typename std::tuple_element_t<N, std::remove_const_t<T>>; 
+		std::get<N>(t);
+		
+	};
 
-			// ___---___ Not owned locked unique lock ___---___
-			// deadlock avoidance since if a thread has the unique lock we have to unlock the map mutex
-			// so they can deconstruct their lock
-			if (read_lock_info->unique_id != std::nullopt or read_lock_info->write_request) {
-				read_lock_info->unique_shared_var.wait(lock, [this] {
-					return read_lock_info->unique_id == std::nullopt and read_lock_info->write_request == false;
-				});
-			}
+	template<class T>
+	concept StreamableTuple = !std::is_reference_v<T> and requires(T t) {
+		typename std::tuple_size<T>::type;
+		requires std::derived_from<std::tuple_size<T>, std::integral_constant<std::size_t, std::tuple_size_v<T>>>;
+	} and
+		[]<std::size_t... N>(std::index_sequence<N...>) {
+		return (has_tuple_element<T, N> and ...);
+		} (std::make_index_sequence<std::tuple_size_v<T>>());
 
-			// ___---___ Owned shared lock ___---___
-			// check if this thread already locked
-			if (read_lock_info->global_map.find(t_id) != read_lock_info->global_map.end()) {
-				// case if the lock was already acquired just increase the counter
-				read_lock_info->global_map.at(t_id).first++;
-				std::osyncstream(std::cout) << "Reaquired read " << t_id << "\n";
-			}
-			// ___---___ No locks ___---___
-			else {
-				// case where the lock has not been acquired
-				read_lock_info->global_map.emplace(t_id, std::make_pair(1, std::shared_lock<std::shared_mutex>(shared_m)));
-				std::osyncstream(std::cout)  << "Aquired read " << t_id << "\n";
-			}
+    template <class T>
+    concept StreamableEnum = std::is_enum_v<T>;
+
+	/// <summary>
+	/// Base case
+	/// </summary>
+	void process_msg() {}
+
+	
+	// Weird behaviour: If a string is passed into process_msg it will be considered as a
+	// Streamable but if it's inside of a template like e.g. std::pair<T, std::string> it
+	// need this function or else it doesn't find anything. I'm really confused by this.
+	void process_msg(std::string msg) {
+		auto size = MultiByteToWideChar(CP_UTF8, 0, msg.c_str(), -1, NULL, 0);
+		std::wstring wide(size, 0);
+		MultiByteToWideChar(CP_UTF8, 0, msg.c_str(), -1, &wide[0], size);
+		intermediate_stream << wide;
+	}
+
+	template <StreamableEnum T>
+	void process_msg(T msg) {
+		intermediate_stream << magic_enum::enum_name(msg);
+	}
+	
+	template <Streamable T> 
+	void process_msg(T msg) {
+		intermediate_stream << msg;
+	} 
+
+	template <StreamableTuple T>
+	void process_msg(T msg);
+
+	template <StreamableContainer T>
+	void process_msg(T arr) {
+		size_t size = arr.size();
+		intermediate_stream << "[";
+		for (const auto& i : arr) {
+			process_msg(i);
+			intermediate_stream << (--size > 0 ? ", " : "");
+		}
+		intermediate_stream << "]";
+	}
+
+	template <StreamableTuple T>
+	void process_msg(T msg) {
+		size_t size = std::tuple_size<T>{};
+		intermediate_stream << "{";
+		std::apply([&](auto&&... args) {
+			size_t index = 0; 
+			((process_msg(args), intermediate_stream << (++index < size ? ", " : "")), ...);
+			}, msg); 
+		intermediate_stream << "}";
+	}
+
+	template<typename T, typename... Targ>
+	void process_msg(T first, Targ... args) {
+		process_msg(first);
+		process_msg(args...);
+	}
+	
+	// Time
+	void get_current_time(std::wstringstream& s) {
+		auto now = std::chrono::system_clock::now();
+		auto in_time_t = std::chrono::system_clock::to_time_t(now);
+		auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
+		std::tm* local = new std::tm;
+		localtime_s(local, &in_time_t);
+		s << std::put_time(local, L"%X") << L":" << std::setfill(L'0') << std::setw(3) << milliseconds.count();
+		delete local;
+	}
+
+	void print_intermediate_stream(std::wstringstream& s); 
+	template<typename T, typename... Targ> 
+	void create_msg(MSG_LEVEL level, T first, Targ... args) {
+		// First process the messages 
+		process_msg(first, args...);  
+		std::wstringstream temp_stream;
+
+		// get the time and add the string
+		switch (level) {
+		case Logger::_INFO:
+			process_msg_stream << info_string;
+			temp_stream << info_string;
+			break;
+		case Logger::_WARNING:
+			process_msg_stream << warning_string;
+			temp_stream << warning_string;
+			break;
+		case Logger::_ERROR:
+			process_msg_stream << error_string;
+			temp_stream << error_string;
+			break;
+		default:
+			break;
 		}
 
+		get_current_time(process_msg_stream);
+		get_current_time(temp_stream);
+
+		process_msg_stream << "]: ";
+		temp_stream << "]: "; 
+
+		process_msg_stream << intermediate_stream.str() << "\n";
+		temp_stream << intermediate_stream.str() << "\n";
+
+
+		print_intermediate_stream(temp_stream); 
+
+		// clear the intermediate stream
+		intermediate_stream.str(L"");
 	}
 
-	const T* get() const {
-		return obj;
+	template<typename T, typename... Targ>
+	void log(T first, Targ... args) {
+		create_msg(MSG_LEVEL::_INFO, first, args...); 
+	}
+	
+    template<typename T, typename... Targ>
+    void warn(T first, Targ... args) {
+        create_msg(MSG_LEVEL::_WARNING, first, args...);
+    }
+
+    template<typename T, typename... Targ>
+    void error(T first, Targ... args) {
+        create_msg(MSG_LEVEL::_ERROR, first, args...);
+    }
+
+	void clear_stream() {
+		process_msg_stream.str(L"");
 	}
 
-	const T* operator->()const { return obj; }
-	const T& operator*() const { return *obj; }
+	void set_handle(HANDLE h, bool add_color = false) {
+		io_handle = h;
+		handle_supports_color = add_color; 
+	}
 
-	~ReadSafeClass() {
-		if (read_lock_info == nullptr)
+	void add_color_to_string(std::wstring& s) { 
+		auto replaceAll = [&s](const std::wstring what, const std::wstring to) {
+			size_t pos = 0;
+			while ((pos = s.find(what, pos)) != std::string::npos) {
+				s.replace(pos, what.length(), to); 
+				pos += to.length(); // In case 'to' contains 'from', like replacing 'x' with 'yx'
+			}
+		};
+
+		replaceAll(info_string, info_color);
+		replaceAll(warning_string, warning_color);
+		replaceAll(error_string, error_color);
+	}
+
+	void write_to_handle(bool clear = false, HANDLE h = nullptr, std::wstringstream& s = process_msg_stream) {
+		HANDLE cur_io_handle = h == nullptr ? io_handle : h;
+		if (cur_io_handle == nullptr) { 
 			return;
-
-		std::thread::id t_id = std::this_thread::get_id();
-		// get acces to the info
-		{
-			std::unique_lock<std::mutex> lock(read_lock_info->m);
-			// check if this thread already locked
-			if (read_lock_info->global_map.find(t_id) == read_lock_info->global_map.end()) {
-				// we should never be here!
-				abort();
-			}
-			read_lock_info->global_map.at(t_id).first--;
-			if (read_lock_info->global_map.at(t_id).first == 0) {
-				// we can remove the entry from the map
-				read_lock_info->global_map.erase(t_id);
-				std::osyncstream(std::cout) << "Delete read " << t_id << "\n";
-				// this should also automatically remove the lock
-			}
+		}
+		
+		if (!handle_supports_color) {
+			WriteFile(cur_io_handle, s.str().c_str(), s.str().size() * sizeof(wchar_t), NULL, NULL);
+		} else {
+			// Add color
+			std::wstring temp = s.str(); 
+			add_color_to_string(temp);
+			WriteFile(cur_io_handle, temp.c_str(), temp.size() * sizeof(wchar_t), NULL, NULL);
 		}
 
-		read_lock_info->unique_shared_var.notify_all();
-		read_lock_info = nullptr;
-	}
-};
-
-template<typename T>
-class WriteSafeClass {
-	T* obj;
-
-	std::shared_ptr<ThreadSafeClassReadMutexInfo> read_lock_info;
-public:
-	WriteSafeClass(T* obj, std::shared_ptr<ThreadSafeClassReadMutexInfo> l, std::shared_mutex& shared_m) : read_lock_info(l), obj(obj) {
-		std::thread::id t_id = std::this_thread::get_id(); 
-
-		// get acces to the info
-		{
-			std::unique_lock<std::mutex> lock(read_lock_info->m);
-			size_t shared_calls = 0;
-			
-			// ___---___ Owns unique lock ___---___
-			if (read_lock_info->unique_id.has_value() and read_lock_info->unique_id.value() == t_id) {
-				read_lock_info->unique_counter += 1;	
-				std::osyncstream(std::cout)  << "Reacquired write " << t_id << "\n";
-				return;
-			}
-
-			// ___---___ Owns a shared lock ___---___
-			// first check if the calling thread has a read lock to avoid deadlock
-			if (read_lock_info->global_map.find(t_id) != read_lock_info->global_map.end()) { 
-				// if there is a write request we have to remove the read lock completly from our list
-				shared_calls = read_lock_info->global_map.at(t_id).first;
-				read_lock_info->global_map.erase(t_id);  
-				std::osyncstream(std::cout) << "Unlock read " << t_id << "\n";
-
-				// after which we have to wait until our read lock is the last in the map and no unique lock is locked
-				if (read_lock_info->global_map.empty() and read_lock_info->unique_id.has_value() == false) { 
-					read_lock_info->unique_lock = std::move(std::unique_lock<std::shared_mutex>(shared_m)); 
-					read_lock_info->unique_id = t_id; 
-					read_lock_info->unique_counter = 1; 
-
-					// add the read lock back into the map so it can be locker later
-					read_lock_info->global_map.emplace(t_id, std::make_pair(shared_calls, std::shared_lock<std::shared_mutex>(shared_m, std::defer_lock)));
-
-					std::osyncstream(std::cout) << "Acquired write " << t_id << "\n";
-					return;
-				}
-			}
-
-			// ___---___ Shared or unique locks are locked  ___---___
-			// we have to check if there are any read or write locks
-			if (read_lock_info->global_map.empty() == false or read_lock_info->unique_id.has_value()) {
-				// we need to wait until all read locks are freed
-				read_lock_info->write_request = true;
-				read_lock_info->unique_shared_var.wait(lock, [this] {
-					return read_lock_info->global_map.empty() and read_lock_info->unique_id == std::nullopt; 
-				});
-				read_lock_info->write_request = false;
-			}
-
-			if (shared_calls != 0) {
-				// add the read lock back into the map so it can be locker later
-				read_lock_info->global_map.emplace(t_id, std::make_pair(shared_calls, std::shared_lock<std::shared_mutex>(shared_m, std::defer_lock)));
-			}
-
-			// we shouldn't be here
-			if (read_lock_info->unique_id.has_value()) {
-				abort();
-			}
-
-			// ___---___ All locks are unlocked  ___---___
-			read_lock_info->unique_lock = std::move(std::unique_lock<std::shared_mutex>(shared_m)); 
-			read_lock_info->unique_id = t_id;
-			read_lock_info->unique_counter = 1; 
+		if (clear) {
+			clear_stream();
 		}
-		std::osyncstream(std::cout)  << "Acquired write " << t_id << "\n";
 	}
 
-	WriteSafeClass(WriteSafeClass&& a) noexcept {
-		obj = std::move(a.obj);
-		read_lock_info = std::move(a.read_lock_info);
-	}
-
-	WriteSafeClass& operator=(WriteSafeClass&& t) noexcept { 
-		this->~WriteSafeClass();
-		new(this) WriteSafeClass(std::move(t));
-		return *this;
-	}
-
-	T* get() const {
-		return obj;
-	}
-
-	T* operator->()const { return obj; }
-	T& operator*() const { return *obj; }
-
-	~WriteSafeClass() {
-		if (read_lock_info == nullptr)
-			return;
-
-		std::thread::id t_id = std::this_thread::get_id();
-		// get acces to the info
-		{
-			std::unique_lock<std::mutex> lock(read_lock_info->m);
-
-			if (read_lock_info->unique_id.has_value() == false or read_lock_info->unique_id.value() != t_id) { 
-				abort(); 
-			}
-
-			read_lock_info->unique_counter -= 1;
-			
-			if (read_lock_info->unique_counter == 0) {
-				// release lock
-				read_lock_info->unique_id = std::nullopt;
-				read_lock_info->unique_lock.unlock();
-
-				// lock any possible read locks that have been acquired by the same thread
-				if (read_lock_info->global_map.find(t_id) != read_lock_info->global_map.end()) {
-					read_lock_info->global_map.at(t_id).second.lock(); 
-
-					std::osyncstream(std::cout) << "Locked read " << t_id << "\n";
-				}
-
-				// notify all possible read threads
-				lock.unlock();
-				std::osyncstream(std::cout)  << "Delete write " << t_id << "\n";
-				read_lock_info->unique_shared_var.notify_all(); 
-
-				read_lock_info = nullptr;
-				return;
-			}
-			
+	void write_to_debug(bool clear = false, std::wstringstream& s = process_msg_stream) {
+		OutputDebugString(s.str().c_str()); 
+		if (clear) {
+			clear_stream();
 		}
+	}
 
-		read_lock_info = nullptr;
-		std::osyncstream(std::cout)  << "Decremented write " << t_id << "\n";
+	void print_intermediate_stream(std::wstringstream& s) {
+		write_to_handle(false, io_handle, s);
+		write_to_debug(false, s);
 	}
 };
-
-template<typename T>
-class ThreadSafeClass {
-	T obj;
-	std::shared_mutex m;
-
-	std::shared_ptr<ThreadSafeClassReadMutexInfo> info = 
-		std::shared_ptr<ThreadSafeClassReadMutexInfo>(new ThreadSafeClassReadMutexInfo());
-public:
-	ThreadSafeClass(T&& obj) : obj(obj) {}
-
-	WriteSafeClass<T> get_write() {
-		return WriteSafeClass<T>(&obj, info, m);
-	}
-
-	ReadSafeClass<T> get_read() {
-		return ReadSafeClass<T>(&obj, info, m);
-	}
-};
-
-ThreadSafeClass<int> thread_safe_int(1);
-
-void do_write() {
-	auto d = thread_safe_int.get_write();
-	auto d2 = thread_safe_int.get_write();
-	std::this_thread::sleep_for(std::chrono::seconds(1));
-	*d += 2;
-	auto c = thread_safe_int.get_read();
-	auto c2 = thread_safe_int.get_read();
-	d.~WriteSafeClass();
-	std::this_thread::sleep_for(std::chrono::seconds(1));
-}
-
-void do_read() {
-	auto d = thread_safe_int.get_read();
-	std::this_thread::sleep_for(std::chrono::seconds(1));
-	std::osyncstream(std::cout)  << *d << "\n";
-
-	auto d1 = thread_safe_int.get_write();
-	auto d2 = thread_safe_int.get_write();
-	auto d3 = thread_safe_int.get_write();
-	d.~ReadSafeClass();
-	std::this_thread::sleep_for(std::chrono::seconds(1));
-}
 
 int main() {
-	auto t1 = std::thread(do_write);
-	auto t2 = std::thread(do_read);
-	auto t3 = std::thread(do_write);
-	auto t4 = std::thread(do_read);
-	auto t5 = std::thread(do_read);
-	auto t6 = std::thread(do_read);
-	auto t7 = std::thread(do_write);
-	
-	t1.join();
-	t2.join();
-	t3.join();
-	t4.join();
-	t5.join();
-	t6.join();
-	t7.join();
-	auto d = thread_safe_int.get_read();
+	//auto h = CreateFile(L"test.log", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_FLAG_WRITE_THROUGH, NULL);
+	auto h = GetStdHandle(STD_OUTPUT_HANDLE);
+	Logger::set_handle(h, true);
 
-	auto d1 = thread_safe_int.get_write();
-
-
-	return 0;
+	const std::wstring a = L"Hallo";
+	Logger::log(a);
+	Logger::log(Logger::MSG_LEVEL::_ERROR); 
+	Logger::warn("This is a warning");
+	Logger::error("This is an error");
 }

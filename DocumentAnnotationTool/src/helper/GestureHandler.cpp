@@ -14,7 +14,7 @@ void GestureHandler::check_bounds() {
 	if (std::isnan(offset_pos.x) or std::isnan(offset_pos.y)) {
 		m_renderer->set_transform_matrix({ 0, 0 });
 		m_renderer->set_scale_matrix(1, {0, 0});
-		Logger::warn("Page was out of bounds");
+		//Logger::warn("Page was out of bounds");
 	}
 	
 	// check for bottom of clipspace

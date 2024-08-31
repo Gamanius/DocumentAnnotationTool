@@ -4,17 +4,21 @@
 
 #include <array>
 #include <atomic>
+#include <chrono>
+#include <codecvt>
 #include <crtdbg.h>
 #include <d2d1.h>
 #include <deque>
 #include <dwrite_3.h>
 #include <functional>
 #include <iostream>
+#include <locale>
 #include <map>
 #include <memory>
 #include <mupdf/fitz/crypt.h>
 #include <mutex>
 #include <optional>
+#include <sstream>
 #include <string>
 #include <thread>
 #include <tuple>
@@ -23,14 +27,11 @@
 // dependencies
 #define MAGIC_ENUM_RANGE_MIN 0
 #define MAGIC_ENUM_RANGE_MAX 256
+#define MAGIC_ENUM_USING_ALIAS_STRING_VIEW using string_view = std::wstring_view;
+#define MAGIC_ENUM_USING_ALIAS_STRING      using string = std::wstring;
 #include "../dependecies/magic_enum/magic_enum.hpp"
 #include "ReadWriteRecursiveMutex.h"
 #include "mupdf/fitz.h"
-
-/// <summary>
-/// ID of the main thread. All other thread should use an ID > 1. ID = 0 is reserved 
-/// </summary>
-constexpr size_t MAIN_THREAD_ID = 1;
 
 #define APPLICATION_NAME L"Docanto"
 #define EPSILON 0.00001f
@@ -49,6 +50,19 @@ inline void SafeRelease(IUnknown* ptr) {
 		ptr->Release();
 		ptr = nullptr;
 	}
+}
+
+inline std::wstring get_win_msg() {
+	auto error = GetLastError();
+	LPWSTR buffer = nullptr;
+	FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+		NULL, error, LANG_SYSTEM_DEFAULT, (LPWSTR)&buffer, 0, NULL);
+	std::wstring msg = buffer;
+	LocalFree(buffer); // Free the buffer.
+	// remove newline and carriage return
+	msg = std::wstring(msg.begin(), msg.end() - 2);
+	// also return the error code
+	return L"(" + std::to_wstring(error) + L") " + msg;
 }
 
 template <typename T, typename M>
@@ -187,35 +201,282 @@ public:
 };
 
 namespace Logger {
-	enum MsgLevel {
-		INFO = 0,
-		WARNING = 1,
-		FATAL = 2
+	enum MSG_LEVEL {
+		_INFO = 0,
+		_WARNING = 1,
+		_ERROR = 2,
+		_NONE = 3
 	};
 
+	inline std::wstringstream process_msg_stream;
+	inline std::wstringstream intermediate_stream;
+	inline std::recursive_mutex log_mutex;
 
-	void log(const std::wstring& msg, MsgLevel lvl = MsgLevel::INFO);
-	void log(const std::string& msg, MsgLevel lvl = MsgLevel::INFO);
-	void log(const unsigned long msg, MsgLevel lvl = MsgLevel::INFO);
-	void log(size_t msg, MsgLevel lvl = MsgLevel::INFO);
-	void log(int msg, MsgLevel lvl = MsgLevel::INFO);
-	void log(const double msg, MsgLevel lvl = MsgLevel::INFO);
-	void warn(const std::string& msg);
+	inline HANDLE io_handle           = nullptr;
+	inline bool handle_supports_color = false;
 
-	void assert_msg(const std::string& msg, const std::string& file, long line);
-	void assert_msg_win(const std::string& msg, const std::string& file, long line);
-	void assert_msg(const std::wstring& msg, const std::string& file, long line);
-	void assert_msg_win(const std::wstring& msg, const std::string& file, long line);
+	const std::wstring info_string = L"[Info|";
+	const std::wstring info_color = L"[\033[36mInfo\033[0m|";
+
+	const std::wstring warning_string = L"[Warning|";
+	const std::wstring warning_color = L"[\033[33mWarning\033[0m|";
+
+	const std::wstring error_string = L"[Error|";
+	const std::wstring error_color = L"[\033[31mError\033[0m|";
+
+
+	template <typename T>
+	concept Streamable = (requires(std::wstringstream & s, T val) {
+		s << val;
+	} or std::convertible_to<T, std::string>) and !std::is_enum_v<T>;
+
+	template <typename T>
+	concept StreamableContainer = requires(T arr) {
+		{
+			arr.begin()
+		} -> std::same_as<typename T::iterator>;
+		{
+			arr.end()
+		} -> std::same_as<typename T::iterator>;
+		{
+			arr.size()
+		} -> std::same_as<size_t>;
+	} and !std::convertible_to<T, std::wstring> and !std::convertible_to<T, std::string>;
+
+	/// <summary>
+	/// https://stackoverflow.com/questions/68443804/c20-concept-to-check-tuple-like-types
+	/// </summary>
+	template<class T, std::size_t N>
+	concept has_tuple_element = requires(T t) {
+		typename std::tuple_element_t<N, std::remove_const_t<T>>;
+		std::get<N>(t);
+
+	};
+
+	template<class T>
+	concept StreamableTuple = !std::is_reference_v<T> and requires(T t) {
+		typename std::tuple_size<T>::type;
+		requires std::derived_from<std::tuple_size<T>, std::integral_constant<std::size_t, std::tuple_size_v<T>>>;
+	} and
+		[]<std::size_t... N>(std::index_sequence<N...>) {
+		return (has_tuple_element<T, N> and ...);
+	} (std::make_index_sequence<std::tuple_size_v<T>>());
+
+	template <class T>
+	concept StreamableEnum = std::is_enum_v<T>;
+
+	template <class T>
+	concept StreamableOptional = requires(T t) {
+		t.value();
+		t.has_value();
+	} and std::convertible_to<T, std::optional<T>>;
+
+	/// <summary>
+	/// Base case
+	/// </summary>
+	inline void process_msg() {}
+
+
+	// Weird behaviour: If a string is passed into process_msg it will be considered as a
+	// Streamable but if it's inside of a template like e.g. std::pair<T, std::string> it
+	// need this function or else it doesn't find anything. I'm really confused by this.
+	inline void process_msg(std::string msg) {
+		auto size = MultiByteToWideChar(CP_UTF8, 0, msg.c_str(), -1, NULL, 0);
+		std::wstring wide(size, 0);
+		MultiByteToWideChar(CP_UTF8, 0, msg.c_str(), -1, &wide[0], size);
+		intermediate_stream << wide;
+	}
+
+	template <StreamableEnum T>
+	void process_msg(T msg) {
+		intermediate_stream << magic_enum::enum_name(msg);
+	}
+
+	template <Streamable T>
+	void process_msg(T msg) {
+		intermediate_stream << msg;
+	}
+
+	template <StreamableTuple T>
+	void process_msg(T msg);
+	template <StreamableOptional T>
+	void process_msg(T msg);
+
+	template <StreamableContainer T>
+	void process_msg(T arr) {
+		size_t size = arr.size();
+		intermediate_stream << "[";
+		for (const auto& i : arr) {
+			process_msg(i);
+			intermediate_stream << (--size > 0 ? ", " : "");
+		}
+		intermediate_stream << "]";
+	}
+
+	template <StreamableTuple T>
+	void process_msg(T msg) {
+		size_t size = std::tuple_size<T>{};
+		intermediate_stream << "{";
+		std::apply([&](auto&&... args) {
+			size_t index = 0;
+			((process_msg(args), intermediate_stream << (++index < size ? ", " : "")), ...);
+			}, msg);
+		intermediate_stream << "}";
+	}
+
+	template <StreamableOptional T>
+	void process_msg(T msg) { 
+		if (msg.has_value()) { 
+			process_msg(msg.value());
+		}
+		else {
+			intermediate_stream << "<std::nullopt>";
+		}
+	}
+
+	template<typename T, typename... Targ>
+	void process_msg(T first, Targ... args) {
+		process_msg(first);
+		process_msg(args...);
+	}
+
+	// Time
+	inline void get_current_time(std::wstringstream& s) {
+		auto now = std::chrono::system_clock::now();
+		auto in_time_t = std::chrono::system_clock::to_time_t(now);
+		auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
+		std::tm* local = new std::tm;
+		localtime_s(local, &in_time_t);
+		s << std::put_time(local, L"%X") << L":" << std::setfill(L'0') << std::setw(3) << milliseconds.count();
+		delete local;
+	}
+
 	
-	void set_console_handle(HANDLE handle);
-	void print_to_console(bool clear = true);
+	void print_intermediate_stream(std::wstringstream& s);
 
-	void print_to_debug(bool clear = true);
+	template<typename T, typename... Targ>
+	void create_msg(MSG_LEVEL level, T first, Targ... args) {
+		// lock the mutex
+		std::lock_guard<std::recursive_mutex> lock(log_mutex); 
+		// First process the messages 
+		process_msg(first, args...);
+		std::wstringstream temp_stream;
 
-	void clear();
+		// get the time and add the string
+		switch (level) {
+		case Logger::_INFO:
+			process_msg_stream << info_string;
+			temp_stream << info_string;
+			break;
+		case Logger::_WARNING:
+			process_msg_stream << warning_string;
+			temp_stream << warning_string;
+			break;
+		case Logger::_ERROR:
+			process_msg_stream << error_string;
+			temp_stream << error_string;
+			break;
+		case Logger::_NONE: 
+			goto NO_FORMATING;
+			break;
+		default:
+			break;
+		}
 
-	const std::wstring get_all_msg();
-}
+		get_current_time(process_msg_stream);
+		get_current_time(temp_stream);
+
+		process_msg_stream << "]: ";
+		temp_stream << "]: ";
+
+	NO_FORMATING:
+
+		process_msg_stream << intermediate_stream.str() << "\n";
+		temp_stream << intermediate_stream.str() << "\n";
+
+
+		print_intermediate_stream(temp_stream);
+
+		// clear the intermediate stream
+		intermediate_stream.str(L"");
+	}
+
+	inline void clear_stream() {
+		process_msg_stream.str(L"");
+	}
+
+	inline void set_handle(HANDLE h, bool add_color = false) {
+		io_handle = h;
+		handle_supports_color = add_color;
+	}
+
+	inline void add_color_to_string(std::wstring& s) {
+		auto replaceAll = [&s](const std::wstring what, const std::wstring to) {
+			size_t pos = 0;
+			while ((pos = s.find(what, pos)) != std::string::npos) {
+				s.replace(pos, what.length(), to);
+				pos += to.length(); // In case 'to' contains 'from', like replacing 'x' with 'yx'
+			}
+			};
+
+		replaceAll(info_string, info_color);
+		replaceAll(warning_string, warning_color);
+		replaceAll(error_string, error_color);
+	}
+
+	inline void write_to_handle(bool clear = false, HANDLE h = nullptr, std::wstringstream& s = process_msg_stream) {
+		HANDLE cur_io_handle = h == nullptr ? io_handle : h;
+		if (cur_io_handle == nullptr) {
+			return;
+		}
+
+		if (!handle_supports_color) {
+			WriteFile(cur_io_handle, s.str().c_str(), (DWORD)(s.str().size() * sizeof(wchar_t)), NULL, NULL);
+		}
+		else {
+			// Add color
+			std::wstring temp = s.str();
+			add_color_to_string(temp);
+			WriteFile(cur_io_handle, temp.c_str(), (DWORD)(temp.size() * sizeof(wchar_t)), NULL, NULL);
+		}
+
+		if (clear) {
+			clear_stream();
+		}
+	}
+
+	inline void write_to_debug(bool clear = false, std::wstringstream& s = process_msg_stream) {
+		OutputDebugString(s.str().c_str());
+		if (clear) {
+			clear_stream();
+		}
+	}
+
+	inline void print_intermediate_stream(std::wstringstream& s) {
+		write_to_handle(false, io_handle, s);
+		write_to_debug(false, s);
+	}
+
+	template<typename T, typename... Targ>
+	void unformated_log(T first, Targ... args) {
+		create_msg(MSG_LEVEL::_NONE, first, args...);
+	}
+
+	template<typename T, typename... Targ>
+	void log(T first, Targ... args) {
+		create_msg(MSG_LEVEL::_INFO, first, args...);
+	}
+
+	template<typename T, typename... Targ>
+	void warn(T first, Targ... args) {
+		create_msg(MSG_LEVEL::_WARNING, first, args...);
+	}
+
+	template<typename T, typename... Targ>
+	void error(T first, Targ... args) {
+		create_msg(MSG_LEVEL::_ERROR, first, args...);
+	}
+};
 
 namespace Renderer { 
 	template <typename T>
@@ -412,6 +673,18 @@ namespace Renderer {
 
 	};
 }
+
+// Overload the stringstream operator for Point and Rectangle
+template <typename T>
+auto& operator<<(std::wstringstream& s, const Renderer::Point<T> p) {
+    return s << L"(x=" << p.x << L", y=" << p.y << L")"; 
+}
+
+template <typename T>
+auto& operator<<(std::wstringstream& s, const Renderer::Rectangle<T>& rect) {
+    return s << L"(x=" << rect.x << L", y=" << rect.y << L", width=" << rect.width << L", height=" << rect.height << L")";
+}
+
 
 template <typename T>
 Renderer::Point<T> operator*(Renderer::Point<T> p , T f) {
@@ -1068,8 +1341,8 @@ private:
 	std::thread m_preview_bitmap_thread;
 	std::atomic_bool m_preview_bitmaps_processed = false;
 	std::atomic_bool m_display_list_processed    = false;
-	std::atomic_uint m_display_list_amount_processed = 0; 
-	std::atomic_uint m_display_list_amount_processed_total = 0;
+	std::atomic_size_t m_display_list_amount_processed = 0;
+	std::atomic_size_t m_display_list_amount_processed_total = 0;
 
 	// High res rendering
 	std::shared_ptr<ThreadSafeVector<DisplayListContent>> m_display_list;
@@ -1503,13 +1776,16 @@ public:
 };
 
 #ifndef NDEBUG
-#define ASSERT(x, y)                       if (!(x)) { Logger::assert_msg(y, __FILE__, __LINE__); __debugbreak(); }
-#define ASSERT_WIN(x,y)                    if (!(x)) { Logger::assert_msg_win(y, __FILE__, __LINE__); __debugbreak(); }
-#define ASSERT_WITH_STATEMENT(x, y, z)     if (!(x)) { Logger::assert_msg(y, __FILE__, __LINE__); __debugbreak(); z; }
-#define ASSERT_WIN_WITH_STATEMENT(x, y, z) if (!(x)) { Logger::assert_msg_win(y, __FILE__, __LINE__); __debugbreak(); z; }
-#define ASSERT_WIN_RETURN_FALSE(x,y)       if (!(x)) { Logger::assert_msg_win(y, __FILE__, __LINE__); __debugbreak(); return false; }
-#define ASSERT_RETURN_NULLOPT(x,y)         if (!(x)) { Logger::assert_msg(y, __FILE__, __LINE__); __debugbreak(); return std::nullopt; }
-#define ASSERT_WIN_RETURN_NULLOPT(x,y)     if (!(x)) { Logger::assert_msg_win(y, __FILE__, __LINE__); __debugbreak(); return std::nullopt; }
+#define WIN_ERROR_MSG(...) Logger::error(__VA_ARGS__, " with Windows Error: \"", get_win_msg(), "\" in File:\"", __FILE__, "\" Line: ", __LINE__);
+#define ERROR_MSG(...)     Logger::error(__VA_ARGS__, "in File:\"", __FILE__, "\" Line: ", __LINE__);
+#define ASSERT(x, ...)                       if (!(x)) {  ERROR_MSG(__VA_ARGS__);     __debugbreak(); } 
+#define ASSERT_WIN(x,...)                    if (!(x)) {  WIN_ERROR_MSG(__VA_ARGS__); __debugbreak(); }
+#define ASSERT_WITH_STATEMENT(x, y, ...)     if (!(x)) {  ERROR_MSG(__VA_ARGS__);     __debugbreak(); y; }
+#define ASSERT_WIN_WITH_STATEMENT(x, y, ...) if (!(x)) {  WIN_ERROR_MSG(__VA_ARGS__); __debugbreak(); y; }
+#define ASSERT_RETURN_FALSE(x, ...)          if (!(x)) {  ERROR_MSG(__VA_ARGS__);     __debugbreak(); return false; }
+#define ASSERT_WIN_RETURN_FALSE(x, ...)      if (!(x)) {  WIN_ERROR_MSG(__VA_ARGS__); __debugbreak(); return false; }
+#define ASSERT_RETURN_NULLOPT(x,...)         if (!(x)) {  ERROR_MSG(__VA_ARGS__);     __debugbreak(); return std::nullopt; }
+#define ASSERT_WIN_RETURN_NULLOPT(x, ...)    if (!(x)) {  WIN_ERROR_MSG(__VA_ARGS__); __debugbreak(); return std::nullopt; }
 #else
 #define ASSERT(x, y)
 #define ASSERT_WIN(x,y) 

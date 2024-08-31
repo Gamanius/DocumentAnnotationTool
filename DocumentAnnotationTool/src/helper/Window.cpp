@@ -433,13 +433,6 @@ LRESULT WindowHandler::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam
 		}
 		return DefWindowProc(hWnd, uMsg, wParam, lParam);
 	}
-	case WM_PDF_BITMAP_READY:
-	{
-		if (currentInstance->m_callback_paint) {
-			currentInstance->m_callback_paint((std::vector<CachedBitmap*>*)lParam);
-		}
-		return NULL;
-	}
 	// TODO add wm_ncpaint
 	case WM_PAINT: 
 	{
@@ -448,6 +441,20 @@ LRESULT WindowHandler::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam
 		}
 
 		ValidateRect(currentInstance->m_hwnd, NULL);
+		return NULL;
+	}
+	case WM_DPICHANGED:
+	{
+		Logger::log("DPI changed to ", HIWORD(wParam));
+		
+		break;
+	}
+	// custom messages
+	case WM_PDF_BITMAP_READY:
+	{
+		if (currentInstance->m_callback_paint) {
+			currentInstance->m_callback_paint((std::vector<CachedBitmap*>*)lParam);
+		}
 		return NULL;
 	}
 	case WM_CUSTOM_MESSAGE:
@@ -603,9 +610,9 @@ bool WindowHandler::init(std::wstring windowName, HINSTANCE instance) {
 	m_dpi = GetDpiForWindow(m_hwnd);
 	if (m_dpi == 0) {
 		m_dpi = 96;
-		Logger::warn("Could not retrieve DPI");
+		//Logger::warn("Could not retrieve DPI");
 	}
-	Logger::log("Retrieved DPI: " + std::to_string(m_dpi));
+	//Logger::log("Retrieved DPI: " + std::to_string(m_dpi));
 
 	// add this windows to the window stack
 	m_allWindowInstances->operator[](m_hwnd) = this;

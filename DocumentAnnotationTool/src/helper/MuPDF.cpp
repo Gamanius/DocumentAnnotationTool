@@ -33,7 +33,7 @@ std::optional<MuPDFHandler::PDF> MuPDFHandler::load_pdf(const std::wstring& path
 
 	// load the pdf 
 	auto file = FileHandler::open_file(path);
-	ASSERT_RETURN_NULLOPT(file.has_value(), L"Could not open file " + path);
+	ASSERT_RETURN_NULLOPT(file.has_value(), L"Could not open file ", path);
 
 	auto stream = fz_open_memory(*ctx, file.value().data, file.value().size);
 	auto doc = fz_open_document_with_stream(*ctx, ".pdf", stream);
@@ -41,7 +41,7 @@ std::optional<MuPDFHandler::PDF> MuPDFHandler::load_pdf(const std::wstring& path
 	auto d = std::shared_ptr<DocumentWrapper>(new DocumentWrapper(m_context, doc));
 	fz_drop_stream(*ctx, stream);
 
-	ASSERT_RETURN_NULLOPT(doc != nullptr, L"Could not open document " + path); 
+	ASSERT_RETURN_NULLOPT(doc != nullptr, L"Could not open document ", path); 
 
 	auto pdf = PDF(m_context, d);
 	pdf.data = file.value().data;

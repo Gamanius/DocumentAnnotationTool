@@ -18,9 +18,6 @@
     <ClCompile Include="src\main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\helper\Logger.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\helper\Window.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -94,5 +91,6 @@
     <None Include="rsc\Ghent_PDF_Output_Suite_V50_Testpages\GhentPDFOutputSuite50_ReadMes.pdf" />
     <None Include="TODO.md" />
     <None Include="rsc\Annotation pdf.pdf" />
+    <None Include="..\README.md" />
   </ItemGroup>
 </Project>

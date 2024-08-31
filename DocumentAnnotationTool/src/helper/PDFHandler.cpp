@@ -98,6 +98,7 @@ Direct2DRenderer::BitmapObject PDFRenderHandler::get_bitmap(Direct2DRenderer& re
 }
 
 void PDFRenderHandler::create_display_list() {
+	Logger::log(L"Start creating Display List");
 	// for each rec create a display list
 	fz_display_list* list_annot   = nullptr;
 	fz_display_list* list_widget  = nullptr;
@@ -124,7 +125,7 @@ void PDFRenderHandler::create_display_list() {
 		// we have to do a fz call since we want to use the ctx.
 		// we can't use any other calls (like m_pdf->get_page()) since we would need to create a ctx
 		// wrapper which would be overkill for this scenario.
-		auto p = fz_load_page(copy_ctx, *doc, i);
+		auto p = fz_load_page(copy_ctx, *doc, static_cast<int>(i));
 		fz_try(copy_ctx) {
 			// create a display list with all the draw calls and so on
 			list_annot   = fz_new_display_list(copy_ctx, fz_bound_page(copy_ctx, p));
@@ -170,6 +171,7 @@ void PDFRenderHandler::create_display_list() {
 	m_render_queue_condition_var.notify_all(); 
 	PostMessage(m_window->get_hwnd(), WM_PAINT, (WPARAM)nullptr, (LPARAM) nullptr); 
 	PostMessage(m_window->get_hwnd(), WM_CUSTOM_MESSAGE, CUSTOM_WM_MESSAGE::PDF_HANDLER_DISPLAY_LIST_UPDATE, (LPARAM)nullptr); 
+	Logger::log(L"Finished Displaylist");
 }
 
 PDFRenderHandler::PDFRenderHandler(MuPDFHandler::PDF* const pdf, Direct2DRenderer* const renderer, WindowHandler* const window, size_t amount_threads) : m_pdf(pdf), m_renderer(renderer), m_window(window) {
@@ -186,14 +188,8 @@ PDFRenderHandler::PDFRenderHandler(MuPDFHandler::PDF* const pdf, Direct2DRendere
 	m_render_queue = std::shared_ptr<ThreadSafeDeque<std::shared_ptr<RenderInfo>>>
 		(new ThreadSafeDeque<std::shared_ptr<RenderInfo>>(std::deque<std::shared_ptr<RenderInfo>>())); 
 
-
-	// init of m_pdf->get_pagerec()
-	// init of m_previewBitmaps
-	//create_preview(1); // create preview with default scale
-
-
 	m_display_list_thread = std::thread([this] { create_display_list(); });
-	m_preview_bitmap_thread = std::thread([this] { create_preview(0.1); });
+	m_preview_bitmap_thread = std::thread([this] { create_preview(0.1f); });
 
 	for (size_t i = 0; i < amount_threads; i++) {
 		m_render_threads.push_back(std::thread([this] { async_render(); }));
@@ -201,6 +197,7 @@ PDFRenderHandler::PDFRenderHandler(MuPDFHandler::PDF* const pdf, Direct2DRendere
 }
 
 void PDFRenderHandler::create_preview(float scale) {
+	Logger::log(L"Start creating Preview Bitmaps");
 	{
 		auto prev = m_preview_bitmaps->get_write();
 		prev->clear();
@@ -227,11 +224,12 @@ void PDFRenderHandler::create_preview(float scale) {
 
 	m_preview_scale = scale;
 	m_preview_bitmaps_processed = true;
+	Logger::log(L"Finished creating Preview Bitmaps");
 }
 
 template<typename T>
 void remove_small_rects(std::vector <Renderer::Rectangle<T>>& rects, float threshold = EPSILON) {
-	for (int i = rects.size() - 1; i >= 0; i--) {
+	for (long i = static_cast<long>(rects.size() - 1); i >= 0; i--) {
 		rects.at(i).validate();
 		if (rects.at(i).width < threshold or rects.at(i).height < threshold) {
 			rects.erase(rects.begin() + i);
@@ -281,7 +279,7 @@ std::vector<Renderer::Rectangle<float>> PDFRenderHandler::render_job_splice_recs
 void PDFRenderHandler::update_render_queue() {
 	// remove items that are finished
 	auto queue = m_render_queue->get_write();
-	for (int i = queue->size() - 1; i >= 0; i--) {
+	for (long i = static_cast<long>(queue->size() - 1); i >= 0; i--) {
 		if (queue->at(i)->stat == RenderInfo::STATUS::FINISHED or queue->at(i)->stat == RenderInfo::STATUS::ABORTED)
 			queue->erase(queue->begin() + i); 
 	}
@@ -438,7 +436,7 @@ void PDFRenderHandler::remove_unused_queue_items() {
 	auto render_queue = m_render_queue->get_write();
 	auto dpi		  = m_renderer->get_dpi() * m_renderer->get_transform_scale();
 
-	for (int i = render_queue->size() - 1; i >= 0; i--) {
+	for (long i = static_cast<long>(render_queue->size() - 1); i >= 0; i--) {
 		auto& queue_item = render_queue->at(i);
 		auto rec_docspace = queue_item->overlap_in_docspace;
 		rec_docspace.x += page_rec->at(queue_item->page).x;
@@ -648,7 +646,7 @@ void PDFRenderHandler::remove_small_cached_bitmaps(float treshold) {
 	if (cached_bitmaps->size() == 0)
 		return;
 
-	for (int i = cached_bitmaps->size() - 1; i >= 0; i--) {
+	for (long i = static_cast<long>(cached_bitmaps->size() - 1); i >= 0; i--) {
 		if ((cached_bitmaps->at(i).doc_coords.width < treshold or cached_bitmaps->at(i).doc_coords.height < treshold) and cached_bitmaps->at(i).used == 0) {
 			cached_bitmaps->erase(cached_bitmaps->begin() + i);
 		}
@@ -736,15 +734,7 @@ void PDFRenderHandler::render(RenderInstructions instruct) {
 
 	if (instruct.render_preview) {
 		render_preview();
-	}
 
-	if (scale > m_preview_scale + EPSILON and m_preview_bitmaps_processed and instruct.render_highres) {
-		// if we are zoomed in, we need to render the page at a higher resolution
-		// than the screen resolution
-		render_high_res(instruct); 
-	}
-
-	if (instruct.render_highres) {
 		auto cached = m_cachedBitmaps->get_write();
 		// add all bitmaps into an array so it can be send to the main window
 		std::vector<CachedBitmap*> temp_cachedBitmaps;
@@ -753,6 +743,12 @@ void PDFRenderHandler::render(RenderInstructions instruct) {
 		}
 		// we can send some of the cached bitmaps already to the window
 		SendMessage(m_window->get_hwnd(), WM_PDF_BITMAP_READY, (WPARAM)nullptr, (LPARAM)(&temp_cachedBitmaps));
+	}
+
+	if (scale > m_preview_scale + EPSILON and m_preview_bitmaps_processed and instruct.render_highres) {
+		// if we are zoomed in, we need to render the page at a higher resolution
+		// than the screen resolution
+		render_high_res(instruct); 
 	}
 }
 

@@ -14,7 +14,7 @@ Direct2DRenderer::Direct2DRenderer(const WindowHandler& w) {
 	D2D1_FACTORY_OPTIONS option{};
 
 #ifdef _DEBUG
-		option.debugLevel = D2D1_DEBUG_LEVEL_INFORMATION;
+	option.debugLevel = D2D1_DEBUG_LEVEL_INFORMATION;
 #else
 	option.debugLevel = D2D1_DEBUG_LEVEL_NONE;
 #endif // _DEBUG
@@ -276,8 +276,7 @@ Direct2DRenderer::BrushObject Direct2DRenderer::create_brush(Renderer::Color c) 
 	BrushObject obj;
 	ID2D1SolidColorBrush* brush = nullptr; 
 	auto result = m_renderTarget->CreateSolidColorBrush(c, &brush);
-
-	ASSERT(result == S_OK, "Could not create brush!");
+	ASSERT_WIN(result == S_OK, "Could not create brush!");
 	obj.m_object = brush;
 
 	return std::move(obj);
@@ -293,24 +292,24 @@ Direct2DRenderer::BitmapObject Direct2DRenderer::create_bitmap(const std::wstrin
 	ID2D1Bitmap* pBitmap = nullptr; 
 
 	auto hr = CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_IWICImagingFactory, reinterpret_cast<void**>(&pWICFactory)); 
-	ASSERT_WITH_STATEMENT(hr == S_OK, "Could not create WIC factory!", goto REALEASE; );
+	ASSERT_WITH_STATEMENT(hr == S_OK, goto REALEASE;, "Could not create WIC factory!");
 
 	// Load the bitmap using WIC
 	hr = pWICFactory->CreateDecoderFromFilename(path.c_str(), nullptr, GENERIC_READ, WICDecodeMetadataCacheOnLoad, &pDecoder);
-	ASSERT_WITH_STATEMENT(hr == S_OK, "Could not create WIC decoder!", goto REALEASE; );
+	ASSERT_WITH_STATEMENT(hr == S_OK, goto REALEASE;, "Could not create WIC decoder!");
 
 	hr = pDecoder->GetFrame(0, &pFrame); 
-	ASSERT_WITH_STATEMENT(hr == S_OK, "Could not get frame from WIC decoder!", pDecoder->Release(); pWICFactory->Release(); goto REALEASE; );
+	ASSERT_WITH_STATEMENT(hr == S_OK, pDecoder->Release(); pWICFactory->Release(); goto REALEASE;, "Could not get frame from WIC decoder!");
 
 	// Create converter 
 	hr = pWICFactory->CreateFormatConverter(&pConverter);
-	ASSERT_WITH_STATEMENT(hr == S_OK, "Could not create WIC format converter!",  goto REALEASE; );
+	ASSERT_WITH_STATEMENT(hr == S_OK, goto REALEASE;, "Could not create WIC format converter!");
 	hr = pConverter->Initialize(pFrame, GUID_WICPixelFormat32bppPBGRA, WICBitmapDitherTypeNone, NULL, 0.f, WICBitmapPaletteTypeCustom);
-	ASSERT_WITH_STATEMENT(hr == S_OK, "Could not initialize WIC format converter!", goto REALEASE; );
+	ASSERT_WITH_STATEMENT(hr == S_OK, goto REALEASE;, "Could not initialize WIC format converter!");
 
 	// Convert the WIC bitmap to Direct2D bitmap
 	hr = m_renderTarget->CreateBitmapFromWicBitmap(pConverter, nullptr, &pBitmap); 
-	ASSERT_WITH_STATEMENT(hr == S_OK, "Could not create Direct2D bitmap!", goto REALEASE; );
+	ASSERT_WITH_STATEMENT(hr == S_OK, goto REALEASE;, "Could not create Direct2D bitmap!");
 	obj.m_object = pBitmap;
 
 REALEASE:

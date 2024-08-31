@@ -90,7 +90,7 @@ void callback_key_up(WindowHandler::VK k) {
 			g_main_renderer->add_scale_matrix(1.25, mouse_pos);
 		}
 		else if (k == WindowHandler::VK::OEM_MINUS) {
-			g_main_renderer->add_scale_matrix(0.8, mouse_pos);
+			g_main_renderer->add_scale_matrix(0.8f, mouse_pos);
 
 		}
 	}
@@ -152,6 +152,7 @@ void callback_mousewheel(short delta, bool hwheel, Renderer::Point<int> center) 
 }
 
 void main_window_loop_run(HINSTANCE h) {
+	Logger::log("Initializing main window loop");
 	g_main_window = std::make_unique<WindowHandler>(APPLICATION_NAME, h);
 
 	g_main_renderer = std::make_unique<Direct2DRenderer>(*g_main_window.get());
@@ -163,6 +164,7 @@ void main_window_loop_run(HINSTANCE h) {
 	g_mupdfcontext = std::shared_ptr<MuPDFHandler>(new MuPDFHandler);
 
 	auto path = FileHandler::open_file_dialog(L"PDF\0*.pdf\0\0", *g_main_window);
+	Logger::log(L"Trying to open ", path);
 
 	if (!path.has_value()) {
 		return;
@@ -192,11 +194,12 @@ void main_window_loop_run(HINSTANCE h) {
 	while(!g_main_window->close_request()) {
 		g_main_window->get_window_messages(true);
 	}
-	
+	Logger::log(L"Got close request. Cleaning up...");
 	// this is creating a 1 byte memory leak
 	std::thread t([] {
 		std::this_thread::sleep_for(std::chrono::seconds(2));
 		// abort if normal cleanup is not possible
+		Logger::error("Could not cleanup in time. Aborting...");
 		abort();
 	});
 	t.detach();
