@@ -15,15 +15,14 @@ Timer& Timer::operator=(Timer other) {
 	return *this;
 }
 
-Timer& Timer::operator=(Timer&& other) noexcept {
-	swap(*this, other); 
-	return *this;
-}
-
 Timer::~Timer() { }
 
 long long Timer::delta_ns() const {
 	return delta<std::chrono::nanoseconds>();
+}
+
+long long Timer::delta_us() const {
+	return delta<std::chrono::microseconds>();
 }
 
 long long Timer::delta_ms() const {

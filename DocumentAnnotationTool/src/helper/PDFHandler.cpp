@@ -138,9 +138,17 @@ void PDFRenderHandler::create_display_list() {
 			dev_content  = fz_new_list_device(copy_ctx, list_content);
 
 			// run all three devices
+			Timer time2;
 			fz_run_page_annots(copy_ctx, p, dev_annot, fz_identity, nullptr);
+			Logger::log("Page ", i + 1, " Annots Rendered in ", time2);
+
+			time2 = Timer();
 			fz_run_page_widgets(copy_ctx, p, dev_widget, fz_identity, nullptr);
+			Logger::log("Page ", i + 1, " Widgets Rendered in ", time2);
+
+			time2 = Timer();
 			fz_run_page_contents(copy_ctx, p, dev_content, fz_identity, nullptr);
+			Logger::log("Page ", i + 1, " Content Rendered in ", time2);
 
 			// add list to array
 			DisplayListContent c;
@@ -495,9 +503,6 @@ void PDFRenderHandler::async_render() {
 	{
 		auto list_array = m_display_list->get_read();
 		for (size_t i = 0; i < list_array->size(); i++) {
-			// retrieve list
-			auto list = list_array->at(i).m_page_annots;  
-
 			// do the copy operation
 			auto copy_list = [ctx](fz_display_list* list) { 
 				fz_display_list* ls = fz_new_display_list(ctx, (list)->mediabox); 
@@ -612,7 +617,7 @@ void PDFRenderHandler::async_render() {
 			info->stat = RenderInfo::STATUS::FINISHED;
 
 			// time it
-			if (time.delta_s() > 3) {
+			if (time.delta_s() > 2) {
 				Logger::warn("Rendering page ", info->page + 1, " took ", time);
 			}
 

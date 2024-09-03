@@ -33,6 +33,7 @@
 #include "../dependecies/magic_enum/magic_enum.hpp"
 #include "ReadWriteRecursiveMutex.h"
 #include "mupdf/fitz.h"
+#include "mupdf/pdf.h"
 
 #define APPLICATION_NAME L"Docanto"
 #define EPSILON 0.00001f
@@ -501,7 +502,6 @@ public:
     Timer(const Timer& other);
     Timer(Timer&& other) noexcept;
     Timer& operator=(Timer other);
-    Timer& operator=(Timer&& other) noexcept;
     ~Timer(); 
 
 	template<typename T> 
@@ -537,10 +537,18 @@ namespace Renderer {
 		template <typename W>
 		Point(Point<W> p) : x((T)p.x), y((T)p.y) {}
 		Point(D2D1_POINT_2F p) : x((T)p.x), y((T)p.y) {}
+		Point(fz_point p) : x((T)p.x), y((T)p.y) {}
 		Point(T x, T y) : x(x), y(y) {}
 
 		operator D2D1_POINT_2F() const {
 			return D2D1::Point2F(x, y);
+		}
+
+		operator fz_point() const {
+			fz_point p;
+			p.x = x;
+			p.y = y;
+			return p;
 		}
 
 		operator std::wstring() const {
@@ -600,6 +608,54 @@ namespace Renderer {
 	template <typename T, typename W>
 	Point<T> operator*(W f, Point<T> p) {
 		return { p.x * static_cast<T>(f), p.y * static_cast<T>(f) };
+	}
+
+	/// <summary>
+	/// This function checks if two line segments intersects. It is copied on the code from https://www.geeksforgeeks.org/check-if-two-given-line-segments-intersect/
+	/// </summary>
+	/// <param name="p1">First point from the first segment</param>
+	/// <param name="q1">Second point from the first segment</param>
+	/// <param name="p2">First point from the seconds segment</param>
+	/// <param name="q2">Second point from the second segment</param>
+	/// <returns></returns>
+	template <typename T>
+	inline bool line_segment_intersects(Point<T> p1, Point<T> q1, Point<T> p2, Point<T> q2) {
+		auto orientation = [](Point<T> p, Point<T> q, Point<T> r) {
+				T val = (q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y);
+				if (val == 0) return 0;  
+				return (val > 0) ? 1 : 2; 
+			};
+
+		auto onSegment = [](Point<T> p, Point<T> q, Point<T> r) {
+			if (q.x <= max(p.x, r.x) and q.x >= min(p.x, r.x) and
+				q.y <= max(p.y, r.y) and q.y >= min(p.y, r.y))
+				return true;
+			return false;
+			};
+
+		int o1 = orientation(p1, q1, p2);
+		int o2 = orientation(p1, q1, q2);
+		int o3 = orientation(p2, q2, p1);
+		int o4 = orientation(p2, q2, q1);
+
+		// General case 
+		if (o1 != o2 && o3 != o4)
+			return true;
+
+		// Special Cases 
+		// p1, q1 and p2 are collinear and p2 lies on segment p1q1 
+		if (o1 == 0 && onSegment(p1, p2, q1)) return true;
+
+		// p1, q1 and q2 are collinear and q2 lies on segment p1q1 
+		if (o2 == 0 && onSegment(p1, q2, q1)) return true;
+
+		// p2, q2 and p1 are collinear and p1 lies on segment p2q2 
+		if (o3 == 0 && onSegment(p2, p1, q2)) return true;
+
+		// p2, q2 and q1 are collinear and q1 lies on segment p2q2 
+		if (o4 == 0 && onSegment(p2, q1, q2)) return true;
+
+		return false; // Doesn't fall in any of the above cases 
 	}
 
 	template <typename T>
@@ -1379,6 +1435,7 @@ class MuPDFHandler {
 	static void lock_mutex(void* user, int lock);
 	static void unlock_mutex(void* user, int lock);
 	static void error_callback(void* user, const char* message);
+	static void warning_callback(void* user, const char* message);
 public:
 
 	struct PDF : public FileHandler::File {
@@ -1386,6 +1443,8 @@ public:
 		// Pointer to the context from the MuPDFHandler
 		std::shared_ptr<ContextWrapper> m_ctx;
 		std::shared_ptr<DocumentWrapper> m_document;
+		// TODO
+		std::shared_ptr<ThreadSafeVector<PageWrapper>> m_pages;
 
 		// Position and dimensions of the pages 
 		std::shared_ptr<ThreadSafeVector<Renderer::Rectangle<float>>> m_pagerec;
@@ -1923,17 +1982,22 @@ public:
 
 class StrokeHandler {
 	struct Stroke {
+		std::shared_ptr<ContextWrapper> ctx;
 		std::vector<Renderer::Point<float>> points;
+		pdf_annot* annot = nullptr;
+		size_t page = 0; 
 		Renderer::CubicBezierGeometry geometry;
+		Renderer::Rectangle<float> bounding_box;
 		Direct2DRenderer::PathObject path;
 		float thickness = 1.0f;
 		Renderer::Color color = { 0, 0, 0 };  
-
+		bool to_be_earesed = false;
 
 		Stroke() = default;
 		Stroke(const Stroke& s) = delete;
 		Stroke(Stroke&& s) noexcept;
 		Stroke& operator=(Stroke s) noexcept;
+		~Stroke();
 
 		friend void swap(Stroke& first, Stroke& second) {
 			using std::swap;
@@ -1943,17 +2007,29 @@ class StrokeHandler {
 			swap(first.color, second.color); 
 			swap(first.path, second.path);
 			swap(first.geometry, second.geometry);
+			swap(first.page, second.page);
+			swap(first.annot, second.annot);
+			swap(first.ctx, second.ctx);
+			swap(first.bounding_box, second.bounding_box);
+			swap(first.to_be_earesed, second.to_be_earesed);
 		}
 	};
 
 	std::vector<Stroke> m_strokes;
 	std::map<UINT, Stroke> m_active_strokes;
+	// earising strokes
+	std::vector<Renderer::Point<float>> m_earising_points;
+	std::vector<size_t> m_index_of_earising_points;
 	// not owned by this class
 	MuPDFHandler::PDF* m_pdf = nullptr;
 	// not owned by this class!
 	Direct2DRenderer* m_renderer = nullptr;
 	// not owned by this class!
 	WindowHandler* m_window = nullptr;
+
+	void apply_stroke_to_pdf(Stroke& s);
+	void parse_all_strokes();
+	std::optional<size_t> get_page_from_point(Renderer::Point<float> p);
 
 public:
 	StrokeHandler() = default;
@@ -1971,6 +2047,9 @@ public:
 	void start_stroke(const WindowHandler::PointerInfo& p);
 	void update_stroke(const WindowHandler::PointerInfo& p);
 	void end_stroke(const WindowHandler::PointerInfo& p);
+
+	void earsing_stroke(const WindowHandler::PointerInfo& p);
+	void end_earsing_stroke(const WindowHandler::PointerInfo& p);
 
 	void render_strokes();
 

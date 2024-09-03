@@ -12,7 +12,11 @@ void MuPDFHandler::unlock_mutex(void* user, int lock) {
 }
 
 void MuPDFHandler::error_callback(void* user, const char* message) {
-	ASSERT(false, "Error in MuPDFHandler: " + std::string(message));
+	Logger::error("MuPDF: \"", message, "\"");
+}
+
+void MuPDFHandler::warning_callback(void* user, const char* message) {
+	Logger::warn("MuPDF: \"", message, "\"");
 }
 
 MuPDFHandler::MuPDFHandler() { 
@@ -25,6 +29,7 @@ MuPDFHandler::MuPDFHandler() {
 	auto c = m_context->get_item();
 
 	fz_set_error_callback(*c, error_callback, nullptr);
+	fz_set_warning_callback(*c, warning_callback, nullptr);
 	fz_register_document_handlers(*c);
 }
 

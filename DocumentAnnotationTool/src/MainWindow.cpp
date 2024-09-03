@@ -52,7 +52,7 @@ void callback_draw(std::optional<std::vector<CachedBitmap*>*> highres_bitmaps) {
 	g_strokehandler->render_strokes();
 
 	// selected page
-	g_main_renderer->set_current_transform_active(); 
+	g_main_renderer->set_current_transform_active();
 	auto selected_page = g_gesturehandler.get_selected_page();
 	if (selected_page != std::nullopt) {
 		auto rec = g_pdf->get_pagerec()->get_read();
@@ -132,25 +132,13 @@ void callback_pointer_down(WindowHandler::PointerInfo p) {
 		g_gesturehandler.start_gesture(p);
 	}
 	// handle everything related to the pen
-	if (p.type == WindowHandler::POINTER_TYPE::STYLUS) {
-		g_strokehandler->start_stroke(p);
-	}
-
-	g_main_window->invalidate_drawing_area();
-}
-
-void callback_pointer_up(WindowHandler::PointerInfo p) {
-	if (p.type == WindowHandler::POINTER_TYPE::MOUSE and not p.button3pressed) { 
-		g_gesturehandler.stop_select_page(p); 
-	}
-
-	if (p.type == WindowHandler::POINTER_TYPE::TOUCH) {
-		g_gesturehandler.end_gesture(p);
-	}
-
-	// handle everything related to the pen
-	if (p.type == WindowHandler::POINTER_TYPE::STYLUS) {
-		g_strokehandler->end_stroke(p);
+	if (p.type == WindowHandler::POINTER_TYPE::STYLUS and p.pressure > 0) {
+		if (p.button2pressed) {
+			g_strokehandler->earsing_stroke(p);
+		} 
+		else {
+			g_strokehandler->start_stroke(p);
+		}
 	}
 
 	g_main_window->invalidate_drawing_area();
@@ -166,9 +154,34 @@ void callback_pointer_update(WindowHandler::PointerInfo p) {
 	}
 
 	// handle everything related to the pen
-	if (p.type == WindowHandler::POINTER_TYPE::STYLUS) {
-		g_strokehandler->update_stroke(p);
+	if (p.type == WindowHandler::POINTER_TYPE::STYLUS and p.pressure > 0) {
+		if (p.button2pressed) {
+			g_strokehandler->earsing_stroke(p);
+		} 
+		else {
+			g_strokehandler->update_stroke(p);
+		}
 	}
+
+	g_main_window->invalidate_drawing_area();
+}
+
+
+void callback_pointer_up(WindowHandler::PointerInfo p) {
+	if (p.type == WindowHandler::POINTER_TYPE::MOUSE and not p.button3pressed) { 
+		g_gesturehandler.stop_select_page(p); 
+	}
+
+	if (p.type == WindowHandler::POINTER_TYPE::TOUCH) {
+		g_gesturehandler.end_gesture(p);
+	}
+
+	// handle everything related to the pen
+	if (p.type == WindowHandler::POINTER_TYPE::STYLUS) {
+		g_strokehandler->end_stroke(p);
+		g_strokehandler->end_earsing_stroke(p);
+	}
+
 	g_main_window->invalidate_drawing_area();
 }
 
