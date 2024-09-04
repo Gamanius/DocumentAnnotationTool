@@ -12,13 +12,13 @@ Direct2DRenderer::BitmapObject PDFRenderHandler::get_bitmap(Direct2DRenderer& re
 
 	auto ctx = m_pdf->get_context();
 	auto doc = m_pdf->get_document();
-	auto pag = m_pdf->get_page(*doc, page);
+	auto pag = m_pdf->get_page(page);
 
 	fz_try(*ctx) {
 		pixmap = fz_new_pixmap(*ctx, fz_device_rgb(*ctx), size.width, size.height, nullptr, 1);
 		fz_clear_pixmap_with_value(*ctx, pixmap, 0xff); // for the white background
 		drawdevice = fz_new_draw_device(*ctx, fz_identity, pixmap);
-		fz_run_page(*ctx, pag, drawdevice, ctm, nullptr);
+		fz_run_page(*ctx, *pag, drawdevice, ctm, nullptr);
 		fz_close_device(*ctx, drawdevice);
 		obj = renderer.create_bitmap((byte*)pixmap->samples, size, (unsigned int)pixmap->stride, 96); // default dpi of the pixmap
 	} fz_always(*ctx) {
@@ -45,13 +45,13 @@ Direct2DRenderer::BitmapObject PDFRenderHandler::get_bitmap(Direct2DRenderer& re
 
 	auto ctx = m_pdf->get_context();
 	auto doc = m_pdf->get_document();
-	auto pag = m_pdf->get_page(*doc, page);
+	auto pag = m_pdf->get_page(page);
 
 	fz_try(*ctx) {
 		pixmap = fz_new_pixmap_with_bbox(*ctx, fz_device_rgb(*ctx), bbox, nullptr, 1);
 		fz_clear_pixmap_with_value(*ctx, pixmap, 0xff); // for the white background
 		drawdevice = fz_new_draw_device(*ctx, fz_identity, pixmap);
-		fz_run_page(*ctx, pag, drawdevice, ctm, nullptr);
+		fz_run_page(*ctx, *pag, drawdevice, ctm, nullptr);
 		fz_close_device(*ctx, drawdevice);
 		obj = renderer.create_bitmap((byte*)pixmap->samples, rec, (unsigned int)pixmap->stride, 96); // default dpi of the pixmap
 	} fz_always(*ctx) {
@@ -78,13 +78,13 @@ Direct2DRenderer::BitmapObject PDFRenderHandler::get_bitmap(Direct2DRenderer& re
 	auto ctx = m_pdf->get_context();
 	auto doc = m_pdf->get_document();
 
-	auto pag = m_pdf->get_page(*doc, page); 
+	auto pag = m_pdf->get_page(page); 
 
 	fz_try(*ctx) {
 		pixmap = fz_new_pixmap_with_bbox(*ctx, fz_device_rgb(*ctx), pixmap_size, nullptr, 1);
 		fz_clear_pixmap_with_value(*ctx, pixmap, 0xff); // for the white background
 		drawdevice = fz_new_draw_device(*ctx, fz_identity, pixmap);
-		fz_run_page(*ctx, pag, drawdevice, fz_concat(transform, ctm), nullptr);
+		fz_run_page(*ctx, *pag, drawdevice, fz_concat(transform, ctm), nullptr);
 		fz_close_device(*ctx, drawdevice);
 		obj = renderer.create_bitmap((byte*)pixmap->samples, pixmap_size, (unsigned int)pixmap->stride, dpi); // default dpi of the pixmap
 	} fz_always(*ctx) {

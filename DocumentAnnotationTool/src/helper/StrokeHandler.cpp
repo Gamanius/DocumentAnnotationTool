@@ -20,7 +20,7 @@ void StrokeHandler::apply_stroke_to_pdf(Stroke& s) {
 	auto ctx = m_pdf->get_context();
 	auto page = m_pdf->get_page(s.page); 
 	auto rec = m_pdf->get_pagerec()->get_read()->at(s.page);
-	s.annot = pdf_create_annot(*ctx, reinterpret_cast<pdf_page*>(page.get_page()), PDF_ANNOT_INK); 
+	s.annot = pdf_create_annot(*ctx, reinterpret_cast<pdf_page*>(*page), PDF_ANNOT_INK); 
 	s.ctx = m_pdf->get_context_wrapper(); 
 	std::array<fz_point, 4> temp_points;
 	for (size_t i = 0; i < s.geometry.points.size() - 1; i++) {
@@ -47,6 +47,29 @@ std::vector<Renderer::Point<float>> get_points_from_annot(MuPDFHandler::PDF* pdf
 	return all_points; 
 }
 
+Renderer::Color get_color_from_annot(MuPDFHandler::PDF* pdf, pdf_annot* a) {
+	auto ctx = pdf->get_context();
+	int n = 0;
+	float c[4];
+	pdf_annot_color(*ctx, a, &n, c);
+	// grey
+	if (n == 1) {
+		byte col = static_cast<byte>(c[0] * 255.0f);
+		return Renderer::Color(col, col, col);
+	}
+	else if (n == 3) {
+		return Renderer::Color(
+			static_cast<byte>(c[0] * 255.0f),
+			static_cast<byte>(c[1] * 255.0f),
+			static_cast<byte>(c[2] * 255.0f)
+		);
+	}
+	else {
+		// TODO
+		Logger::warn("Annot colorspace not supported");
+	}
+}
+
 void StrokeHandler::parse_all_strokes() {
 	auto ctx = m_pdf->get_context();
 	auto page_amount = m_pdf->get_page_count();
@@ -54,7 +77,7 @@ void StrokeHandler::parse_all_strokes() {
 	for (size_t i = 0; i < page_amount; i++) {
 		auto current_page = m_pdf->get_page(i);
 		
-		auto annot = pdf_first_annot(*ctx, reinterpret_cast<pdf_page*>(current_page.get_page())); 
+		auto annot = pdf_first_annot(*ctx, reinterpret_cast<pdf_page*>(*current_page)); 
 		if (annot == nullptr) {
 			continue;
 		}
@@ -74,7 +97,8 @@ void StrokeHandler::parse_all_strokes() {
 				s.page = i;
 				s.ctx = m_pdf->get_context_wrapper();
 				s.points = get_points_from_annot(m_pdf, annot);
-				
+				s.thickness = pdf_annot_border_width(*ctx, annot);
+				s.color = get_color_from_annot(m_pdf, annot);
 				
 				m_strokes.push_back(std::move(s));
 			}
@@ -176,6 +200,9 @@ void StrokeHandler::earsing_stroke(const WindowHandler::PointerInfo& p) {
 		Logger::warn("Trying to erase a stroke while there are still active strokes");
 	}
 	m_earising_points.push_back(m_renderer->inv_transform_point(p.pos)); 
+	if (m_earising_points.size() > 10) { 
+		m_earising_points.erase(m_earising_points.begin());
+	}
 
 	if (m_earising_points.size() >= 2) {
 		// we can check if the last two added points overlap with any other curve
@@ -220,7 +247,7 @@ void StrokeHandler::end_earsing_stroke(const WindowHandler::PointerInfo& p) {
 		last_index = index;
 		auto ctx = m_strokes.at(index).ctx->get_context();
 		auto page = m_pdf->get_page(m_strokes.at(index).page);
-		pdf_delete_annot(*ctx, reinterpret_cast<pdf_page*>(page.get_page()), m_strokes.at(index).annot);
+		pdf_delete_annot(*ctx, reinterpret_cast<pdf_page*>(*page), m_strokes.at(index).annot);
 
 		m_strokes.erase(m_strokes.begin() + index);
 	}
@@ -237,9 +264,11 @@ void StrokeHandler::render_strokes() {
 		// check if a path exist
 		// A path object may not exist if the stroke was generated from the pdf 
 		if (stroke.path.m_object == nullptr) {
-			for (size_t j = 0; j < stroke.points.size() - 1; j++) {
-				m_renderer->draw_line(stroke.points.at(j), stroke.points.at(j + 1), {0, 255, 0}, 5);
-			}
+			if (stroke.to_be_earesed) 
+				for (size_t j = 0; j < stroke.points.size() - 1; j++) {
+					m_renderer->draw_line(stroke.points.at(j), stroke.points.at(j + 1), {255, 0, 0}, stroke.thickness * 2);
+					m_renderer->draw_line(stroke.points.at(j), stroke.points.at(j + 1), stroke.color, stroke.thickness);
+				}
 			continue;
 		}
 

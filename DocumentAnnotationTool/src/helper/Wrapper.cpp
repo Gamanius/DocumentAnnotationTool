@@ -27,38 +27,21 @@ DocumentWrapper::~DocumentWrapper() {
 	fz_drop_document(*ctx, *doc);
 }
 
-PageWrapper::PageWrapper(std::shared_ptr<ContextWrapper> a, fz_page* p) {
+PageWrapper::PageWrapper(std::shared_ptr<ContextWrapper> a, fz_page* p) : ThreadSafeClass<fz_page*>(std::move(p)) {
 	m_context = a;
-	page = p;
 }
 
-PageWrapper::PageWrapper(PageWrapper&& t) noexcept {
-	page = t.page;
-	t.page = nullptr;
 
-	m_context = std::move(t.m_context);
-
-}
-
-PageWrapper& PageWrapper::operator=(PageWrapper&& t) noexcept {
-	this->~PageWrapper(); 
-	new(this) PageWrapper(std::move(t));
-	return *this;
-}
-
-PageWrapper::operator fz_page* () const {
-	return page;
-}
-
-fz_page* PageWrapper::get_page() const {
-	return page;
+ThreadSafePageWrapper PageWrapper::get_page() {
+	return this->get_item();
 }
 
 PageWrapper::~PageWrapper() {
-	if (page == nullptr)
+	auto page = this->get_item();
+	if (*page == nullptr)
 		return;
 	auto ctx = m_context->get_context();
-	fz_drop_page(*ctx, page);
+	fz_drop_page(*ctx, *page);
 }
 
 DisplayListWrapper::DisplayListWrapper(std::shared_ptr<ContextWrapper> a, fz_display_list* l) : ThreadSafeClass<fz_display_list*>(std::move(l)) {

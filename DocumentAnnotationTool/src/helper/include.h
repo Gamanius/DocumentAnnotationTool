@@ -157,19 +157,15 @@ struct ContextWrapper : public ThreadSafeClass<fz_context*> {
 	~ContextWrapper();
 };
 
-struct PageWrapper {
+typedef RawSafeClass<fz_page*, std::recursive_mutex> ThreadSafePageWrapper;
+
+struct PageWrapper : public ThreadSafeClass<fz_page*> {
 private:
 	std::shared_ptr<ContextWrapper> m_context;
-	fz_page* page = nullptr;
 public:
 	PageWrapper(std::shared_ptr<ContextWrapper> a, fz_page* p);
 
-	PageWrapper(PageWrapper&& t) noexcept;
-	PageWrapper& operator=(PageWrapper&& t) noexcept;
-
-	operator fz_page* () const;
-
-	fz_page* get_page() const;
+	ThreadSafePageWrapper get_page();
 
 	~PageWrapper();
 };
@@ -1444,7 +1440,7 @@ public:
 		std::shared_ptr<ContextWrapper> m_ctx;
 		std::shared_ptr<DocumentWrapper> m_document;
 		// TODO
-		std::shared_ptr<ThreadSafeVector<PageWrapper>> m_pages;
+		std::vector<std::shared_ptr<PageWrapper>> m_pages;
 
 		// Position and dimensions of the pages 
 		std::shared_ptr<ThreadSafeVector<Renderer::Rectangle<float>>> m_pagerec;
@@ -1480,8 +1476,7 @@ public:
 		/// <param name="doc"></param>
 		/// <param name="page"></param>
 		/// <returns></returns>
-		PageWrapper get_page(size_t page);
-		PageWrapper get_page(fz_document* doc, size_t page); 
+		ThreadSafePageWrapper get_page(size_t page);
 
 		void sort_page_positions();
 
