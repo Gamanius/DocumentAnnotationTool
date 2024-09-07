@@ -143,7 +143,7 @@ void Direct2DRenderer::draw_path(PathObject& obj, Renderer::Color c, float thick
 
 void Direct2DRenderer::draw_rect(Renderer::Rectangle<float> rec, BrushObject& brush, float thicc) {
 	begin_draw();
-	m_renderTarget->DrawRectangle(PxToDp(rec), brush.m_object, thicc);
+	m_renderTarget->DrawRectangle(rec, brush.m_object, thicc);
 	end_draw();
 }
 

@@ -37,14 +37,15 @@
 
 #define APPLICATION_NAME L"Docanto"
 #define EPSILON 0.00001f
-#define PDF_STITCH_THRESHOLD 0.1f
+#define PDF_STITCH_THRESHOLD 1.0f
 #define FLOAT_EQUAL(a, b) (abs(a - b) < EPSILON)
 
 /// Custom WM_APP message to signal that the bitmap is ready to be drawn
 #define WM_PDF_BITMAP_READY (WM_APP + 0x0BAD /*Magic number (rolled by fair dice)*/)
 #define WM_CUSTOM_MESSAGE (WM_APP + 0x0BAD + 1)
 enum CUSTOM_WM_MESSAGE {
-	PDF_HANDLER_DISPLAY_LIST_UPDATE
+	PDF_HANDLER_DISPLAY_LIST_UPDATE,
+	PDF_HANDLER_ANNOTAION_CHANGE
 };
 
 inline void SafeRelease(IUnknown* ptr) {
@@ -868,7 +869,6 @@ auto& operator<<(std::wstringstream& s, const Renderer::Rectangle<T>& rect) {
 }
 
 
-
 /// <summary>
 /// Given two rectangles r1 and r2 it will first remove the overlapping area of r2 from r1. The now non rectangle r1 will be split up into a maximum of
 /// 4 rectangles and returned in an array. The array will be filled with std::nullopt if the rectangle does not exist. It will not return any rectangles
@@ -1082,6 +1082,40 @@ std::vector<Renderer::Rectangle<T>> splice_rect(Renderer::Rectangle<T> r1, const
 		chopped_rects.at(i).validate();
 	}
 	return chopped_rects;
+}
+
+/// <summary>
+/// Will check how many corners of r2 are inside of r1
+/// </summary>
+/// <typeparam name="T"></typeparam>
+/// <param name="r1">The bigger rectangle</param>
+/// <param name="r2">The smaller rectangle</param>
+/// <returns></returns>
+template<typename T>
+byte amount_of_corners_inside_rectangles(Renderer::Rectangle<T> r1, Renderer::Rectangle<T> r2) {
+	// now we check for every point
+	std::array<bool, 4> corner_check = { false, false, false, false };
+	// upperleft
+	if (r1.intersects(r2.upperleft()))
+		corner_check[0] = true;
+	// upperright
+	if (r1.intersects(r2.upperright()))
+		corner_check[1] = true;
+	// bottomleft
+	if (r1.intersects(r2.lowerleft()))
+		corner_check[2] = true;
+	// bottomright
+	if (r1.intersects(r2.lowerright()))
+		corner_check[3] = true;
+
+	// count the number of corners that are inside
+	byte num_corner_inside = 0;
+	for (size_t i = 0; i < corner_check.size(); i++) {
+		if (corner_check[i])
+			num_corner_inside++;
+	}
+
+	return num_corner_inside;
 }
 
 /// <summary>
@@ -1511,13 +1545,14 @@ class WindowHandler;
 class PDFRenderHandler {
 public:
 	struct RenderInstructions {
-		bool render_content = true;
-		bool render_widgets = true;
-		bool render_annots = true;
+		bool draw_content = true;
+		bool draw_annots = true;
+		bool draw_preview = true;
 
 		bool render_highres = true;
+		bool render_annots = true;
 		bool render_preview = true;
-		bool render_outline = true;
+		bool draw_outline = true;
 	};
 
 	struct RenderInfo {
@@ -1527,18 +1562,32 @@ public:
 			FINISHED,
 			ABORTED
 		};
+
+		enum JOB_TYPE {
+			HIGH_RES,
+			PREVIEW,
+			ANNOTATION,
+			RELOAD_ANNOTATIONS,
+			UNKNOWN
+		};
+
 		size_t page = 0;
 		fz_cookie* cookie = nullptr;
 		STATUS stat = WAITING;
-		float dpi = MUPDF_DEFAULT_DPI;
 		Renderer::Rectangle<float> overlap_in_docspace;
-		RenderInstructions instructions;
+
+		float dpi = MUPDF_DEFAULT_DPI;
+		JOB_TYPE job = UNKNOWN;
+
+		// This if for use in the reload of the annotations
+		// so the thread know if they already reloaded the annotations
+		std::vector<std::thread::id> thread_ids;
 
 		RenderInfo() = default;
 		RenderInfo(size_t page, float dpi, Renderer::Rectangle<float> overlap) : page(page), dpi(dpi), overlap_in_docspace(overlap) {
 			cookie = new fz_cookie({ 0,0,0,0,0 });
 		}		
-		RenderInfo(size_t page, float dpi, Renderer::Rectangle<float> overlap, RenderInstructions instruction) : page(page), dpi(dpi), overlap_in_docspace(overlap), instructions(instruction) { 
+		RenderInfo(size_t page, float dpi, Renderer::Rectangle<float> overlap, JOB_TYPE job) : page(page), dpi(dpi), overlap_in_docspace(overlap), job(job) {
 			cookie = new fz_cookie({ 0,0,0,0,0 });
 		}
 		// move constructor
@@ -1546,9 +1595,11 @@ public:
 			page = t.page;
 			dpi = t.dpi;
 			cookie = t.cookie; 
+			t.cookie = nullptr;
 			stat = t.stat;
 			overlap_in_docspace = t.overlap_in_docspace;
-			instructions = t.instructions;
+			job = t.job; 
+			thread_ids = std::move(t.thread_ids);
 		}
 		// move assignment
 		RenderInfo& operator=(RenderInfo&& t) noexcept {
@@ -1572,7 +1623,7 @@ private:
 	* 2. m_pagerec
 	* 3. m_preview_bitmaps
 	* 4. m_display_list
-	* 5. m_cachedBitmaps
+	* 5. m_highres_bitmaps
 	* 6. m_render_queue
 	*/ 
 
@@ -1583,63 +1634,57 @@ private:
 	// not owned by this class!
 	WindowHandler* const m_window = nullptr;
 
-	// Preview rendering
-	// rendererd at half scale or otherwise specified 
-	std::shared_ptr<ThreadSafeVector<CachedBitmap>> m_preview_bitmaps;
-	std::thread m_preview_bitmap_thread;
-	std::atomic_bool m_preview_bitmaps_processed = false;
-	std::atomic_bool m_display_list_processed    = false;
-	std::atomic_size_t m_display_list_amount_processed = 0;
-	std::atomic_size_t m_display_list_amount_processed_total = 0;
-
-	// High res rendering
+	// --- Display list generation ---
 	std::shared_ptr<ThreadSafeVector<DisplayListContent>> m_display_list;
 	std::thread m_display_list_thread;
-	// this array hold all high res bitmaps 
-	std::shared_ptr<ThreadSafeDeque<CachedBitmap>> m_cachedBitmaps = nullptr; 
 
-	// For Multithreading
+	std::atomic_bool  m_display_list_processed               = false;
+	std::atomic_size_t m_display_list_amount_processed       = 0;
+	std::atomic_size_t m_display_list_amount_processed_total = 0;
+
+	// --- For Multithreading ---
+	// General Multithreading
 	std::atomic_bool m_should_threads_die = false;
 	std::atomic_bool m_render_jobs_available = false;
 	std::atomic_long m_amount_thread_running = 0;
-	std::shared_ptr<ThreadSafeDeque<std::shared_ptr<RenderInfo>>> m_render_queue = nullptr;
-	std::mutex m_render_queue_mutex; 
-	std::condition_variable m_render_queue_condition_var;
 	std::vector<std::thread> m_render_threads;
+	std::shared_ptr<ThreadSafeDeque<std::shared_ptr<RenderInfo>>> m_render_queue = nullptr; 
 
-	float m_preview_scale = 0.5; 
+	std::mutex m_render_queue_mutex;
+	std::condition_variable m_render_queue_condition_var;
+	// High res rendering
+	std::shared_ptr<ThreadSafeDeque<CachedBitmap>> m_highres_bitmaps = nullptr; 
+	// Preview rendering
+	std::atomic<float> m_preview_dpi = 0.1f * MUPDF_DEFAULT_DPI;  
+	std::shared_ptr<ThreadSafeDeque<CachedBitmap>> m_preview_bitmaps = nullptr;
+	// Annotations rendering
+	std::shared_ptr<ThreadSafeDeque<CachedBitmap>> m_annotation_bitmaps = nullptr;
+	std::shared_ptr<ThreadSafeDeque<CachedBitmap>> m_annotation_bitmaps_old = nullptr;
 
-	void create_preview(float scale = 0.5);
 	void create_display_list();
 
-	void render_high_res(RenderInstructions r); 
-	void render_high_res();
+	void create_render_job(RenderInstructions r);
+
+	void send_bitmaps(RenderInstructions r);
+
+	std::vector<PDFRenderHandler::RenderInfo> get_pdf_overlap(RenderInfo::JOB_TYPE type, std::vector<size_t>& cached_bitmap_index, std::optional<float> dpi_check, float dpi_margin = 0.0f, size_t limit = 0);
+	std::vector<size_t> get_page_overlap();
 
 	void remove_unused_queue_items();
 	void update_render_queue();
 	void async_render();
 
-	std::vector<Renderer::Rectangle<float>> render_job_splice_recs(Renderer::Rectangle<float>, const std::vector<size_t>& cashedBitmapindex);
-	std::vector<size_t> render_job_clipped_cashed_bitmaps(Renderer::Rectangle<float> overlap_clip_space, float dpi);
-
 	void remove_small_cached_bitmaps(float treshold);
 
-	/// <summary>
-	/// 
-	/// </summary>
 	/// <param name="max_memory">In Mega Bytes</param>
-	void reduce_cache_size(unsigned long long max_memory);
+	void reduce_cache_size(std::shared_ptr<ThreadSafeDeque<CachedBitmap>> target, unsigned long long max_memory);  
+	unsigned long long get_cache_memory_usage(std::shared_ptr<ThreadSafeDeque<CachedBitmap>> target) const;
 
 
 public:
 	PDFRenderHandler() = default;
 
 	PDFRenderHandler(MuPDFHandler::PDF* const pdf, Direct2DRenderer* const renderer, WindowHandler* const window, size_t amount_threads = 2);
-
-	// move constructor
-	PDFRenderHandler(PDFRenderHandler&& t) noexcept;
-	// move assignment
-	PDFRenderHandler& operator=(PDFRenderHandler&& t) noexcept;
 
 	~PDFRenderHandler(); 
 
@@ -1697,11 +1742,10 @@ public:
 	/// It will force to rerender the whole pdf
 	/// </summary>
 	void clear_render_cache();
+	void clear_annotation_cache();
+	void update_annotations(size_t page);
 	float get_display_list_progress();
 
-
-
-	unsigned long long get_cache_memory_usage() const;
 };
 
 class WindowHandler {
@@ -1886,7 +1930,7 @@ public:
 
 private:
 	std::function<void(std::optional<std::vector<CachedBitmap*>*>)> m_callback_paint;
-	std::function<void(CUSTOM_WM_MESSAGE)> m_callback_cutom_msg;
+	std::function<void(CUSTOM_WM_MESSAGE, void*)> m_callback_cutom_msg;
 	std::function<void(Renderer::Rectangle<long>)> m_callback_size;
 	std::function<void(PointerInfo)> m_callback_pointer_down;
 	std::function<void(PointerInfo)> m_callback_pointer_up;
@@ -1909,7 +1953,7 @@ public:
 	void set_state(WINDOW_STATE state);
 
 	void set_callback_paint(std::function<void(std::optional<std::vector<CachedBitmap*>*>)> callback);
-	void set_callback_custom_msg(std::function<void(CUSTOM_WM_MESSAGE)> callback);
+	void set_callback_custom_msg(std::function<void(CUSTOM_WM_MESSAGE, void*)> callback);
 	void set_callback_size(std::function<void(Renderer::Rectangle<long>)> callback);
 	void set_callback_pointer_down(std::function<void(PointerInfo)> callback);
 	void set_callback_pointer_up(std::function<void(PointerInfo)> callback);

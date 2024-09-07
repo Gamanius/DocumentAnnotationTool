@@ -22,10 +22,11 @@ void callback_draw(std::optional<std::vector<CachedBitmap*>*> highres_bitmaps) {
 	g_main_renderer->set_current_transform_active();
 	g_main_renderer->begin_draw();
 	PDFRenderHandler::RenderInstructions instructions;
+	instructions.draw_annots = g_draw_annots;
 	instructions.render_annots = g_draw_annots;
 
 	if (highres_bitmaps.has_value() == false) {
-		g_main_renderer->clear(Renderer::Color(50, 50, 50)); 
+		g_main_renderer->clear(Renderer::Color(50, 50, 50));
 		// when the highres_bitmaps arg is nullopt then it is a normal draw call from windows
 		// but only call when no gesture is in progress
 		if (g_gesturehandler.is_gesture_active() == false) {
@@ -33,6 +34,7 @@ void callback_draw(std::optional<std::vector<CachedBitmap*>*> highres_bitmaps) {
 		}
 		else {
 			instructions.render_highres = false;
+			instructions.render_annots = false;
 			g_pdfrenderhandler->render(instructions);
 		}
 	}
@@ -42,9 +44,9 @@ void callback_draw(std::optional<std::vector<CachedBitmap*>*> highres_bitmaps) {
 		for (size_t i = 0; i < bitmaps->size(); i++) {
 			auto rec = g_pdf->get_pagerec()->get_read(); 
 			auto pagerec = bitmaps->at(i)->doc_coords + rec->at(bitmaps->at(i)->page).upperleft();
-			if (g_main_renderer->inv_transform_rect(g_main_renderer->get_window_size())
-				.intersects(pagerec)) {
+			if (g_main_renderer->inv_transform_rect(g_main_renderer->get_window_size()).intersects(pagerec)) {
 				g_main_renderer->draw_bitmap(bitmaps->at(i)->bitmap, pagerec, Direct2DRenderer::INTERPOLATION_MODE::LINEAR);
+				//g_main_renderer->draw_rect(pagerec, { static_cast<byte>(i), static_cast<byte>(i + 40), static_cast<byte>(i + 80)}, 2);
 			}
 	
 		}
@@ -65,13 +67,26 @@ void callback_draw(std::optional<std::vector<CachedBitmap*>*> highres_bitmaps) {
 	g_main_renderer->end_draw();
 }
 
-void custom_msg(CUSTOM_WM_MESSAGE msg) {
-	auto progress = g_pdfrenderhandler->get_display_list_progress();
-	if (FLOAT_EQUAL(progress, 1)) {
-		g_main_window->set_window_title(APPLICATION_NAME);
+void custom_msg(CUSTOM_WM_MESSAGE msg, void* data) {
+	switch (msg) {
+	case PDF_HANDLER_DISPLAY_LIST_UPDATE:
+	{
+		auto progress = g_pdfrenderhandler->get_display_list_progress();
+		if (FLOAT_EQUAL(progress, 1)) {
+			g_main_window->set_window_title(APPLICATION_NAME);
+		}
+		else {
+			g_main_window->set_window_title(APPLICATION_NAME + std::wstring(L" | Parsing pages: ") + std::to_wstring(progress * 100) + L" % ");
+		}
+		return;
 	}
-	else {
-		g_main_window->set_window_title(APPLICATION_NAME + std::wstring(L" | Parsing pages: ") + std::to_wstring(progress * 100) + L" % ");
+	case PDF_HANDLER_ANNOTAION_CHANGE:
+	{
+		// The data is in this case a size_t* 
+		g_pdfrenderhandler->update_annotations(*static_cast<size_t*>(data));
+		g_main_window->invalidate_drawing_area();
+		return;
+	}
 	}
 }
 
@@ -110,11 +125,11 @@ void callback_key_up(WindowHandler::VK k) {
 	if (k == WindowHandler::VK::F5) { 
 		// refresh
 		g_pdfrenderhandler->clear_render_cache();
+		g_pdfrenderhandler->update_annotations(0);
 	}
 
 	if (k == WindowHandler::VK::F3) {
 		g_draw_annots = not g_draw_annots;
-		g_pdfrenderhandler->clear_render_cache();
 	}
 
 	g_main_window->invalidate_drawing_area();
@@ -178,8 +193,12 @@ void callback_pointer_up(WindowHandler::PointerInfo p) {
 
 	// handle everything related to the pen
 	if (p.type == WindowHandler::POINTER_TYPE::STYLUS) {
-		g_strokehandler->end_stroke(p);
-		g_strokehandler->end_earsing_stroke(p);
+		if (p.button2pressed) {
+			g_strokehandler->end_earsing_stroke(p);
+		}
+		else {
+			g_strokehandler->end_stroke(p);
+		}
 	}
 
 	g_main_window->invalidate_drawing_area();
@@ -213,12 +232,12 @@ void main_window_loop_run(HINSTANCE h) {
 	auto pdf = g_mupdfcontext->load_pdf(path.value());
 	g_pdf = &pdf.value();
 	g_gesturehandler = GestureHandler(g_main_renderer.get(), &pdf.value());
+	auto strok_handler = StrokeHandler(g_pdf, g_main_renderer.get(), g_main_window.get());
+	g_strokehandler = &strok_handler;
 
 	auto pdf_handler = PDFRenderHandler(g_pdf, g_main_renderer.get(), g_main_window.get(), 2);
 	g_pdfrenderhandler = &pdf_handler;
 
-	auto strok_handler = StrokeHandler(g_pdf, g_main_renderer.get(), g_main_window.get());
-	g_strokehandler = &strok_handler;
 
 	Logger::success("Loaded PDF file in ", time);
 

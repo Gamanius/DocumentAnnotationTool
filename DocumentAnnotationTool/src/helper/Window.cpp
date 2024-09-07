@@ -462,7 +462,7 @@ LRESULT WindowHandler::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam
 	case WM_CUSTOM_MESSAGE:
 	{
 		if (currentInstance->m_callback_cutom_msg) {
-			currentInstance->m_callback_cutom_msg((CUSTOM_WM_MESSAGE)lParam); 
+			currentInstance->m_callback_cutom_msg((CUSTOM_WM_MESSAGE)lParam, (void*)wParam);
 		}
 		return NULL; 
 	}
@@ -527,7 +527,7 @@ void WindowHandler::set_callback_paint(std::function<void(std::optional<std::vec
 	m_callback_paint = callback;
 }
 
-void WindowHandler::set_callback_custom_msg(std::function<void(CUSTOM_WM_MESSAGE)> callback) {
+void WindowHandler::set_callback_custom_msg(std::function<void(CUSTOM_WM_MESSAGE, void*)> callback) {
 	m_callback_cutom_msg = callback;
 }
 
