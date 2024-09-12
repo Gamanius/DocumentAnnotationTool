@@ -1,4 +1,4 @@
-#include "include.h"
+#include "Direct2D.h"
 #include <wincodec.h>
 #include <d2d1.h>
 
@@ -58,7 +58,7 @@ void Direct2DRenderer::clear(Renderer::Color c) {
 	end_draw();
 }
 
-void Direct2DRenderer::resize(Renderer::Rectangle<long> r) {
+void Direct2DRenderer::resize(Math::Rectangle<long> r) {
 	m_renderTarget->Resize(r);
 
 	// we should also check if the dpi changed
@@ -69,21 +69,21 @@ void Direct2DRenderer::resize(Renderer::Rectangle<long> r) {
 	m_window_size = r;
 }
 
-void Direct2DRenderer::draw_bitmap(BitmapObject& bitmap, Renderer::Point<float> pos, INTERPOLATION_MODE mode, float opacity) {
+void Direct2DRenderer::draw_bitmap(BitmapObject& bitmap, Math::Point<float> pos, INTERPOLATION_MODE mode, float opacity) {
 	begin_draw(); 
 	m_renderTarget->DrawBitmap(bitmap.m_object, D2D1::RectF(pos.x, pos.y, pos.x + bitmap.m_object->GetSize().width, pos.y + bitmap.m_object->GetSize().height),
 		opacity, mode == INTERPOLATION_MODE::NEAREST_NEIGHBOR ? D2D1_BITMAP_INTERPOLATION_MODE_NEAREST_NEIGHBOR : D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
 	end_draw();	
 }
 
-void Direct2DRenderer::draw_bitmap(BitmapObject& bitmap, Renderer::Rectangle<float> dest, INTERPOLATION_MODE mode, float opacity) {
+void Direct2DRenderer::draw_bitmap(BitmapObject& bitmap, Math::Rectangle<float> dest, INTERPOLATION_MODE mode, float opacity) {
 	begin_draw();
 	m_renderTarget->DrawBitmap(bitmap.m_object, dest, opacity, 
 		mode == INTERPOLATION_MODE::NEAREST_NEIGHBOR ? D2D1_BITMAP_INTERPOLATION_MODE_NEAREST_NEIGHBOR : D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
 	end_draw();
 }
 
-void Direct2DRenderer::draw_text(const std::wstring& text, Renderer::Point<float> pos, TextFormatObject& format, BrushObject& brush) {
+void Direct2DRenderer::draw_text(const std::wstring& text, Math::Point<float> pos, TextFormatObject& format, BrushObject& brush) {
 	IDWriteTextLayout* textLayout;
 	auto result = m_writeFactory->CreateTextLayout(
 		text.c_str(),
@@ -109,19 +109,19 @@ void Direct2DRenderer::draw_text(const std::wstring& text, Renderer::Point<float
 
 }
 
-void Direct2DRenderer::draw_text(const std::wstring& text, Renderer::Point<float> pos, Renderer::Color c, float size) {
+void Direct2DRenderer::draw_text(const std::wstring& text, Math::Point<float> pos, Renderer::Color c, float size) {
 	auto format = create_text_format(L"Consolas", size);
 	auto brush  = create_brush(c);
 	draw_text(text, pos, format, brush);
 }
 
-void Direct2DRenderer::draw_line(Renderer::Point<float> p1, Renderer::Point<float> p2, BrushObject& brush, float thick) {
+void Direct2DRenderer::draw_line(Math::Point<float> p1, Math::Point<float> p2, BrushObject& brush, float thick) {
 	begin_draw();
 	m_renderTarget->DrawLine(p1, p2, brush.m_object, thick);
 	end_draw();
 }
 
-void Direct2DRenderer::draw_line(Renderer::Point<float> p1, Renderer::Point<float> p2, Renderer::Color c, float thick) {
+void Direct2DRenderer::draw_line(Math::Point<float> p1, Math::Point<float> p2, Renderer::Color c, float thick) {
 	begin_draw();
 	auto brush = create_brush(c);
 	draw_line(p1, p2, brush, thick);
@@ -141,33 +141,33 @@ void Direct2DRenderer::draw_path(PathObject& obj, Renderer::Color c, float thick
 	end_draw();
 }
 
-void Direct2DRenderer::draw_rect(Renderer::Rectangle<float> rec, BrushObject& brush, float thicc) {
+void Direct2DRenderer::draw_rect(Math::Rectangle<float> rec, BrushObject& brush, float thicc) {
 	begin_draw();
 	m_renderTarget->DrawRectangle(rec, brush.m_object, thicc);
 	end_draw();
 }
 
-void Direct2DRenderer::draw_rect(Renderer::Rectangle<float> rec, BrushObject& brush) {
+void Direct2DRenderer::draw_rect(Math::Rectangle<float> rec, BrushObject& brush) {
 	draw_rect(rec, brush, 1.0f);
 }
 
-void Direct2DRenderer::draw_rect_filled(Renderer::Rectangle<float> rec, BrushObject& brush) {
+void Direct2DRenderer::draw_rect_filled(Math::Rectangle<float> rec, BrushObject& brush) {
 	begin_draw();
 	m_renderTarget->FillRectangle(rec, brush.m_object);
 	end_draw();
 }
 
-void Direct2DRenderer::draw_rect(Renderer::Rectangle<float> rec, Renderer::Color c, float thick) {
+void Direct2DRenderer::draw_rect(Math::Rectangle<float> rec, Renderer::Color c, float thick) {
 	// create the brush object
 	auto temp_brush = create_brush(c);
 	draw_rect(rec, temp_brush, thick);
 }
 
-void Direct2DRenderer::draw_rect(Renderer::Rectangle<float> rec, Renderer::Color c) {
+void Direct2DRenderer::draw_rect(Math::Rectangle<float> rec, Renderer::Color c) {
 	draw_rect(rec, c, 1.0f);
 }
 
-void Direct2DRenderer::draw_rect_filled(Renderer::Rectangle<float> rec, Renderer::Color c) {
+void Direct2DRenderer::draw_rect_filled(Math::Rectangle<float> rec, Renderer::Color c) {
 	// create brush object
 	auto temp_brush = create_brush(c);
 	draw_rect_filled(rec, temp_brush);
@@ -181,7 +181,7 @@ void Direct2DRenderer::set_identity_transform_active() {
 	m_renderTarget->SetTransform(D2D1::Matrix3x2F::Identity());
 }
 
-void Direct2DRenderer::set_transform_matrix(Renderer::Point<float> p) {
+void Direct2DRenderer::set_transform_matrix(Math::Point<float> p) {
 	m_transformPosMatrix = D2D1::Matrix3x2F::Translation(p.x, p.y);
 }
 
@@ -189,11 +189,11 @@ void Direct2DRenderer::set_transform_matrix(D2D1::Matrix3x2F m) {
 	m_transformPosMatrix = m;
 }
 
-void Direct2DRenderer::add_transform_matrix(Renderer::Point<float> p) {
+void Direct2DRenderer::add_transform_matrix(Math::Point<float> p) {
 	m_transformPosMatrix = D2D1::Matrix3x2F::Translation(p.x, p.y) * m_transformPosMatrix;
 }
 
-void Direct2DRenderer::set_scale_matrix(float scale, Renderer::Point<float> center) {
+void Direct2DRenderer::set_scale_matrix(float scale, Math::Point<float> center) {
 	m_transformScaleMatrix = D2D1::Matrix3x2F::Scale({ scale, scale }, center);
 }
 
@@ -201,7 +201,7 @@ void Direct2DRenderer::set_scale_matrix(D2D1::Matrix3x2F m) {
 	m_transformScaleMatrix = m;
 }
 
-void Direct2DRenderer::add_scale_matrix(float scale, Renderer::Point<float> center) {
+void Direct2DRenderer::add_scale_matrix(float scale, Math::Point<float> center) {
 	// calc the new scale matrix
 	// boi i wish i would know how this works again...
 	auto mat = D2D1::Matrix3x2F(m_transformScaleMatrix);
@@ -218,7 +218,7 @@ D2D1::Matrix3x2F Direct2DRenderer::get_scale_matrix() const {
 	return m_transformScaleMatrix;
 }
 
-Renderer::Point<float> Direct2DRenderer::get_zoom_center() const {
+Math::Point<float> Direct2DRenderer::get_zoom_center() const {
 	if (FLOAT_EQUAL(m_transformScaleMatrix._11, 1)) {
 		return { m_transformScaleMatrix._31, m_transformScaleMatrix._32 };
 	}
@@ -226,27 +226,27 @@ Renderer::Point<float> Direct2DRenderer::get_zoom_center() const {
 		m_transformScaleMatrix._32 / (1 - m_transformScaleMatrix._11), };
 }
 
-Renderer::Point<float> Direct2DRenderer::get_transform_pos() const {
+Math::Point<float> Direct2DRenderer::get_transform_pos() const {
 	return { m_transformPosMatrix._31, m_transformPosMatrix._32 };
 }
 
-Renderer::Rectangle<long> Direct2DRenderer::get_window_size() const {
+Math::Rectangle<long> Direct2DRenderer::get_window_size() const {
 	return m_window_size;
 }
 
-Renderer::Rectangle<double> Direct2DRenderer::get_window_size_normalized() const {
+Math::Rectangle<double> Direct2DRenderer::get_window_size_normalized() const {
 	auto dpi = get_dpi();
-	return Renderer::Rectangle<double>(0, 0, m_window_size.width * (96.0f / dpi), m_window_size.height * (96.0f / dpi));
+	return Math::Rectangle<double>(0, 0, m_window_size.width * (96.0f / dpi), m_window_size.height * (96.0f / dpi));
 }
 
-Renderer::Rectangle<float> Direct2DRenderer::transform_rect(const Renderer::Rectangle<float> rec) const {
+Math::Rectangle<float> Direct2DRenderer::transform_rect(const Math::Rectangle<float> rec) const {
 	auto transform = m_transformPosMatrix * m_transformScaleMatrix;
 	auto p1 = transform.TransformPoint({ rec.x, rec.y });
 	auto p2 = transform.TransformPoint({ rec.right(), rec.bottom()});
 	return { p1, p2 };
 }
 
-Renderer::Rectangle<float> Direct2DRenderer::inv_transform_rect(const Renderer::Rectangle<float> rec) const {
+Math::Rectangle<float> Direct2DRenderer::inv_transform_rect(const Math::Rectangle<float> rec) const {
 	auto transform = m_transformPosMatrix * m_transformScaleMatrix;
 	transform.Invert();
 	auto p1 = transform.TransformPoint({ rec.x, rec.y });
@@ -254,12 +254,12 @@ Renderer::Rectangle<float> Direct2DRenderer::inv_transform_rect(const Renderer::
 	return { p1, p2 };
 }
 
-Renderer::Point<float> Direct2DRenderer::transform_point(const Renderer::Point<float> p) const {
+Math::Point<float> Direct2DRenderer::transform_point(const Math::Point<float> p) const {
 	auto transform = m_transformPosMatrix * m_transformScaleMatrix; 
 	return transform.TransformPoint(p); 
 }
 
-Renderer::Point<float> Direct2DRenderer::inv_transform_point(const Renderer::Point<float> p) const {
+Math::Point<float> Direct2DRenderer::inv_transform_point(const Math::Point<float> p) const {
 	auto transform = m_transformPosMatrix * m_transformScaleMatrix;
 	transform.Invert();
 	return transform.TransformPoint(p);
@@ -355,7 +355,7 @@ REALEASE:
 	return std::move(obj); 
 }
 
-Direct2DRenderer::BitmapObject Direct2DRenderer::create_bitmap(const byte* const data, Renderer::Rectangle<unsigned int> size, unsigned int stride, float dpi) {
+Direct2DRenderer::BitmapObject Direct2DRenderer::create_bitmap(const byte* const data, Math::Rectangle<unsigned int> size, unsigned int stride, float dpi) {
 	ID2D1Bitmap* pBitmap = nullptr;
 	D2D1_BITMAP_PROPERTIES prop;
 

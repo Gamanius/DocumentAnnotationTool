@@ -97,7 +97,7 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)mupdf\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)mupdf\include;$(ProjectDir)src\dependencies;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -118,7 +118,7 @@
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)mupdf\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)mupdf\include;$(ProjectDir)src\dependencies;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -139,7 +139,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)mupdf\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)mupdf\include;$(ProjectDir)src\dependencies;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -160,7 +160,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)mupdf\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)mupdf\include;$(ProjectDir)src\dependencies;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -175,31 +175,45 @@
     </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="src\helper\Direct2D.cpp" />
-    <ClCompile Include="src\helper\FileHandler.cpp" />
-    <ClCompile Include="src\helper\GestureHandler.cpp" />
-    <ClCompile Include="src\helper\MuPDF.cpp" />
-    <ClCompile Include="src\helper\PDFHandler.cpp" />
-    <ClCompile Include="src\helper\Renderer.cpp" />
-    <ClCompile Include="src\helper\Timer.cpp" />
-    <ClCompile Include="src\helper\Window.cpp" />
-    <ClCompile Include="src\helper\Wrapper.cpp" />
+    <ClCompile Include="src\helper\Windows\Direct2D.cpp" />
+    <ClCompile Include="src\helper\General\FileHandler.cpp" />
+    <ClCompile Include="src\helper\PDF\GestureHandler.cpp" />
+    <ClCompile Include="src\helper\PDF\MuPDF.cpp" />
+    <ClCompile Include="src\helper\PDF\PDFRenderHandler.cpp" />
+    <ClCompile Include="src\helper\General\Timer.cpp" />
+    <ClCompile Include="src\helper\Windows\Renderer.cpp" />
+    <ClCompile Include="src\helper\Windows\Window.cpp" />
+    <ClCompile Include="src\helper\PDF\Wrapper.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\MainWindow.cpp" />
-    <ClCompile Include="src\helper\StrokeHandler.cpp" />
+    <ClCompile Include="src\helper\PDF\StrokeHandler.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\dependecies\magic_enum\magic_enum.hpp" />
-    <ClInclude Include="src\dependecies\magic_enum\magic_enum_all.hpp" />
-    <ClInclude Include="src\dependecies\magic_enum\magic_enum_containers.hpp" />
-    <ClInclude Include="src\dependecies\magic_enum\magic_enum_flags.hpp" />
-    <ClInclude Include="src\dependecies\magic_enum\magic_enum_format.hpp" />
-    <ClInclude Include="src\dependecies\magic_enum\magic_enum_fuse.hpp" />
-    <ClInclude Include="src\dependecies\magic_enum\magic_enum_iostream.hpp" />
-    <ClInclude Include="src\dependecies\magic_enum\magic_enum_switch.hpp" />
-    <ClInclude Include="src\dependecies\magic_enum\magic_enum_utility.hpp" />
+    <ClInclude Include="src\dependencies\MagicEnum.h" />
+    <ClInclude Include="src\dependencies\magic_enum\magic_enum.hpp" />
+    <ClInclude Include="src\dependencies\magic_enum\magic_enum_all.hpp" />
+    <ClInclude Include="src\dependencies\magic_enum\magic_enum_containers.hpp" />
+    <ClInclude Include="src\dependencies\magic_enum\magic_enum_flags.hpp" />
+    <ClInclude Include="src\dependencies\magic_enum\magic_enum_format.hpp" />
+    <ClInclude Include="src\dependencies\magic_enum\magic_enum_fuse.hpp" />
+    <ClInclude Include="src\dependencies\magic_enum\magic_enum_iostream.hpp" />
+    <ClInclude Include="src\dependencies\magic_enum\magic_enum_switch.hpp" />
+    <ClInclude Include="src\dependencies\magic_enum\magic_enum_utility.hpp" />
+    <ClInclude Include="src\dependencies\ThreadSafeClass.h" />
+    <ClInclude Include="src\helper\General\FileHandler.h" />
+    <ClInclude Include="src\helper\General\General.h" />
+    <ClInclude Include="src\helper\General\Logger.h" />
+    <ClInclude Include="src\helper\General\Math.h" />
+    <ClInclude Include="src\helper\General\Timer.h" />
     <ClInclude Include="src\helper\include.h" />
-    <ClInclude Include="src\helper\ReadWriteRecursiveMutex.h" />
+    <ClInclude Include="src\helper\PDF\GestureHandler.h" />
+    <ClInclude Include="src\helper\PDF\MuPDF.h" />
+    <ClInclude Include="src\helper\PDF\PDF.h" />
+    <ClInclude Include="src\helper\PDF\PDFRenderHandler.h" />
+    <ClInclude Include="src\helper\PDF\StrokeHandler.h" />
+    <ClInclude Include="src\helper\Windows\Direct2D.h" />
+    <ClInclude Include="src\dependencies\ReadWriteRecursiveMutex.h" />
+    <ClInclude Include="src\helper\Windows\WindowHandler.h" />
     <ClInclude Include="src\MainWindow.h" />
   </ItemGroup>
   <ItemGroup>

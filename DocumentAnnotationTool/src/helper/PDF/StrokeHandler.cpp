@@ -1,4 +1,4 @@
-#include "include.h"
+#include "StrokeHandler.h"
 
 StrokeHandler::Stroke::Stroke(Stroke&& s) noexcept {
 	swap(*this, s);
@@ -38,8 +38,8 @@ void StrokeHandler::apply_stroke_to_pdf(Stroke& s) {
 	pdf_set_annot_color(*ctx, s.annot, 3, b); 
 }
 
-std::vector<Renderer::Point<float>> get_points_from_annot(MuPDFHandler::PDF* pdf, pdf_annot* a) {
-	std::vector<Renderer::Point<float>> all_points;
+std::vector<Math::Point<float>> get_points_from_annot(MuPDFHandler::PDF* pdf, pdf_annot* a) {
+	std::vector<Math::Point<float>> all_points;
 	auto ctx = pdf->get_context();
 	auto list_count = pdf_annot_ink_list_count(*ctx, a);
 	auto vertex_count = pdf_annot_ink_list_stroke_count(*ctx, a, 0);
@@ -120,7 +120,7 @@ void StrokeHandler::parse_all_strokes() {
 	Logger::log("Found ", m_strokes.size(), " ink annotations in the document");
 }
 
-std::optional<size_t> StrokeHandler::get_page_from_point(Renderer::Point<float> p) {
+std::optional<size_t> StrokeHandler::get_page_from_point(Math::Point<float> p) {
 	auto recs = m_pdf->get_pagerec()->get_read();
 	for (size_t i = 0; i < recs->size(); i++) {
 		if (recs->at(i).intersects(p)) {
@@ -227,7 +227,7 @@ void StrokeHandler::earsing_stroke(const WindowHandler::PointerInfo& p) {
 		for (size_t i = 0; i < m_strokes.size(); i++) {
 			auto& stroke = m_strokes.at(i);
 			// special case where stroke.points.size == 1
-			if (stroke.points.size() == 1 and Renderer::line_segment_intersects(p1, p2, stroke.points.at(0), stroke.points.at(0))) {
+			if (stroke.points.size() == 1 and Math::line_segment_intersects(p1, p2, stroke.points.at(0), stroke.points.at(0))) {
 				m_index_of_earising_points.push_back(i);
 				stroke.to_be_earesed = true;
 				continue;
@@ -237,7 +237,7 @@ void StrokeHandler::earsing_stroke(const WindowHandler::PointerInfo& p) {
 				if (stroke.page != page) {
 					continue;
 				}
-				if (Renderer::line_segment_intersects(p1, p2, stroke.points.at(j), stroke.points.at(j + 1)) or (p1 - stroke.points.at(j)).distance() < stroke.thickness * 4) {
+				if (Math::line_segment_intersects(p1, p2, stroke.points.at(j), stroke.points.at(j + 1)) or (p1 - stroke.points.at(j)).distance() < stroke.thickness * 4) {
 					m_index_of_earising_points.push_back(i);
 					stroke.to_be_earesed = true;
 					break;

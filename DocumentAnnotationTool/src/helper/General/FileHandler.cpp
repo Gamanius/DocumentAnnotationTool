@@ -1,4 +1,4 @@
-#include "include.h"
+#include "FileHandler.h"
 
 std::optional<std::wstring> FileHandler::open_file_dialog(const wchar_t* filter, HWND windowhandle) {
 
@@ -79,7 +79,7 @@ bool FileHandler::write_file(byte* data, size_t amount, const std::wstring& path
     return succ;
 }
 
-std::optional<Renderer::Rectangle<DWORD>> FileHandler::get_bitmap_size(const std::wstring& path) {
+std::optional<Math::Rectangle<DWORD>> FileHandler::get_bitmap_size(const std::wstring& path) {
     HBITMAP hBitmap = (HBITMAP)LoadImage(NULL, path.c_str(), IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE | LR_CREATEDIBSECTION);
 
     ASSERT_WIN_RETURN_NULLOPT(hBitmap != NULL, "Could not load bitmap " + std::string(path.begin(), path.end()));
@@ -89,5 +89,5 @@ std::optional<Renderer::Rectangle<DWORD>> FileHandler::get_bitmap_size(const std
                 DeleteObject(hBitmap); return std::nullopt;,
                 "Could not get bitmap size of file ", path);
 
-    return Renderer::Rectangle<DWORD>(0, 0, bm.bmWidth, bm.bmHeight);
+    return Math::Rectangle<DWORD>(0, 0, bm.bmWidth, bm.bmHeight);
 }

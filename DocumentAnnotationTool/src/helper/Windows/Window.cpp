@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include.h"
+#include "WindowHandler.h"
 #include "windowsx.h"
 #define CHECK_BIT(var,pos) ((var) & (1<<(pos)))
 
@@ -389,8 +389,8 @@ LRESULT WindowHandler::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam
 			break;
 		POINT ppp = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
 		ScreenToClient(currentInstance->m_hwnd, &ppp);
-		auto p = Renderer::Point<float>(ppp);
-		currentInstance->m_callback_mousewheel(-GET_WHEEL_DELTA_WPARAM(wParam), true, Renderer::Point<int>(currentInstance->PxToDp(p)));
+		auto p = Math::Point<float>(ppp);
+		currentInstance->m_callback_mousewheel(-GET_WHEEL_DELTA_WPARAM(wParam), true, Math::Point<int>(currentInstance->PxToDp(p)));
 		return 0;
 	}
 	case WM_POINTERWHEEL:
@@ -399,7 +399,7 @@ LRESULT WindowHandler::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam
 			break;
 		POINT ppp = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
 		ScreenToClient(currentInstance->m_hwnd, &ppp);
-		auto p = Renderer::Point<float>(ppp);
+		auto p = Math::Point<float>(ppp);
 		currentInstance->m_callback_mousewheel(GET_WHEEL_DELTA_WPARAM(wParam), GetKeyState(VK_SHIFT) & 0x8000, currentInstance->PxToDp(p));
 		return 0;
 	}
@@ -446,7 +446,7 @@ LRESULT WindowHandler::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam
 	case WM_DPICHANGED:
 	{
 		RECT* const prcNewWindow = (RECT*)lParam;
-		auto newrec = Renderer::Rectangle(*prcNewWindow);
+		auto newrec = Math::Rectangle(*prcNewWindow);
 		Logger::log("DPI changed to ", HIWORD(wParam), ". Using new window dimensions ", newrec);
 		currentInstance->set_window_size(newrec);
 		return 0;
@@ -497,13 +497,13 @@ void WindowHandler::set_window_title(const std::wstring& s) {
 	SetWindowText(m_hwnd, s.c_str()); 
 }
 
-Renderer::Rectangle<long> WindowHandler::get_window_size() const {
+Math::Rectangle<long> WindowHandler::get_window_size() const {
 	RECT r;
 	GetClientRect(m_hwnd, &r);
-	return Renderer::Rectangle<long>(r.left, r.top, r.right - r.left, r.bottom - r.top);
+	return Math::Rectangle<long>(r.left, r.top, r.right - r.left, r.bottom - r.top);
 }
 
-void WindowHandler::set_window_size(Renderer::Rectangle<long> r) {
+void WindowHandler::set_window_size(Math::Rectangle<long> r) {
 	SetWindowPos(m_hwnd, HWND_TOP, r.x, r.y, r.width, r.height, SWP_NOZORDER); 
 }
 
@@ -516,8 +516,8 @@ bool WindowHandler::is_key_pressed(VK key) {
 	
 }
 
-Renderer::Point<long> WindowHandler::get_mouse_pos() const {
-	Renderer::Point<long> p;
+Math::Point<long> WindowHandler::get_mouse_pos() const {
+	Math::Point<long> p;
 	GetCursorPos((POINT*)&p); // could be bad
 	ScreenToClient(m_hwnd, (POINT*)&p);
 	return PxToDp(p);
@@ -531,7 +531,7 @@ void WindowHandler::set_callback_custom_msg(std::function<void(CUSTOM_WM_MESSAGE
 	m_callback_cutom_msg = callback;
 }
 
-void WindowHandler::set_callback_size(std::function<void(Renderer::Rectangle<long>)> callback) {
+void WindowHandler::set_callback_size(std::function<void(Math::Rectangle<long>)> callback) {
 	m_callback_size = callback;
 }
 
@@ -547,7 +547,7 @@ void WindowHandler::set_callback_pointer_update(std::function<void(PointerInfo)>
 	m_callback_pointer_update = callback;
 }
 
-void WindowHandler::set_callback_mousewheel(std::function<void(short, bool, Renderer::Point<int>)> callback) {
+void WindowHandler::set_callback_mousewheel(std::function<void(short, bool, Math::Point<int>)> callback) {
 	m_callback_mousewheel = callback;
 }
 
@@ -563,7 +563,7 @@ void WindowHandler::invalidate_drawing_area() {
 	InvalidateRect(m_hwnd, NULL, FALSE); 
 }
 
-void WindowHandler::invalidate_drawing_area(Renderer::Rectangle<long> rec) {
+void WindowHandler::invalidate_drawing_area(Math::Rectangle<long> rec) {
 	RECT r = { rec.x, rec.y, rec.x + rec.width, rec.y + rec.height };
 	InvalidateRect(m_hwnd, &r, FALSE);
 }

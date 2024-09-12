@@ -1,6 +1,5 @@
-#include "include.h"
 #include "mupdf/pdf.h"
-#include <sstream>
+#include "MuPDF.h"
 #include <exception>
 
 void MuPDFHandler::lock_mutex(void* user, int lock) {
@@ -71,8 +70,8 @@ MuPDFHandler::PDF::PDF(std::shared_ptr<ContextWrapper> ctx, std::shared_ptr<Docu
 	// and document
 	auto d = doc->get_document();
 
-	m_pagerec = std::shared_ptr<ThreadSafeVector<Renderer::Rectangle<float>>>
-		(new ThreadSafeVector<Renderer::Rectangle<float>>(std::vector<Renderer::Rectangle<float>>()));
+	m_pagerec = std::shared_ptr<ThreadSafeVector<Math::Rectangle<float>>>
+		(new ThreadSafeVector<Math::Rectangle<float>>(std::vector<Math::Rectangle<float>>()));
 
 	// load in all pages
 	auto page_count = get_page_count();
@@ -120,7 +119,7 @@ ThreadSafeDocumentWrapper MuPDFHandler::PDF::get_document() const {
 	return m_document->get_item();
 }
 
-std::shared_ptr<ThreadSafeVector<Renderer::Rectangle<float>>> MuPDFHandler::PDF::get_pagerec() {
+std::shared_ptr<ThreadSafeVector<Math::Rectangle<float>>> MuPDFHandler::PDF::get_pagerec() {
 	return m_pagerec;
 }
 
@@ -162,17 +161,17 @@ void MuPDFHandler::PDF::save_pdf(const std::wstring& path) {
 	}
 }
 
-Renderer::Rectangle<float> MuPDFHandler::PDF::get_page_size(size_t page, float dpi) { 
+Math::Rectangle<float> MuPDFHandler::PDF::get_page_size(size_t page, float dpi) { 
 	auto c = m_ctx->get_context();
 	auto d = m_document->get_document();
 	auto p = get_page(page);
 
-	Renderer::Rectangle<float> rect;
+	Math::Rectangle<float> rect;
 	rect = fz_bound_page(*c, *p);
-	return Renderer::Rectangle<float>(0, 0, rect.width * (dpi/ MUPDF_DEFAULT_DPI), rect.height * (dpi/ MUPDF_DEFAULT_DPI));
+	return Math::Rectangle<float>(0, 0, rect.width * (dpi/ MUPDF_DEFAULT_DPI), rect.height * (dpi/ MUPDF_DEFAULT_DPI));
 }
 
-Renderer::Rectangle<float> MuPDFHandler::PDF::get_bounds() const {
+Math::Rectangle<float> MuPDFHandler::PDF::get_bounds() const {
 	auto write = m_pagerec->get_read();
 
 	auto d = write->at(0);
@@ -186,7 +185,7 @@ Renderer::Rectangle<float> MuPDFHandler::PDF::get_bounds() const {
 		down = max(down, r.bottom());
 	}
 
-	return Renderer::Rectangle<float>(left, up, right - left, down - up); 
+	return Math::Rectangle<float>(left, up, right - left, down - up); 
 } 
 
 
@@ -196,7 +195,7 @@ void MuPDFHandler::PDF::sort_page_positions() {
 	double height = 0;
 	for (size_t i = 0; i < get_page_count(); i++) {
 		auto size = get_page_size(i);
-		dest->push_back(Renderer::Rectangle<double>(0, height, size.width, size.height));
+		dest->push_back(Math::Rectangle<double>(0, height, size.width, size.height));
 		height += get_page_size(i).height;
 		height += m_seperation_distance;
 	}

@@ -1,5 +1,4 @@
-#include "include.h"
-
+#include "PDFRenderHandler.h"
 
 Direct2DRenderer::BitmapObject PDFRenderHandler::get_bitmap(Direct2DRenderer& renderer, size_t page, float dpi) const {
 	fz_matrix ctm;
@@ -31,7 +30,7 @@ Direct2DRenderer::BitmapObject PDFRenderHandler::get_bitmap(Direct2DRenderer& re
 	return std::move(obj);
 }
 
-Direct2DRenderer::BitmapObject PDFRenderHandler::get_bitmap(Direct2DRenderer& renderer, size_t page, Renderer::Rectangle<unsigned int> rec) const {
+Direct2DRenderer::BitmapObject PDFRenderHandler::get_bitmap(Direct2DRenderer& renderer, size_t page, Math::Rectangle<unsigned int> rec) const {
 	fz_matrix ctm;
 	auto size = m_pdf->get_page_size(page); 
 	ctm = fz_scale((rec.width / size.width), (rec.height / size.height));
@@ -64,7 +63,7 @@ Direct2DRenderer::BitmapObject PDFRenderHandler::get_bitmap(Direct2DRenderer& re
 	return std::move(obj);
 }
 
-Direct2DRenderer::BitmapObject PDFRenderHandler::get_bitmap(Direct2DRenderer& renderer, size_t page, Renderer::Rectangle<float> source, float dpi) const {
+Direct2DRenderer::BitmapObject PDFRenderHandler::get_bitmap(Direct2DRenderer& renderer, size_t page, Math::Rectangle<float> source, float dpi) const {
 	fz_matrix ctm;
 	ctm = fz_scale((dpi / MUPDF_DEFAULT_DPI), (dpi / MUPDF_DEFAULT_DPI));
 	auto transform = fz_translate(-source.x, -source.y);
@@ -214,7 +213,7 @@ PDFRenderHandler::PDFRenderHandler(MuPDFHandler::PDF* const pdf, Direct2DRendere
 }
 
 template<typename T>
-void remove_small_rects(std::vector <Renderer::Rectangle<T>>& rects, float threshold = EPSILON) {
+void remove_small_rects(std::vector <Math::Rectangle<T>>& rects, float threshold = EPSILON) {
 	for (long i = static_cast<long>(rects.size() - 1); i >= 0; i--) {
 		rects.at(i).validate();
 		if (rects.at(i).width < threshold or rects.at(i).height < threshold) {
@@ -313,7 +312,7 @@ std::vector<PDFRenderHandler::RenderInfo> PDFRenderHandler::get_pdf_overlap(Rend
 	// We first get the clip space
 	auto clip_space = m_renderer->inv_transform_rect(m_renderer->get_window_size_normalized());
 
-	auto add_stitch = [](Renderer::Rectangle<float>& r) {
+	auto add_stitch = [](Math::Rectangle<float>& r) {
 		r.x      -= PDF_STITCH_THRESHOLD;
 		r.y      -= PDF_STITCH_THRESHOLD;
 		r.width  += PDF_STITCH_THRESHOLD * 2;
@@ -344,7 +343,7 @@ std::vector<PDFRenderHandler::RenderInfo> PDFRenderHandler::get_pdf_overlap(Rend
 		}
 
 		auto page_clip_overlap = clip_space.calculate_overlap(page_recs->at(curr_page));
-		std::vector<Renderer::Rectangle<float>> intersecting_recs;
+		std::vector<Math::Rectangle<float>> intersecting_recs;
 
 		// --- Check if the page is already in the cache ---
 		auto cached_bitmaps = cached_bitmaps_ptr->get_read();
@@ -430,7 +429,7 @@ std::vector<PDFRenderHandler::RenderInfo> PDFRenderHandler::get_pdf_overlap(Rend
 		}
 		
 		// in the other case we have to process the overlap further for more efficient rendering
-		std::vector<Renderer::Rectangle<float>> chopped_render_targets = splice_rect(page_clip_overlap, intersecting_recs);
+		std::vector<Math::Rectangle<float>> chopped_render_targets = splice_rect(page_clip_overlap, intersecting_recs);
 		merge_rects(chopped_render_targets); 
 		remove_small_rects(chopped_render_targets); 
 
@@ -656,7 +655,7 @@ void PDFRenderHandler::async_render() {
 			// create new pixmap
 			pixmap = fz_new_pixmap_with_bbox(ctx, fz_device_rgb(ctx), pixmap_size, nullptr, 1);
 			// create draw device
-			drawdevice = fz_new_draw_device(ctx, fz_concat(transform, ctm), pixmap);
+			drawdevice = fz_new_draw_device(ctx, fz_concat(transform, ctm), pixmap); 
 			// render to draw device
 			if (info->job == RenderInfo::JOB_TYPE::ANNOTATION) {
 				fz_clear_pixmap(ctx, pixmap); // for transparent background

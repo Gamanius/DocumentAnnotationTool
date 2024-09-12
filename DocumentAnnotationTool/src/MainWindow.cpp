@@ -1,5 +1,5 @@
 #include "helper/include.h"
-#include "MainWindow.h"
+#include <filesystem>
 
 std::unique_ptr<WindowHandler> g_main_window;
 std::unique_ptr<Direct2DRenderer> g_main_renderer;
@@ -90,7 +90,7 @@ void custom_msg(CUSTOM_WM_MESSAGE msg, void* data) {
 	}
 }
 
-void callback_size(Renderer::Rectangle<long> r) {
+void callback_size(Math::Rectangle<long> r) {
 	g_main_renderer->resize(r);
 	g_gesturehandler.check_bounds();
 }
@@ -135,8 +135,8 @@ void callback_key_up(WindowHandler::VK k) {
 	g_main_window->invalidate_drawing_area();
 }
 
-Renderer::Point<float> g_init_touch_pos = { 0, 0 };
-Renderer::Point<float> g_init_trans_pos = { 0, 0 };
+Math::Point<float> g_init_touch_pos = { 0, 0 };
+Math::Point<float> g_init_trans_pos = { 0, 0 };
 
 void callback_pointer_down(WindowHandler::PointerInfo p) {
 	if (p.type == WindowHandler::POINTER_TYPE::MOUSE and p.button3pressed) {
@@ -204,7 +204,7 @@ void callback_pointer_up(WindowHandler::PointerInfo p) {
 	g_main_window->invalidate_drawing_area();
 }
 
-void callback_mousewheel(short delta, bool hwheel, Renderer::Point<int> center) {
+void callback_mousewheel(short delta, bool hwheel, Math::Point<int> center) {
 	g_gesturehandler.update_mouse(static_cast<float>(delta)/2.0f, hwheel, center);
 	g_main_window->invalidate_drawing_area();
 }

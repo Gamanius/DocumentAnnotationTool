@@ -18,75 +18,117 @@
     <ClCompile Include="src\main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\helper\Window.cpp">
+    <ClCompile Include="src\helper\Windows\Window.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\helper\Direct2D.cpp">
+    <ClCompile Include="src\helper\Windows\Direct2D.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\MainWindow.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\helper\FileHandler.cpp">
+    <ClCompile Include="src\helper\General\FileHandler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\helper\MuPDF.cpp">
+    <ClCompile Include="src\helper\PDF\MuPDF.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\helper\PDFHandler.cpp">
+    <ClCompile Include="src\helper\PDF\PDFRenderHandler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\helper\Wrapper.cpp">
+    <ClCompile Include="src\helper\PDF\Wrapper.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\helper\GestureHandler.cpp">
+    <ClCompile Include="src\helper\PDF\GestureHandler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\helper\Timer.cpp">
+    <ClCompile Include="src\helper\General\Timer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\helper\StrokeHandler.cpp">
+    <ClCompile Include="src\helper\PDF\StrokeHandler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\helper\Renderer.cpp">
+    <ClCompile Include="src\helper\Windows\Renderer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\helper\include.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="src\MainWindow.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\helper\ReadWriteRecursiveMutex.h">
+    <ClInclude Include="src\dependencies\ReadWriteRecursiveMutex.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\dependecies\magic_enum\magic_enum.hpp">
+    <ClInclude Include="src\dependencies\magic_enum\magic_enum.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\dependecies\magic_enum\magic_enum_all.hpp">
+    <ClInclude Include="src\dependencies\magic_enum\magic_enum_all.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\dependecies\magic_enum\magic_enum_containers.hpp">
+    <ClInclude Include="src\dependencies\magic_enum\magic_enum_containers.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\dependecies\magic_enum\magic_enum_flags.hpp">
+    <ClInclude Include="src\dependencies\magic_enum\magic_enum_flags.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\dependecies\magic_enum\magic_enum_format.hpp">
+    <ClInclude Include="src\dependencies\magic_enum\magic_enum_format.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\dependecies\magic_enum\magic_enum_fuse.hpp">
+    <ClInclude Include="src\dependencies\magic_enum\magic_enum_fuse.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\dependecies\magic_enum\magic_enum_iostream.hpp">
+    <ClInclude Include="src\dependencies\magic_enum\magic_enum_iostream.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\dependecies\magic_enum\magic_enum_switch.hpp">
+    <ClInclude Include="src\dependencies\magic_enum\magic_enum_switch.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\dependecies\magic_enum\magic_enum_utility.hpp">
+    <ClInclude Include="src\dependencies\magic_enum\magic_enum_utility.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\dependencies\ThreadSafeClass.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\helper\General\Logger.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\helper\General\Timer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\helper\General\FileHandler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\helper\General\Math.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\helper\General\General.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\dependencies\MagicEnum.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\helper\Windows\Direct2D.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\helper\Windows\WindowHandler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\helper\PDF\MuPDF.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\helper\PDF\PDFRenderHandler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\helper\PDF\StrokeHandler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\helper\PDF\GestureHandler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\helper\PDF\PDF.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\helper\include.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

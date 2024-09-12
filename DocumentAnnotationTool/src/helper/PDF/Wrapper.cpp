@@ -1,4 +1,4 @@
-#include "include.h"
+#include "MuPDF.h"
 
 ContextWrapper::ContextWrapper(fz_context* c) : ThreadSafeClass<fz_context*>(std::move(c)) {}
 

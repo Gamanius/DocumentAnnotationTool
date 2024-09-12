@@ -1,4 +1,4 @@
-#include "include.h"
+#include "GestureHandler.h"
 #include "cmath"
 
 void GestureHandler::check_bounds() {
@@ -43,7 +43,7 @@ void GestureHandler::check_bounds() {
 
 void GestureHandler::process_one_finger(GestureFinger& finger) {
 	auto scale = m_renderer->get_transform_scale();
-	Renderer::Point<float> new_pos = (1 / scale) * (finger.last_position - finger.initial_position);
+	Math::Point<float> new_pos = (1 / scale) * (finger.last_position - finger.initial_position);
 	m_renderer->set_transform_matrix(new_pos + m_initial_offset);
 }
 
@@ -212,7 +212,7 @@ void GestureHandler::end_gesture(const WindowHandler::PointerInfo& p) {
 	}
 }
 
-void GestureHandler::update_mouse(short delta, bool hwheel, Renderer::Point<int> center) {
+void GestureHandler::update_mouse(short delta, bool hwheel, Math::Point<int> center) {
 	if (is_gesture_active()) { 
 		return;
 	}
@@ -239,7 +239,7 @@ void GestureHandler::start_select_page(const WindowHandler::PointerInfo& p) {
 
 	for (size_t i = 0; i < recs->size(); i++) {
 		if (recs->at(i).intersects(mouse_pos)) {
-			m_selected_page = std::make_pair(i, Renderer::Point<float>(p.pos));
+			m_selected_page = std::make_pair(i, Math::Point<float>(p.pos));
 			return;
 		}
 	}
