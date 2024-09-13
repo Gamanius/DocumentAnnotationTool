@@ -395,3 +395,20 @@ Direct2DRenderer::PathObject Direct2DRenderer::create_bezier_path(const Renderer
 	SafeRelease(sink);
 	return std::move(PathObject(path)); 
 }
+
+Direct2DRenderer::PathObject Direct2DRenderer::create_line_path(const std::vector<Math::Point<float>>& line) {
+	ID2D1PathGeometry* path = nullptr;
+	ID2D1GeometrySink* sink = nullptr;
+	auto res = m_factory->CreatePathGeometry(&path);
+	ASSERT_WIN(res == S_OK, "Could not create path geometry!");
+	path->Open(&sink);
+
+	sink->BeginFigure(line[0], D2D1_FIGURE_BEGIN_FILLED);
+	// the cast is possible since the d2d1_point has the same memory layout as the line
+	sink->AddLines(reinterpret_cast<const D2D1_POINT_2F*>(&line[1]), static_cast<UINT>(line.size() - 1));
+	sink->EndFigure(D2D1_FIGURE_END_OPEN);
+	sink->Close();
+
+	SafeRelease(sink);
+	return std::move(PathObject(path));
+}

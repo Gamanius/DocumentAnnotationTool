@@ -287,6 +287,7 @@ public:
 	BitmapObject create_bitmap(const std::wstring& path);
 	BitmapObject create_bitmap(const byte* const data, Math::Rectangle<unsigned int> size, unsigned int stride, float dpi);
 	PathObject create_bezier_path(const Renderer::CubicBezierGeometry& cub);
+	PathObject create_line_path(const std::vector<Math::Point<float>>& line);
 };
 
 struct CachedBitmap {

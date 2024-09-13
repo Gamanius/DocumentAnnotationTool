@@ -5,6 +5,7 @@
 #include "MuPDF.h"
 
 #include <algorithm>
+#include <list>
 
 #ifndef _STROKE_HANDLER_H_
 #define _STROKE_HANDLER_H_
@@ -20,7 +21,7 @@ class StrokeHandler {
 		Direct2DRenderer::PathObject path;
 		float thickness = 1.0f;
 		Renderer::Color color = { 0, 0, 0 };
-		bool to_be_earesed = false;
+		bool to_be_erased = false;
 
 		Stroke() = default;
 		Stroke(const Stroke& s) = delete;
@@ -40,15 +41,14 @@ class StrokeHandler {
 			swap(first.annot, second.annot);
 			swap(first.ctx, second.ctx);
 			swap(first.bounding_box, second.bounding_box);
-			swap(first.to_be_earesed, second.to_be_earesed);
+			swap(first.to_be_erased, second.to_be_erased);
 		}
 	};
 
-	std::vector<Stroke> m_strokes;
+	std::list<Stroke> m_strokes; 
 	std::map<UINT, Stroke> m_active_strokes;
 	// earising strokes
 	std::vector<Math::Point<float>> m_earising_points;
-	std::vector<size_t> m_index_of_earising_points;
 	// not owned by this class
 	MuPDFHandler::PDF* m_pdf = nullptr;
 	// not owned by this class!

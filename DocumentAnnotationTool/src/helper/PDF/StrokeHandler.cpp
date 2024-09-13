@@ -42,8 +42,8 @@ std::vector<Math::Point<float>> get_points_from_annot(MuPDFHandler::PDF* pdf, pd
 	std::vector<Math::Point<float>> all_points;
 	auto ctx = pdf->get_context();
 	auto list_count = pdf_annot_ink_list_count(*ctx, a);
-	auto vertex_count = pdf_annot_ink_list_stroke_count(*ctx, a, 0);
 	for (int i = 0; i < list_count; i++) {
+		auto vertex_count = pdf_annot_ink_list_stroke_count(*ctx, a, i);
 		for (size_t k = 0; k < vertex_count; k++) {
 			all_points.push_back(pdf_annot_ink_list_stroke_vertex(*ctx, a, i, k)); 
 		}
@@ -224,12 +224,10 @@ void StrokeHandler::earsing_stroke(const WindowHandler::PointerInfo& p) {
 		auto p1 = m_earising_points.at(m_earising_points.size() - 2);
 		auto p2 = m_earising_points.at(m_earising_points.size() - 1);
 		// iterate through all strokes and check if the line intersects with any of them
-		for (size_t i = 0; i < m_strokes.size(); i++) {
-			auto& stroke = m_strokes.at(i);
+		for (auto& stroke : m_strokes) { 
 			// special case where stroke.points.size == 1
 			if (stroke.points.size() == 1 and Math::line_segment_intersects(p1, p2, stroke.points.at(0), stroke.points.at(0))) {
-				m_index_of_earising_points.push_back(i);
-				stroke.to_be_earesed = true;
+				stroke.to_be_erased = true;
 				continue;
 			}
 
@@ -238,8 +236,10 @@ void StrokeHandler::earsing_stroke(const WindowHandler::PointerInfo& p) {
 					continue;
 				}
 				if (Math::line_segment_intersects(p1, p2, stroke.points.at(j), stroke.points.at(j + 1)) or (p1 - stroke.points.at(j)).distance() < stroke.thickness * 4) {
-					m_index_of_earising_points.push_back(i);
-					stroke.to_be_earesed = true;
+					if (stroke.path.m_object == nullptr) {
+						stroke.path = m_renderer->create_line_path(stroke.points);
+					}
+					stroke.to_be_erased = true;
 					break;
 				}
 			}
@@ -254,25 +254,26 @@ void StrokeHandler::end_earsing_stroke(const WindowHandler::PointerInfo& p) {
 	}
 	earsing_stroke(p);
 	// we now delete the strokes from the list
-	std::sort(m_index_of_earising_points.begin(), m_index_of_earising_points.end(), std::greater<>());
 	size_t last_index = ~0;
 	auto ctx = m_pdf->get_context();
 	std::vector<size_t> pages_to_update;
-	for (size_t i = 0; i < m_index_of_earising_points.size(); i++) {
-		auto index = m_index_of_earising_points.at(i);
-		// in case of duplicates
-		if (last_index == index) {
+	auto it = m_strokes.begin();
+	while (it != m_strokes.end()) {
+		auto& stroke = *it; 
+		// Check if the element has to be erased
+		if (!stroke.to_be_erased) {
+			++it;
 			continue;
 		}
-		last_index = index;
-		auto page = m_pdf->get_page(m_strokes.at(index).page);
-		pages_to_update.push_back(m_strokes.at(index).page); 
-		pdf_delete_annot(*ctx, reinterpret_cast<pdf_page*>(*page), m_strokes.at(index).annot);
+
+		// Remove the element from the pdf
+		auto page = m_pdf->get_page(stroke.page); 
+		pages_to_update.push_back(stroke.page); 
+		pdf_delete_annot(*ctx, reinterpret_cast<pdf_page*>(*page), stroke.annot); 
 		
 
-		m_strokes.erase(m_strokes.begin() + index); 
+		it = m_strokes.erase(it); 
 	}
-	m_index_of_earising_points.clear();
 	m_earising_points.clear();
 
 	// update the page
@@ -297,20 +298,14 @@ void StrokeHandler::render_strokes() {
 	// iterate through all strokes and draw them using the renderer
 	m_renderer->set_current_transform_active();
 	m_renderer->begin_draw();
-	for (size_t i = 0; i < m_strokes.size(); i++) {
-		auto& stroke = m_strokes.at(i);
+	for (auto& stroke : m_strokes) {
 		// check if a path exist
 		// A path object may not exist if the stroke was generated from the pdf 
 		if (stroke.path.m_object == nullptr) {
-			if (stroke.to_be_earesed) 
-				for (size_t j = 0; j < stroke.points.size() - 1; j++) {
-					m_renderer->draw_line(stroke.points.at(j), stroke.points.at(j + 1), {255, 0, 0}, stroke.thickness * 2);
-					m_renderer->draw_line(stroke.points.at(j), stroke.points.at(j + 1), stroke.color, stroke.thickness);
-				}
 			continue;
 		}
 
-		if (stroke.to_be_earesed) {
+		if (stroke.to_be_erased) {
 			m_renderer->draw_path(stroke.path, {255, 0, 0}, stroke.thickness * 2);
 		}
 		m_renderer->draw_path(stroke.path, stroke.color, stroke.thickness); 
