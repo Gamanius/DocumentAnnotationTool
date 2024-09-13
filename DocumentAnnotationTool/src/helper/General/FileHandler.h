@@ -3,7 +3,9 @@
 #include <Windows.h>
 #include <optional>
 #include <string>
+#include <filesystem>
 #include "Math.h"
+#include "Macros.h" 
 #include "../General/General.h"
 
 #ifndef _FILE_HANDLER_H_
@@ -63,6 +65,9 @@ namespace FileHandler {
 	std::optional<File> open_file(const std::wstring& path);
 
 	bool write_file(byte* data, size_t amount, const std::wstring& path, bool overwrite = true);
+	bool write_file_to_appdata(const File& f, std::filesystem::path path, bool overwrite = true);
+
+	std::filesystem::path get_appdata_path(); 
 
 	/// <summary>
 	/// Returns size of the bitmap

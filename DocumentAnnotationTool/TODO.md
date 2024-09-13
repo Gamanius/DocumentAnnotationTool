@@ -1,6 +1,4 @@
 ## Possible bugs
-- <span style="color:red;">Loading in the points is currently very buggy</span>
-- <span style="color:red;">Erasing over pages will lead to problems</span>
 - <span style="color:orange;">Annotations don't play nice with moving of pages</span>
 - <span style="color:green;"> Check for DIP and NON-DIP calls to the Direct2D API. </span>
 

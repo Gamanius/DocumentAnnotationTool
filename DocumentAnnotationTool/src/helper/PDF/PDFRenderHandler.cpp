@@ -921,36 +921,38 @@ void PDFRenderHandler::update_annotations(size_t page) {
 	fz_device* dev_annot = nullptr;
 	fz_device* dev_widget = nullptr;
 
-	auto display_list = m_display_list->get_write();
+	{
+		auto display_list = m_display_list->get_write();
 
-	// get the page that will be rendered
-	auto doc = m_pdf->get_document();
-	auto p = m_pdf->get_page(page);
-	auto ctx = m_pdf->get_context();
+		// get the page that will be rendered
+		auto doc = m_pdf->get_document();
+		auto p = m_pdf->get_page(page);
+		auto ctx = m_pdf->get_context();
 
-	fz_try(*ctx) {
-		// create a display list with all the draw calls and so on
-		list_annot = fz_new_display_list(*ctx, fz_bound_page(*ctx, *p));
-		list_widget = fz_new_display_list(*ctx, fz_bound_page(*ctx, *p));
+		fz_try(*ctx) {
+			// create a display list with all the draw calls and so on
+			list_annot = fz_new_display_list(*ctx, fz_bound_page(*ctx, *p));
+			list_widget = fz_new_display_list(*ctx, fz_bound_page(*ctx, *p));
 
-		dev_annot = fz_new_list_device(*ctx, list_annot);
-		dev_widget = fz_new_list_device(*ctx, list_widget);
+			dev_annot = fz_new_list_device(*ctx, list_annot);
+			dev_widget = fz_new_list_device(*ctx, list_widget);
 		
-		// run all devices
-		fz_run_page_annots(*ctx, *p, dev_annot, fz_identity, nullptr);
-		fz_run_page_widgets(*ctx, *p, dev_widget, fz_identity, nullptr);
+			// run all devices
+			fz_run_page_annots(*ctx, *p, dev_annot, fz_identity, nullptr);
+			fz_run_page_widgets(*ctx, *p, dev_widget, fz_identity, nullptr);
 
-		// add list to array
-		display_list->at(page).m_page_annots = std::shared_ptr<DisplayListWrapper>(new DisplayListWrapper(m_pdf->get_context_wrapper(), list_annot));
-		display_list->at(page).m_page_widgets = std::shared_ptr<DisplayListWrapper>(new DisplayListWrapper(m_pdf->get_context_wrapper(), list_widget));
-	} fz_always(*ctx) {
-		// flush the device
-		fz_close_device(*ctx, dev_annot);
-		fz_close_device(*ctx, dev_widget);
-		fz_drop_device(*ctx, dev_annot);
-		fz_drop_device(*ctx, dev_widget);
-	} fz_catch(*ctx) {
-		ASSERT(false, "Could not create display list");
+			// add list to array
+			display_list->at(page).m_page_annots = std::shared_ptr<DisplayListWrapper>(new DisplayListWrapper(m_pdf->get_context_wrapper(), list_annot));
+			display_list->at(page).m_page_widgets = std::shared_ptr<DisplayListWrapper>(new DisplayListWrapper(m_pdf->get_context_wrapper(), list_widget));
+		} fz_always(*ctx) {
+			// flush the device
+			fz_close_device(*ctx, dev_annot);
+			fz_close_device(*ctx, dev_widget);
+			fz_drop_device(*ctx, dev_annot);
+			fz_drop_device(*ctx, dev_widget);
+		} fz_catch(*ctx) {
+			ASSERT(false, "Could not create display list");
+		}
 	}
 
 	auto queue = m_render_queue->get_write();

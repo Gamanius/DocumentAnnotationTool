@@ -61,8 +61,10 @@ void callback_draw(std::optional<std::vector<CachedBitmap*>*> highres_bitmaps) {
 		g_main_renderer->draw_rect(rec->at(selected_page.value()), { 0, 0, 255 }, 5);
 	}
 
+
 	// draw ui elements
 	g_main_renderer->set_identity_transform_active();
+	g_main_renderer->draw_line({ 0, -100 }, { 100, 100 }, { 255, 0, 0 }, 5);
 	
 	g_main_renderer->end_draw();
 }

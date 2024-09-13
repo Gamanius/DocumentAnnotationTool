@@ -1,6 +1,8 @@
 #pragma once
 
 #include "../General/General.h"
+#include "Macros.h"
+
 #include <Windows.h>
 #include <map>
 #include <functional>
@@ -8,8 +10,6 @@
 /// Custom WM_APP message to signal that the bitmap is ready to be drawn
 #define WM_PDF_BITMAP_READY (WM_APP + 0x0BAD /*Magic number (rolled by fair dice)*/)
 #define WM_CUSTOM_MESSAGE (WM_APP + 0x0BAD + 1)
-
-#define APPLICATION_NAME L"Docanto" 
 
 #ifndef _WINDOW_HANDLER_H_
 #define _WINDOW_HANDLER_H_

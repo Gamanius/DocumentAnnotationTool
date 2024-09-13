@@ -36,6 +36,7 @@ void StrokeHandler::apply_stroke_to_pdf(Stroke& s) {
 
 	float b[] = { s.color.r/255.0f, s.color.g / 255.0f, s.color.b / 255.0f };
 	pdf_set_annot_color(*ctx, s.annot, 3, b); 
+	pdf_set_annot_border_width(*ctx, s.annot, s.thickness); 
 }
 
 std::vector<Math::Point<float>> get_points_from_annot(MuPDFHandler::PDF* pdf, pdf_annot* a) {
@@ -87,34 +88,39 @@ void StrokeHandler::parse_all_strokes() {
 		if (annot == nullptr) {
 			continue;
 		}
-		auto type  = pdf_annot_type(*ctx, annot);
+
+		enum pdf_annot_type type;
 		do {
-			type = pdf_annot_type(*ctx, annot);
-			if (type == pdf_annot_type::PDF_ANNOT_INK) {
-				auto has_ink = pdf_annot_has_ink_list(*ctx, annot);
-				if (!has_ink) {
-					Logger::warn("Found annotation without points... what?");
-					continue;
-				}
-				// add it the the strokes as it may have to be deleted later on
-				pdf_keep_annot(*ctx, annot);
-				Stroke s;
-				s.annot = annot;
-				s.page = i;
-				s.ctx = m_pdf->get_context_wrapper();
-				s.points = get_points_from_annot(m_pdf, annot);
-				// transform the points into clip space
-				for (size_t j = 0; j < s.points.size(); j++) {
-					s.points.at(j) += rec->at(i).upperleft();
-				}
-				s.thickness = pdf_annot_border_width(*ctx, annot);
-				if (FLOAT_EQUAL(0, s.thickness)) {
-					s.thickness = 1;
-				}
-				s.color = get_color_from_annot(m_pdf, annot);
-				
-				m_strokes.push_back(std::move(s));
+			type = pdf_annot_type(*ctx, annot); 
+			if (type != pdf_annot_type::PDF_ANNOT_INK) {
+				continue;
 			}
+
+			auto has_ink = pdf_annot_has_ink_list(*ctx, annot);
+			if (!has_ink) {
+				Logger::warn("Found annotation without points... what?");
+				continue;
+			}
+
+			// add it the the strokes as it may have to be deleted later on
+			pdf_keep_annot(*ctx, annot);
+			Stroke s;
+			s.annot = annot;
+			s.page = i;
+			s.ctx = m_pdf->get_context_wrapper();
+			s.color = get_color_from_annot(m_pdf, annot);
+			s.points = get_points_from_annot(m_pdf, annot);
+			// transform the points into clip space
+			for (size_t j = 0; j < s.points.size(); j++) {
+				s.points.at(j) += rec->at(i).upperleft();
+			}
+
+			s.thickness = pdf_annot_border_width(*ctx, annot);
+			if (FLOAT_EQUAL(0, s.thickness)) {
+				s.thickness = 1;
+			}
+				
+			m_strokes.push_back(std::move(s));
 		} while ((annot = pdf_next_annot(*ctx, annot)) != NULL);
 	}
 	Logger::log("Found ", m_strokes.size(), " ink annotations in the document");
@@ -219,33 +225,34 @@ void StrokeHandler::earsing_stroke(const WindowHandler::PointerInfo& p) {
 		m_earising_points.erase(m_earising_points.begin());
 	}
 
-	if (m_earising_points.size() >= 2) {
-		// we can check if the last two added points overlap with any other curve
-		auto p1 = m_earising_points.at(m_earising_points.size() - 2);
-		auto p2 = m_earising_points.at(m_earising_points.size() - 1);
-		// iterate through all strokes and check if the line intersects with any of them
-		for (auto& stroke : m_strokes) { 
-			// special case where stroke.points.size == 1
-			if (stroke.points.size() == 1 and Math::line_segment_intersects(p1, p2, stroke.points.at(0), stroke.points.at(0))) {
-				stroke.to_be_erased = true;
+	if (m_earising_points.size() < 2) {
+		return;
+	}
+
+	// we can check if the last two added points overlap with any other curve
+	auto p1 = m_earising_points.at(m_earising_points.size() - 2);
+	auto p2 = m_earising_points.at(m_earising_points.size() - 1);
+	// iterate through all strokes and check if the line intersects with any of them
+	for (auto& stroke : m_strokes) { 
+		// special case where stroke.points.size == 1
+		if (stroke.points.size() == 1 and (p1 - stroke.points.at(0)).distance() < stroke.thickness * 4) {
+			stroke.to_be_erased = true;
+			continue;
+		}
+
+		for (size_t j = 0; j < stroke.points.size() - 1; j++) {
+			if (stroke.page != page) {
 				continue;
 			}
-
-			for (size_t j = 0; j < stroke.points.size() - 1; j++) {
-				if (stroke.page != page) {
-					continue;
+			if (Math::line_segment_intersects(p1, p2, stroke.points.at(j), stroke.points.at(j + 1)) or (p1 - stroke.points.at(j)).distance() < stroke.thickness * 4) {
+				if (stroke.path.m_object == nullptr) {
+					stroke.path = m_renderer->create_line_path(stroke.points);
 				}
-				if (Math::line_segment_intersects(p1, p2, stroke.points.at(j), stroke.points.at(j + 1)) or (p1 - stroke.points.at(j)).distance() < stroke.thickness * 4) {
-					if (stroke.path.m_object == nullptr) {
-						stroke.path = m_renderer->create_line_path(stroke.points);
-					}
-					stroke.to_be_erased = true;
-					break;
-				}
+				stroke.to_be_erased = true;
+				break;
 			}
 		}
 	}
-	
 }
 
 void StrokeHandler::end_earsing_stroke(const WindowHandler::PointerInfo& p) {
@@ -253,8 +260,8 @@ void StrokeHandler::end_earsing_stroke(const WindowHandler::PointerInfo& p) {
 		return;
 	}
 	earsing_stroke(p);
+
 	// we now delete the strokes from the list
-	size_t last_index = ~0;
 	auto ctx = m_pdf->get_context();
 	std::vector<size_t> pages_to_update;
 	auto it = m_strokes.begin();
@@ -278,7 +285,7 @@ void StrokeHandler::end_earsing_stroke(const WindowHandler::PointerInfo& p) {
 
 	// update the page
 	std::sort(pages_to_update.begin(), pages_to_update.end());
-	last_index = ~0; 
+	size_t last_index = ~0; 
 	for (auto& page : pages_to_update) {
 		if (page == last_index) {
 			continue;
@@ -286,12 +293,9 @@ void StrokeHandler::end_earsing_stroke(const WindowHandler::PointerInfo& p) {
 		auto p = m_pdf->get_page(page);
 		pdf_update_page(*ctx, reinterpret_cast<pdf_page*>(*p));
 		last_index = page;
+
+		SendMessage(m_window->get_hwnd(), WM_CUSTOM_MESSAGE, reinterpret_cast<WPARAM>(&page), CUSTOM_WM_MESSAGE::PDF_HANDLER_ANNOTAION_CHANGE); 
 	}
-	if (pages_to_update.empty()) { 
-		return; 
-	}
-	size_t a = *pages_to_update.begin();
-	SendMessage(m_window->get_hwnd(), WM_CUSTOM_MESSAGE, reinterpret_cast<WPARAM>(&a), CUSTOM_WM_MESSAGE::PDF_HANDLER_ANNOTAION_CHANGE);
 }
 
 void StrokeHandler::render_strokes() {
@@ -308,6 +312,9 @@ void StrokeHandler::render_strokes() {
 		if (stroke.to_be_erased) {
 			m_renderer->draw_path(stroke.path, {255, 0, 0}, stroke.thickness * 2);
 		}
+
+		// TODO: we dont need to draw new strokes that have been applied to the pdf
+		// if we updated the page due to a erasing event
 		m_renderer->draw_path(stroke.path, stroke.color, stroke.thickness); 
 		
 	}

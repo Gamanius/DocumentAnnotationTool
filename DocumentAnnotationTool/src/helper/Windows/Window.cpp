@@ -1,7 +1,9 @@
 #pragma once
 
 #include "WindowHandler.h"
-#include "windowsx.h"
+#include <windowsx.h>
+#include <dwmapi.h>
+
 #define CHECK_BIT(var,pos) ((var) & (1<<(pos)))
 
 
@@ -351,10 +353,26 @@ static WindowHandler::PointerInfo parse_pointer_info(const WindowHandler& w, WPA
 }
 
 LRESULT WindowHandler::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+	// The WM_CREATE msg must be translated before anything else
+	switch (uMsg) {
+	case WM_CREATE:
+	{	
+		// add this windows to the window stack
+		auto window = reinterpret_cast<CREATESTRUCT*>(lParam)->lpCreateParams; 
+		m_allWindowInstances->operator[](hWnd) = reinterpret_cast<WindowHandler*>(window);
+		SetWindowPos(hWnd, nullptr, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE);
+		break;
+	}
+	}
+
 	WindowHandler* currentInstance = m_allWindowInstances->operator[](hWnd);
 	if (currentInstance == nullptr) {
 		return DefWindowProc(hWnd, uMsg, wParam, lParam);
 	}
+	LRESULT result;
+
+	auto dwm_has_processed = DwmDefWindowProc(hWnd, uMsg, wParam, lParam, &result);
+	if (dwm_has_processed) return result;
 
 	switch (uMsg) {
 	case WM_CLOSE:
@@ -425,6 +443,58 @@ LRESULT WindowHandler::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam
 
 		return 0;
 	}
+
+	case WM_NCCALCSIZE:
+	{
+		auto client_area_needs_calculating = static_cast<bool>(wParam);
+
+		if (client_area_needs_calculating) {
+
+			auto parameters = reinterpret_cast<NCCALCSIZE_PARAMS*>(lParam);
+
+			auto& requested_client_area = parameters->rgrc[0];
+			requested_client_area.right -= GetSystemMetrics(SM_CXFRAME) + GetSystemMetrics(SM_CXPADDEDBORDER);
+			requested_client_area.left += GetSystemMetrics(SM_CXFRAME) + GetSystemMetrics(SM_CXPADDEDBORDER);
+			requested_client_area.bottom -= GetSystemMetrics(SM_CYFRAME) + GetSystemMetrics(SM_CXPADDEDBORDER);
+
+
+			return 0;
+		}
+		break;
+	}
+	case WM_NCHITTEST:
+	{
+		// Acquire the window rect
+		RECT window_rectangle;
+		GetWindowRect(hWnd, &window_rectangle);
+
+		auto offset = 10;
+
+		POINT cursor_position{
+			GET_X_LPARAM(lParam), 
+			GET_Y_LPARAM(lParam)
+		};
+
+		if (cursor_position.y < window_rectangle.top + offset && cursor_position.x < window_rectangle.left + offset) return HTTOPLEFT;
+		if (cursor_position.y < window_rectangle.top + offset && cursor_position.x > window_rectangle.right - offset) return HTTOPRIGHT;
+		if (cursor_position.y > window_rectangle.bottom - offset && cursor_position.x > window_rectangle.right - offset) return HTBOTTOMRIGHT;
+		if (cursor_position.y > window_rectangle.bottom - offset && cursor_position.x < window_rectangle.left + offset) return HTBOTTOMLEFT;
+
+		if (cursor_position.x > window_rectangle.left && cursor_position.x < window_rectangle.right) {
+			if (cursor_position.y < window_rectangle.top + offset) return HTTOP;
+			else if (cursor_position.y > window_rectangle.bottom - offset) return HTBOTTOM;
+		}
+		if (cursor_position.y > window_rectangle.top && cursor_position.y < window_rectangle.bottom) {
+			if (cursor_position.x < window_rectangle.left + offset) return HTLEFT;
+			else if (cursor_position.x > window_rectangle.right - offset) return HTRIGHT;
+		}
+
+		if (cursor_position.x > window_rectangle.left && cursor_position.x < window_rectangle.right) {
+			if (cursor_position.y < window_rectangle.top + 100) return HTCAPTION;
+		}
+
+		return HTNOWHERE;
+	}
 	case WM_SIZE:
 	case WM_SIZING:
 	{
@@ -437,7 +507,7 @@ LRESULT WindowHandler::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam
 	case WM_PAINT: 
 	{
 		if (currentInstance->m_callback_paint) {
-			currentInstance->m_callback_paint(std::nullopt);
+			currentInstance->m_callback_paint(std::nullopt); 
 		}
 
 		ValidateRect(currentInstance->m_hwnd, NULL);
@@ -500,7 +570,7 @@ void WindowHandler::set_window_title(const std::wstring& s) {
 Math::Rectangle<long> WindowHandler::get_window_size() const {
 	RECT r;
 	GetClientRect(m_hwnd, &r);
-	return Math::Rectangle<long>(r.left, r.top, r.right - r.left, r.bottom - r.top);
+	return Math::Rectangle<long>(0, 0, r.right, r.bottom - 50);
 }
 
 void WindowHandler::set_window_size(Math::Rectangle<long> r) {
@@ -602,10 +672,15 @@ bool WindowHandler::init(std::wstring windowName, HINSTANCE instance) {
 	wc.hCursor = LoadCursor(NULL, IDC_ARROW);
 	wc.hbrBackground = CreateSolidBrush(3289650);
 	wc.lpszClassName = windowName.c_str();
-
 	ASSERT_WIN_RETURN_FALSE(RegisterClass(&wc), "Could not register Window");
 
-	m_hwnd = CreateWindow(wc.lpszClassName, windowName.c_str(), WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, 0, 0, instance, 0);
+	m_hwnd = CreateWindowEx(WS_EX_OVERLAPPEDWINDOW, wc.lpszClassName, windowName.c_str(), WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, 0, 0, instance, this); 
+	MARGINS m;
+	m.cxLeftWidth = 0;
+	m.cxRightWidth = 0;
+	m.cyTopHeight = 100;
+	m.cyBottomHeight = 0;
+	DwmExtendFrameIntoClientArea(m_hwnd, &m);
 	ASSERT_WIN_RETURN_FALSE(m_hwnd, "Window creation was not succefull");
 
 	m_hdc = GetDC(m_hwnd);
@@ -613,9 +688,6 @@ bool WindowHandler::init(std::wstring windowName, HINSTANCE instance) {
 
 	bool temp = EnableMouseInPointer(true);
 	ASSERT_WIN_RETURN_FALSE(temp, "Couldn't add Mouse input into Pointer Input Stack API");
-
-	// add this windows to the window stack
-	m_allWindowInstances->operator[](m_hwnd) = this;
 
 	return true;
 }
