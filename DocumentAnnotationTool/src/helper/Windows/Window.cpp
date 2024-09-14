@@ -1,8 +1,9 @@
 #pragma once
 
 #include "WindowHandler.h"
-#include <windowsx.h>
 #include <dwmapi.h>
+#include <windowsx.h>
+#include <Vssym32.h>
 
 #define CHECK_BIT(var,pos) ((var) & (1<<(pos)))
 
@@ -360,6 +361,8 @@ LRESULT WindowHandler::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam
 		// add this windows to the window stack
 		auto window = reinterpret_cast<CREATESTRUCT*>(lParam)->lpCreateParams; 
 		m_allWindowInstances->operator[](hWnd) = reinterpret_cast<WindowHandler*>(window);
+
+		// notify that the frame has changed
 		SetWindowPos(hWnd, nullptr, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE);
 		break;
 	}
@@ -443,7 +446,6 @@ LRESULT WindowHandler::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam
 
 		return 0;
 	}
-
 	case WM_NCCALCSIZE:
 	{
 		auto client_area_needs_calculating = static_cast<bool>(wParam);
@@ -457,49 +459,69 @@ LRESULT WindowHandler::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam
 			requested_client_area.left += GetSystemMetrics(SM_CXFRAME) + GetSystemMetrics(SM_CXPADDEDBORDER);
 			requested_client_area.bottom -= GetSystemMetrics(SM_CYFRAME) + GetSystemMetrics(SM_CXPADDEDBORDER);
 
-
 			return 0;
+
 		}
 		break;
 	}
 	case WM_NCHITTEST:
 	{
-		// Acquire the window rect
-		RECT window_rectangle;
-		GetWindowRect(hWnd, &window_rectangle);
+		auto xPos = GET_X_LPARAM(lParam);
+		auto yPos = GET_Y_LPARAM(lParam);
+		Math::Point<long> mousepos = { xPos, yPos };
+		mousepos = mousepos - currentInstance->get_window_position();
 
-		auto offset = 10;
+		auto windowsize = currentInstance->get_window_size(); 
+		// size of the borders
+		int offset = 15;
 
-		POINT cursor_position{
-			GET_X_LPARAM(lParam), 
-			GET_Y_LPARAM(lParam)
-		};
+		Math::Rectangle<int> top_left(0, 0, offset, offset);
+		Math::Rectangle<int> top_right(windowsize.width - offset, 0, windowsize.width, offset);
+		Math::Rectangle<int> bottom_left(0, windowsize.height - offset, offset, windowsize.height);
+		Math::Rectangle<int> bottom_right(windowsize.width - offset, windowsize.height - offset, windowsize.width, windowsize.height);
 
-		if (cursor_position.y < window_rectangle.top + offset && cursor_position.x < window_rectangle.left + offset) return HTTOPLEFT;
-		if (cursor_position.y < window_rectangle.top + offset && cursor_position.x > window_rectangle.right - offset) return HTTOPRIGHT;
-		if (cursor_position.y > window_rectangle.bottom - offset && cursor_position.x > window_rectangle.right - offset) return HTBOTTOMRIGHT;
-		if (cursor_position.y > window_rectangle.bottom - offset && cursor_position.x < window_rectangle.left + offset) return HTBOTTOMLEFT;
-
-		if (cursor_position.x > window_rectangle.left && cursor_position.x < window_rectangle.right) {
-			if (cursor_position.y < window_rectangle.top + offset) return HTTOP;
-			else if (cursor_position.y > window_rectangle.bottom - offset) return HTBOTTOM;
+		if (top_left.intersects(mousepos)) {
+			return HTTOPLEFT; 
 		}
-		if (cursor_position.y > window_rectangle.top && cursor_position.y < window_rectangle.bottom) {
-			if (cursor_position.x < window_rectangle.left + offset) return HTLEFT;
-			else if (cursor_position.x > window_rectangle.right - offset) return HTRIGHT;
+		if (top_right.intersects(mousepos)) {
+			return HTTOPRIGHT;
 		}
-
-		if (cursor_position.x > window_rectangle.left && cursor_position.x < window_rectangle.right) {
-			if (cursor_position.y < window_rectangle.top + 100) return HTCAPTION;
+		if (bottom_left.intersects(mousepos)) {
+			return HTBOTTOMLEFT;
+		}
+		if (bottom_right.intersects(mousepos)) {
+			return HTBOTTOMRIGHT;
 		}
 
-		return HTNOWHERE;
+		Math::Rectangle<int> top(0, 0, windowsize.width, offset);
+		Math::Rectangle<int> bottom(0, windowsize.height, windowsize.width, offset);
+		Math::Rectangle<int> left(0, 0, offset, windowsize.height);
+		Math::Rectangle<int> right(windowsize.width, 0, offset, windowsize.height); 
+
+		if (top.intersects(mousepos)) {
+			return HTTOP;
+		}
+		if (bottom.intersects(mousepos)) {
+			return HTBOTTOM;
+		}
+		if (left.intersects(mousepos)) {
+			return HTLEFT;
+		}
+		if (right.intersects(mousepos)) {
+			return HTRIGHT;
+		}
+
+		Math::Rectangle<int> toolbar(0, 0, windowsize.width, currentInstance->get_toolbar_margin()); 
+		if (toolbar.intersects(mousepos)) {
+			return HTCAPTION; 
+		}
+		break;
 	}
 	case WM_SIZE:
 	case WM_SIZING:
 	{
 		if (currentInstance->m_callback_size) {
-			currentInstance->m_callback_size(currentInstance->get_window_size());
+			currentInstance->m_callback_size(currentInstance->get_client_size());
 		}
 		return DefWindowProc(hWnd, uMsg, wParam, lParam);
 	}
@@ -509,7 +531,10 @@ LRESULT WindowHandler::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam
 		if (currentInstance->m_callback_paint) {
 			currentInstance->m_callback_paint(std::nullopt); 
 		}
-
+		RECT r = { 0, 0, currentInstance->m_toolbar_margin, currentInstance->m_toolbar_margin };
+		DrawThemeBackground(currentInstance->m_windowtheme, currentInstance->m_hdc, WP_CLOSEBUTTON, CBS_NORMAL, &r, NULL);
+		
+		//DrawFrameControl(currentInstance->m_hdc, &r, DFC_CAPTION, DFCS_CAPTIONCLOSE);
 		ValidateRect(currentInstance->m_hwnd, NULL);
 		return NULL;
 	}
@@ -567,10 +592,25 @@ void WindowHandler::set_window_title(const std::wstring& s) {
 	SetWindowText(m_hwnd, s.c_str()); 
 }
 
-Math::Rectangle<long> WindowHandler::get_window_size() const {
+unsigned int WindowHandler::get_toolbar_margin() const {
+	return m_toolbar_margin;
+}
+
+Math::Rectangle<long> WindowHandler::get_client_size() const {
 	RECT r;
 	GetClientRect(m_hwnd, &r);
-	return Math::Rectangle<long>(0, 0, r.right, r.bottom - 50);
+	return Math::Rectangle<long>(0, 0, r.right, r.bottom );
+}
+
+Math::Rectangle<long> WindowHandler::get_window_size() const { 
+	RECT r;
+	DwmGetWindowAttribute(m_hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, &r, sizeof(RECT));
+	return r; 
+}
+
+Math::Point<long> WindowHandler::get_window_position() const {
+	auto r = get_window_size(); 
+	return Math::Point<long>(r.x, r.y); 
 }
 
 void WindowHandler::set_window_size(Math::Rectangle<long> r) {
@@ -674,17 +714,24 @@ bool WindowHandler::init(std::wstring windowName, HINSTANCE instance) {
 	wc.lpszClassName = windowName.c_str();
 	ASSERT_WIN_RETURN_FALSE(RegisterClass(&wc), "Could not register Window");
 
-	m_hwnd = CreateWindowEx(WS_EX_OVERLAPPEDWINDOW, wc.lpszClassName, windowName.c_str(), WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, 0, 0, instance, this); 
+	m_hwnd = CreateWindowEx(WS_EX_OVERLAPPEDWINDOW, wc.lpszClassName, windowName.c_str(), WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, 0, 0, instance, this);
+	
+	// set the margin
 	MARGINS m;
 	m.cxLeftWidth = 0;
-	m.cxRightWidth = 0;
-	m.cyTopHeight = 100;
+	m.cxRightWidth = -1;
+	m.cyTopHeight = m_toolbar_margin; 
 	m.cyBottomHeight = 0;
-	DwmExtendFrameIntoClientArea(m_hwnd, &m);
+	HRESULT hr = DwmExtendFrameIntoClientArea(m_hwnd, &m);
+	ASSERT_WIN_RETURN_FALSE(SUCCEEDED(hr), "Could not extend frame into client area");  
+
 	ASSERT_WIN_RETURN_FALSE(m_hwnd, "Window creation was not succefull");
 
 	m_hdc = GetDC(m_hwnd);
 	ASSERT_WIN_RETURN_FALSE(m_hwnd, "Could not retrieve device m_context");
+
+	m_windowtheme = OpenThemeData(m_hwnd, L"WINDOW");
+	ASSERT_WIN_RETURN_FALSE(m_windowtheme != NULL, "Could not open window theme"); 
 
 	bool temp = EnableMouseInPointer(true);
 	ASSERT_WIN_RETURN_FALSE(temp, "Couldn't add Mouse input into Pointer Input Stack API");
@@ -697,6 +744,7 @@ WindowHandler::WindowHandler(std::wstring windowname, HINSTANCE instance) {
 }
 
 WindowHandler::~WindowHandler() {
+	CloseThemeData(m_windowtheme); 
 	m_allWindowInstances->erase(m_hwnd);
 	ASSERT_WIN(DestroyWindow(m_hwnd), "Error when destroying window");
 }

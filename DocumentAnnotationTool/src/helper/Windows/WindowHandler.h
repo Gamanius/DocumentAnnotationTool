@@ -4,6 +4,7 @@
 #include "Macros.h"
 
 #include <Windows.h>
+#include <Uxtheme.h>
 #include <map>
 #include <functional>
 
@@ -24,10 +25,13 @@ enum CUSTOM_WM_MESSAGE {
 class WindowHandler {
 	HWND m_hwnd = NULL;
 	HDC m_hdc = NULL;
+	HTHEME m_windowtheme = NULL; 
 
 	bool m_closeRequest = false;
 
 	static std::unique_ptr<std::map<HWND, WindowHandler*>> m_allWindowInstances;
+
+	const unsigned int m_toolbar_margin = 100;
 
 public:
 
@@ -269,8 +273,14 @@ public:
 		return dip * (get_dpi() / 96.0f);
 	}
 
+	unsigned int get_toolbar_margin() const;
+
 	// Returns the window size
+	Math::Rectangle<long> get_client_size() const;
+
 	Math::Rectangle<long> get_window_size() const;
+
+	Math::Point<long> get_window_position() const;
 
 	// Sets a new windowsize
 	void set_window_size(Math::Rectangle<long> r);
