@@ -102,7 +102,7 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d2d1.lib;libmupdf.lib;dwrite.lib;Windowscodecs.lib;Dwmapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>d2d1.lib;libmupdf.lib;dwrite.lib;Windowscodecs.lib;Dwmapi.lib;UxTheme.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)mupdf\platform\win32\x64\$(ConfigurationName);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <Manifest>
@@ -125,7 +125,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d2d1.lib;libmupdf.lib;dwrite.lib;Windowscodecs.lib;Dwmapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>d2d1.lib;libmupdf.lib;dwrite.lib;Windowscodecs.lib;Dwmapi.lib;UxTheme.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)mupdf\platform\win32\x64\$(ConfigurationName);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <Manifest>
@@ -144,7 +144,7 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d2d1.lib;libmupdf.lib;dwrite.lib;Windowscodecs.lib;Dwmapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>d2d1.lib;libmupdf.lib;dwrite.lib;Windowscodecs.lib;Dwmapi.lib;UxTheme.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)mupdf\platform\win32\x64\$(ConfigurationName);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <Manifest>
@@ -167,7 +167,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d2d1.lib;libmupdf.lib;dwrite.lib;Windowscodecs.lib;Dwmapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>d2d1.lib;libmupdf.lib;dwrite.lib;Windowscodecs.lib;Dwmapi.lib;UxTheme.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)mupdf\platform\win32\x64\$(ConfigurationName);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <Manifest>
@@ -175,6 +175,7 @@
     </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\helper\UI\CaptionHandler.cpp" />
     <ClCompile Include="src\helper\Windows\Direct2D.cpp" />
     <ClCompile Include="src\helper\General\FileHandler.cpp" />
     <ClCompile Include="src\helper\PDF\GestureHandler.cpp" />
@@ -189,6 +190,7 @@
     <ClCompile Include="src\helper\PDF\StrokeHandler.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\helper\UI\CaptionHandler.h" />
     <ClInclude Include="src\dependencies\Macros.h" />
     <ClInclude Include="src\dependencies\MagicEnum.h" />
     <ClInclude Include="src\dependencies\magic_enum\magic_enum.hpp" />
@@ -212,6 +214,7 @@
     <ClInclude Include="src\helper\PDF\PDF.h" />
     <ClInclude Include="src\helper\PDF\PDFRenderHandler.h" />
     <ClInclude Include="src\helper\PDF\StrokeHandler.h" />
+    <ClInclude Include="src\helper\UI\UI.h" />
     <ClInclude Include="src\helper\Windows\Direct2D.h" />
     <ClInclude Include="src\dependencies\ReadWriteRecursiveMutex.h" />
     <ClInclude Include="src\helper\Windows\WindowHandler.h" />

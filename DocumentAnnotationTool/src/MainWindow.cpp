@@ -13,6 +13,8 @@ std::shared_ptr<MuPDFHandler> g_mupdfcontext;
 PDFRenderHandler* g_pdfrenderhandler = nullptr;
 StrokeHandler* g_strokehandler = nullptr;
 
+CaptionHandler g_caption;
+
 GestureHandler g_gesturehandler;
 
 bool g_draw_annots = true;
@@ -64,7 +66,7 @@ void callback_draw(std::optional<std::vector<CachedBitmap*>*> highres_bitmaps) {
 
 	// draw ui elements
 	g_main_renderer->set_identity_transform_active();
-	g_main_renderer->draw_line({ 0, -100 }, { 100, 100 }, { 255, 0, 0 }, 5);
+	g_caption.draw_caption();
 	
 	g_main_renderer->end_draw();
 }
@@ -216,6 +218,11 @@ void main_window_loop_run(HINSTANCE h) {
 	g_main_window = std::make_unique<WindowHandler>(APPLICATION_NAME, h);
 
 	g_main_renderer = std::make_unique<Direct2DRenderer>(*g_main_window.get());
+	g_caption = CaptionHandler(g_main_renderer.get());  
+
+	auto temp = std::bind(&CaptionHandler::handle_hittest, &g_caption, std::placeholders::_1, std::placeholders::_2); 
+	g_main_window->set_callback_nchittest(temp); 
+
 	auto default_brush = g_main_renderer->create_brush(Renderer::Color(255, 0, 0));
 	g_brush = &default_brush;
 	auto default_text_format = g_main_renderer->create_text_format(L"Consolas", 100);

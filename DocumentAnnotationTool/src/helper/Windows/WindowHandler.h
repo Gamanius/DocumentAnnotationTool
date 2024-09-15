@@ -4,7 +4,6 @@
 #include "Macros.h"
 
 #include <Windows.h>
-#include <Uxtheme.h>
 #include <map>
 #include <functional>
 
@@ -16,6 +15,7 @@
 #define _WINDOW_HANDLER_H_
 
 struct CachedBitmap;
+class CaptionHandler;
 
 enum CUSTOM_WM_MESSAGE {
 	PDF_HANDLER_DISPLAY_LIST_UPDATE,
@@ -25,7 +25,6 @@ enum CUSTOM_WM_MESSAGE {
 class WindowHandler {
 	HWND m_hwnd = NULL;
 	HDC m_hdc = NULL;
-	HTHEME m_windowtheme = NULL; 
 
 	bool m_closeRequest = false;
 
@@ -215,6 +214,8 @@ private:
 	std::function<void(short, bool, Math::Point<int>)> m_callback_mousewheel;
 	std::function<void(VK)> m_callback_key_down;
 	std::function<void(VK)> m_callback_key_up;
+
+	std::function<LRESULT(Math::Point<long>, Math::Rectangle<long>)> m_callback_nchittest; 
 public:
 
 	static LRESULT parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -238,6 +239,8 @@ public:
 	void set_callback_mousewheel(std::function<void(short, bool, Math::Point<int>)> callback);
 	void set_callback_key_down(std::function<void(VK)> callback);
 	void set_callback_key_up(std::function<void(VK)> callback);
+	
+	void set_callback_nchittest(std::function<LRESULT(Math::Point<long>, Math::Rectangle<long>)> callback); 
 
 	void invalidate_drawing_area();
 	void invalidate_drawing_area(Math::Rectangle<long> rec);
@@ -294,6 +297,7 @@ public:
 	static bool is_key_pressed(VK key);
 
 	Math::Point<long> get_mouse_pos() const;
+
 
 	/// <summary>
 	///  returns the window handle

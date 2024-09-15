@@ -54,8 +54,7 @@ Direct2DRenderer::~Direct2DRenderer() {
 
 void Direct2DRenderer::clear(Renderer::Color c) {
 	begin_draw();
-	set_identity_transform_active();
-	draw_rect_filled(m_window_size, c);
+	m_renderTarget->Clear(c);
 	end_draw();
 }
 
