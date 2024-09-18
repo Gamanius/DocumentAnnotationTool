@@ -225,6 +225,7 @@ public:
 	Math::Point<float> inv_transform_point(const Math::Point<float> p) const;
 
 	UINT get_dpi() const;
+	float get_dpi_scale() const;
 
 	/// <summary>
 	/// Converts the given pixel to DIPs (device independent pixels)
@@ -245,6 +246,7 @@ public:
 	T DptoPx(T dip) const {
 		return dip * (get_dpi() / 96.0f);
 	}
+
 
 	template<typename T>
 	Math::Point<T> PxToDp(const Math::Point<T>& pxPoint) const {

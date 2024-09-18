@@ -28,18 +28,34 @@ void CaptionHandler::set_caption(const std::wstring& caption) {
 
 void CaptionHandler::draw_caption() {
 	m_renderer->begin_draw();
+	auto scale = m_renderer->get_dpi_scale();
 	m_renderer->set_identity_transform_active();
-	auto win_size = m_renderer->get_window_size(); 
+	auto win_size = m_renderer->get_window_size();
 
-	m_renderer->draw_rect_filled({ 0, 0, static_cast<float>(win_size.width), static_cast<float>(m_caption_size) }, { 0, 0, 255 });
+	float caption_height = m_caption_size;
+	auto caption_width = win_size.width * scale;
+	m_renderer->draw_rect_filled({ 0, 0, caption_width, caption_height }, { 70, 70, 70 });
+	m_renderer->draw_text(APPLICATION_NAME, { 0, 0 }, { 255, 255, 255 }, caption_height);
 
 	// close button
-	m_renderer->draw_rect_filled({ static_cast<float>(win_size.width - m_caption_size), 0, static_cast<float>(m_caption_size), static_cast<float>(m_caption_size) }, { 255, 0, 0 });
+	m_renderer->draw_rect_filled({ caption_width - caption_height, 0, caption_height, caption_height }, { 255, 0, 0 });
+	m_renderer->draw_line({ caption_width - caption_height + caption_height / 4, caption_height / 4 }, { caption_width - caption_height + caption_height - caption_height / 4, caption_height - caption_height / 4 }, { 255, 255, 255 }, 2);
+	m_renderer->draw_line({ caption_width - caption_height + caption_height / 4, caption_height - caption_height / 4 }, { caption_width - caption_height + caption_height - caption_height / 4, caption_height / 4 }, { 255, 255, 255 }, 2);
+
+	// Maximize button
+	m_renderer->draw_rect_filled({ caption_width - caption_height * 2, 0, caption_height, caption_height }, { 50, 0, 0 });
+	m_renderer->draw_rect({ { caption_width - caption_height * 2 + caption_height / 4, caption_height / 4 }, { caption_width - caption_height * 2 + caption_height - caption_height / 4, caption_height - caption_height / 4 } }, { 255, 255, 255 }, 2);
+
+	// Minimize
+	m_renderer->draw_rect_filled({ caption_width - caption_height * 3, 0, caption_height, caption_height }, { 255, 0, 255 });
+	m_renderer->draw_line({ caption_width - caption_height * 3 + caption_height / 4, caption_height / 2 }, { caption_width - caption_height * 3 + caption_height - caption_height / 4, caption_height / 2 }, { 255, 255, 255 }, 2);
+
 	m_renderer->end_draw();
 }
 
 LRESULT CaptionHandler::handle_hittest(Math::Point<long> mousepos, Math::Rectangle<long> windowsize) {
 	int offset = 15;
+	float caption_size = m_caption_size / m_renderer->get_dpi_scale();
 
 	Math::Rectangle<int> top_left(0, 0, offset, offset);
 	Math::Rectangle<int> top_right(windowsize.width - offset, 0, windowsize.width, offset);
@@ -78,15 +94,25 @@ LRESULT CaptionHandler::handle_hittest(Math::Point<long> mousepos, Math::Rectang
 		return HTRIGHT;
 	}
 
-	Math::Rectangle<int> toolbar(0, 0, windowsize.width, m_caption_size);  
+	Math::Rectangle<int> close_btn(windowsize.width - caption_size, 0, caption_size, caption_size);
+	if (close_btn.intersects(mousepos)) {
+		return HTCLOSE;
+	}
+	Math::Rectangle<int> max_btn(windowsize.width - caption_size * 2, 0, caption_size, caption_size);
+	if (max_btn.intersects(mousepos)) {
+		return HTMAXBUTTON;
+	}
+
+	Math::Rectangle<int> min_btn(windowsize.width - caption_size * 3, 0, caption_size, caption_size);
+	if (min_btn.intersects(mousepos)) {
+		return HTMINBUTTON;
+	}
+
+	Math::Rectangle<int> toolbar(0, 0, windowsize.width, caption_size);  
 	if (toolbar.intersects(mousepos)) {
 		return HTCAPTION;
 	}
 
-	Math::Rectangle<int> close_btn(windowsize.width - m_caption_size, 0, m_caption_size, m_caption_size);
-	if (close_btn.intersects(mousepos)) {
-		return HTCLOSE;
-	}
 
 	return HTNOWHERE;
 }

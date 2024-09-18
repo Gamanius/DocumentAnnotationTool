@@ -473,9 +473,40 @@ LRESULT WindowHandler::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam
 
 		auto windowsize = currentInstance->get_window_size(); 
 		if (currentInstance->m_callback_nchittest) {
-			return currentInstance->m_callback_nchittest(mousepos, windowsize);
+			auto result = currentInstance->m_callback_nchittest(mousepos, windowsize);
+			if (result != HTNOWHERE) {
+				return result;
+			}
 		}
 		
+		break;
+	}
+	// We have to handle these by ourself since windows doesn't do it?
+	case WM_NCLBUTTONDOWN:
+	{
+		switch (wParam) {
+		case HTMINBUTTON:
+		case HTMAXBUTTON:
+		case HTCLOSE:
+			return 0;
+		}
+		break;
+	}
+	case WM_NCLBUTTONUP:
+	{
+		switch (wParam) {
+		case HTMINBUTTON:
+			ShowWindow(currentInstance->m_hwnd, SW_MINIMIZE);
+			return 0;
+		case HTMAXBUTTON:
+			WINDOWPLACEMENT wp;
+			GetWindowPlacement(currentInstance->m_hwnd, &wp); 
+			ShowWindow(currentInstance->m_hwnd, wp.showCmd == SW_MAXIMIZE ? SW_RESTORE : SW_MAXIMIZE);
+			return 0;
+		case HTCLOSE:
+			SendMessage(currentInstance->m_hwnd, WM_CLOSE, 0, 0); 
+			return 0;
+		}
 		break;
 	}
 	case WM_SIZE:
@@ -688,8 +719,6 @@ bool WindowHandler::init(std::wstring windowName, HINSTANCE instance) {
 	// The only solution that i found is to just draw over the whole window and draw my own caption buttons and title bar.
 	HRESULT hr = DwmExtendFrameIntoClientArea(m_hwnd, &m);
 	ASSERT_WIN_RETURN_FALSE(SUCCEEDED(hr), "Could not extend frame into client area");  
-
-
 
 	m_hdc = GetDC(m_hwnd);
 	ASSERT_WIN_RETURN_FALSE(m_hwnd, "Could not retrieve device m_context");

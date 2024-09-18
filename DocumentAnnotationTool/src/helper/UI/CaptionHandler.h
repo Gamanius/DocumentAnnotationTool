@@ -6,7 +6,7 @@ class CaptionHandler {
 	Direct2DRenderer* m_renderer = nullptr;
 	std::wstring m_caption;
 
-	unsigned int m_caption_size = 100;
+	unsigned int m_caption_size = APPLICATION_TOOLBAR_HEIGHT;
 public:
 	CaptionHandler() = default;
 	CaptionHandler(Direct2DRenderer* renderer);

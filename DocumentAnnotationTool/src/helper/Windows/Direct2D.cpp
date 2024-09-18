@@ -269,6 +269,10 @@ UINT Direct2DRenderer::get_dpi() const {
 	return GetDpiForWindow(m_hwnd);
 }
 
+float Direct2DRenderer::get_dpi_scale() const {
+	return 96.0f/get_dpi(); 
+}
+
 void Direct2DRenderer::begin_draw() {
 	std::lock_guard lock(draw_lock);
 	if (m_isRenderinProgress == 0)
