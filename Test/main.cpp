@@ -1,367 +1,540 @@
-﻿#define UNICODE
-#define _UNICODE
-#define STRICT
-#define STRICT_TYPED_ITEMIDS
-// get Windows version right; right now Windows Vista
-// unless otherwise stated, all values from Microsoft's sdkddkver.h
-// TODO is all of this necessary? how is NTDDI_VERSION used?
-// TODO plaform update sp2
-#define WINVER          0x0600  /* from Microsoft's winnls.h */
-#define _WIN32_WINNT        0x0600
-#define _WIN32_WINDOWS  0x0600  /* from Microsoft's pdh.h */
-#define _WIN32_IE           0x0700
-#define NTDDI_VERSION       0x06000000
+﻿#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
-#include <commctrl.h>
 #include <uxtheme.h>
-#include <windowsx.h>
-#include <shobjidl.h>
-#include <d2d1.h>
-#include <d2d1helper.h>
-#include <dwrite.h>
-#include <usp10.h>
-#include <msctf.h>
-#include <textstor.h>
-#include <olectl.h>
-#include <shlwapi.h>
-#include <dwmapi.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <string.h>
-#include <wchar.h>
-#include <stdarg.h>
-#include <stdio.h>
-#include <math.h>
-#include <float.h>
-#include <inttypes.h>
-#include <vector>
-#include <map>
-#include <string>
-
-#pragma comment(linker, \
-    "\"/manifestdependency:type='Win32' " \
-    "name='Microsoft.Windows.Common-Controls' " \
-    "version='6.0.0.0' " \
-    "processorArchitecture='*' " \
-    "publicKeyToken='6595b64144ccf1df' " \
-    "language='*'\"")
+#include <vssym32.h>
 #pragma comment(lib, "user32.lib")
-#pragma comment(lib, "kernel32.lib")
 #pragma comment(lib, "gdi32.lib")
-#pragma comment(lib, "comctl32.lib")
 #pragma comment(lib, "uxtheme.lib")
-#pragma comment(lib, "dwmapi.lib")
 
-#define HR(call) printf("%s -> 0x%I32X\n", #call, call)
+#include <stdbool.h>
 
-struct metrics {
-    RECT windowRect;
-    MARGINS resizeFrameInsets;
-    MARGINS nonclientInsets;
-    MARGINS realNonclientInsets;
-    RECT effectiveClientRect;
-    RECT relativeClientRect;
-};
 
-BOOL defWindowProcFirst = TRUE;
-
-// TODO this is incorrect when maximized
-void getMetrics(HWND hwnd, struct metrics* m) {
-    RECT r;
-
-    GetWindowRect(hwnd, &(m->windowRect));
-
-    // get the margins of the resize frame
-    ZeroMemory(&r, sizeof(RECT));
-    AdjustWindowRectEx(&r,
-        GetWindowStyle(hwnd) & ~WS_CAPTION,
-        FALSE,
-        GetWindowExStyle(hwnd));
-    m->resizeFrameInsets.cxLeftWidth = -r.left;
-    m->resizeFrameInsets.cyTopHeight = -r.top;
-    m->resizeFrameInsets.cxRightWidth = r.right;
-    m->resizeFrameInsets.cyBottomHeight = r.bottom;
-
-    // get non-client insets
-    ZeroMemory(&r, sizeof(RECT));
-    AdjustWindowRectEx(&r,
-        GetWindowStyle(hwnd),
-        FALSE,
-        GetWindowExStyle(hwnd));
-    m->nonclientInsets.cxLeftWidth = -r.left;
-    m->nonclientInsets.cyTopHeight = -r.top;
-    m->nonclientInsets.cxRightWidth = r.right;
-    m->nonclientInsets.cyBottomHeight = r.bottom;
-    if (defWindowProcFirst) {
-        m->nonclientInsets.cxLeftWidth = 0;
-        m->nonclientInsets.cxRightWidth = 0;
-        m->nonclientInsets.cyBottomHeight = 0;
-    }
-
-    // give the top 2.5x the room so we can shove stuff in there
-    m->realNonclientInsets = m->nonclientInsets;
-    m->realNonclientInsets.cyTopHeight *= 2.5;
-
-    // compute the effective client rect
-    m->effectiveClientRect = m->windowRect;
-    m->effectiveClientRect.left += m->realNonclientInsets.cxLeftWidth;
-    m->effectiveClientRect.top += m->realNonclientInsets.cyTopHeight;
-    m->effectiveClientRect.right -= m->realNonclientInsets.cxRightWidth;
-    m->effectiveClientRect.bottom -= m->realNonclientInsets.cyBottomHeight;
-
-    // and compute it relative to the window's real client rect
-    m->relativeClientRect = m->effectiveClientRect;
-    MapWindowRect(NULL, hwnd, &(m->relativeClientRect));
-
-#if 0
-    // for debugging
-    printf("***\n");
-#define PRINTRECT(r) ((int)((r).left)), ((int)((r).top)), ((int)((r).right)), ((int)((r).bottom))
-    printf("window rect %d %d %d %d\n", PRINTRECT(m->windowRect));
-    ZeroMemory(&r, sizeof(RECT));
-    AdjustWindowRectEx(&r,
-        GetWindowStyle(hwnd),
-        FALSE,
-        GetWindowExStyle(hwnd));
-    r.left = -r.left; r.top = -r.top;
-    printf("edge insets %d %d %d %d\n", PRINTRECT(r));
-    HR(DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, &r, sizeof(RECT)));
-    printf("DWMWA_EXTENDED_FRAME_BOUNDS %d %d %d %d\n", PRINTRECT(r));
-    {
-        HMODULE m;
-        m = LoadLibraryW(L"kernel32.dll");
-        if (m == NULL)printf("unknown os\n");
-        // TODO this doesn't work; apparently the function is really in one of the api-ms-core* DLLs...
-        else if (GetProcAddress(m, "VirtualAllocFromApp") != NULL)printf("windows 10\n");
-        else if (GetProcAddress(m, "GetPackageApplicationIds") != NULL)printf("windows 8.1\n");
-        else if (GetProcAddress(m, "GetSystemTimePreciseAsFileTime") != NULL)printf("windows 8\n");
-        else printf("windows 7\n");
-    }
-    printf("\n");
+// These are defined in <windowsx.h> but we don't want to pull in whole header
+// And we need them because coordinates are signed when you have multi-monitor setup.
+#ifndef GET_X_PARAM
+#define GET_X_PARAM(lp) ((int)(short)LOWORD(lp))
 #endif
+
+#ifndef GET_Y_PARAM
+#define GET_Y_PARAM(lp) ((int)(short)HIWORD(lp))
+#endif
+
+static LRESULT
+win32_custom_title_bar_example_window_callback(
+    HWND handle,
+    UINT message,
+    WPARAM w_param,
+    LPARAM l_param
+); // Implementation is at the end of the file
+
+int WinMain(
+    HINSTANCE hInstance,
+    HINSTANCE hPrevInstance,
+    char* pCmdLine,
+    int nCmdShow
+) {
+    // Support high-dpi screens
+    if (!SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2)) {
+        OutputDebugStringA("WARNING: could not set DPI awareness");
+    }
+
+    // Register a "Window Class"
+    static const wchar_t* window_class_name = L"WIN32_CUSTOM_TITLEBAR_EXAMPLE";
+    WNDCLASSEXW window_class = { 0 };
+    {
+        window_class.cbSize = sizeof(window_class);
+        window_class.lpszClassName = window_class_name;
+        // Set the procedure that will receive window messages (events)
+        window_class.lpfnWndProc = win32_custom_title_bar_example_window_callback;
+        // Ask to send WM_PAINT when resizing horizontally and vertically
+        window_class.style = CS_HREDRAW | CS_VREDRAW;
+    }
+    RegisterClassExW(&window_class);
+
+    int window_style
+        = WS_THICKFRAME   // required for a standard resizeable window
+        | WS_SYSMENU      // Explicitly ask for the titlebar to support snapping via Win + ← / Win + →
+        | WS_MAXIMIZEBOX  // Add maximize button to support maximizing via mouse dragging
+        // to the top of the screen
+        | WS_MINIMIZEBOX  // Add minimize button to support minimizing by clicking on the taskbar icon
+        | WS_VISIBLE;     // Make window visible after it is created (not important)
+    CreateWindowExW(
+        WS_EX_APPWINDOW,
+        window_class_name,
+        L"Win32 Custom Title Bar Example",
+        // The
+        window_style,
+        CW_USEDEFAULT,
+        CW_USEDEFAULT,
+        800,
+        600,
+        0,
+        0,
+        0,
+        0
+    );
+
+    // Run message loop
+    for (MSG message = { 0 };;) {
+        BOOL result = GetMessageW(&message, 0, 0, 0);
+        if (result > 0) {
+            TranslateMessage(&message);
+            DispatchMessageW(&message);
+        }
+        else {
+            break;
+        }
+    }
+
+    return 0;
 }
 
-HWND rebarHost;
-HWND rebar;
+static int
+win32_dpi_scale(
+    int value,
+    UINT dpi
+) {
+    return (int)((float)value * dpi / 96);
+}
 
-const char* htnames[] = {
-    "HTERROR",
-    "HTTRANSPARENT",
-    "HTNOWHERE",
-    "HTCLIENT",
-    "HTCAPTION",
-    "HTSYSMENU",
-    "HTGROWBOX",
-    "HTMENU",
-    "HTHSCROLL",
-    "HTVSCROLL",
-    "HTMINBUTTON",
-    "HTMAXBUTTON",
-    "HTLEFT",
-    "HTRIGHT",
-    "HTTOP",
-    "HTTOPLEFT",
-    "HTTOPRIGHT",
-    "HTBOTTOM",
-    "HTBOTTOMLEFT",
-    "HTBOTTOMRIGHT",
-    "HTBORDER",
-    "HTOBJECT",
-    "HTCLOSE",
-    "HTHELP",
-};
+// Adopted from:
+// https://github.com/oberth/custom-chrome/blob/master/source/gui/window_helper.hpp#L52-L64
+static RECT
+win32_titlebar_rect(
+    HWND handle
+) {
+    SIZE title_bar_size = { 50 };
+    const int top_and_bottom_borders = 2;
+    HTHEME theme = OpenThemeData(handle, L"WINDOW");
+    UINT dpi = GetDpiForWindow(handle);
+    GetThemePartSize(theme, NULL, WP_CAPTION, CS_ACTIVE, NULL, TS_TRUE, &title_bar_size);
+    CloseThemeData(theme);
 
-LRESULT CALLBACK wndproc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-    struct metrics m;
-    HDC dc;
-    PAINTSTRUCT ps;
-    BOOL dwmHandled;
-    LRESULT lResult;
+    int height = win32_dpi_scale(title_bar_size.cy, dpi) + top_and_bottom_borders;
 
-    dwmHandled = DwmDefWindowProc(hwnd, uMsg, wParam, lParam, &lResult);
-    getMetrics(hwnd, &m);
-    switch (uMsg) {
-    case WM_CREATE:
-        SetWindowPos(hwnd, NULL,
-            m.windowRect.left, m.windowRect.top,
-            m.windowRect.right - m.windowRect.left, m.windowRect.bottom - m.windowRect.top,
-            SWP_FRAMECHANGED);
-        // TODO if we pass SWP_NOOWNERZORDER || SWP_NOZORDER, the default frame is not correctly inhibited
+    RECT rect;
+    GetClientRect(handle, &rect);
+    rect.bottom = rect.top + height;
+    return rect;
+}
 
-        rebarHost = CreateWindowExW(0,
-            L"rebarHost", L"",
-            WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
-            m.realNonclientInsets.cxLeftWidth,
-            m.nonclientInsets.cyTopHeight,
-            m.windowRect.right - m.windowRect.left -
-            m.realNonclientInsets.cxLeftWidth - m.realNonclientInsets.cxRightWidth,
-            m.realNonclientInsets.cyTopHeight - m.nonclientInsets.cyTopHeight,
-            hwnd, NULL, GetModuleHandle(NULL), NULL);
+// Set this to 0 to remove the fake shadow painting
+#define WIN32_FAKE_SHADOW_HEIGHT 1
+// The offset of the 2 rectangles of the maximized window button
+#define WIN32_MAXIMIZED_RECTANGLE_OFFSET 2
 
-        rebar = CreateWindowExW(0,
-            REBARCLASSNAMEW, L"",
-            WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | RBS_VARHEIGHT | CCS_NODIVIDER,
-            0, 0, 0, 0,
-            rebarHost, NULL, GetModuleHandle(NULL), NULL);
+static RECT
+win32_fake_shadow_rect(
+    HWND handle
+) {
+    RECT rect;
+    GetClientRect(handle, &rect);
+    rect.bottom = rect.top + WIN32_FAKE_SHADOW_HEIGHT;
+    return rect;
+}
 
-        {
-            REBARBANDINFOW rb;
+typedef struct {
+    RECT close;
+    RECT maximize;
+    RECT minimize;
+} CustomTitleBarButtonRects;
 
-            ZeroMemory(&rb, sizeof(REBARBANDINFOW));
-            rb.cbSize = sizeof(REBARBANDINFOW);
-            rb.fMask = RBBIM_TEXT;
-            auto d = L"This is a rebar";
-            rb.lpText = (LPWSTR)d;
-            HR((HRESULT)SendMessageW(rebar, RB_INSERTBANDW, (WPARAM)(-1), (LPARAM)(&rb)));
+typedef enum {
+    CustomTitleBarHoveredButton_None,
+    CustomTitleBarHoveredButton_Minimize,
+    CustomTitleBarHoveredButton_Maximize,
+    CustomTitleBarHoveredButton_Close,
+} CustomTitleBarHoveredButton;
+
+static CustomTitleBarButtonRects
+win32_get_title_bar_button_rects(
+    HWND handle,
+    const RECT* title_bar_rect
+) {
+    UINT dpi = GetDpiForWindow(handle);
+    CustomTitleBarButtonRects button_rects;
+    // Sadly SM_CXSIZE does not result in the right size buttons for Win10
+    int button_width = win32_dpi_scale(47, dpi);
+    button_rects.close = *title_bar_rect;
+    button_rects.close.top += WIN32_FAKE_SHADOW_HEIGHT;
+
+    button_rects.close.left = button_rects.close.right - button_width;
+    button_rects.maximize = button_rects.close;
+    button_rects.maximize.left -= button_width;
+    button_rects.maximize.right -= button_width;
+    button_rects.minimize = button_rects.maximize;
+    button_rects.minimize.left -= button_width;
+    button_rects.minimize.right -= button_width;
+    return button_rects;
+}
+
+static bool
+win32_window_is_maximized(
+    HWND handle
+) {
+    WINDOWPLACEMENT placement = { 0 };
+    placement.length = sizeof(WINDOWPLACEMENT);
+    if (GetWindowPlacement(handle, &placement)) {
+        return placement.showCmd == SW_SHOWMAXIMIZED;
+    }
+    return false;
+}
+
+static void
+win32_center_rect_in_rect(
+    RECT* to_center,
+    const RECT* outer_rect
+) {
+    int to_width = to_center->right - to_center->left;
+    int to_height = to_center->bottom - to_center->top;
+    int outer_width = outer_rect->right - outer_rect->left;
+    int outer_height = outer_rect->bottom - outer_rect->top;
+
+    int padding_x = (outer_width - to_width) / 2;
+    int padding_y = (outer_height - to_height) / 2;
+
+    to_center->left = outer_rect->left + padding_x;
+    to_center->top = outer_rect->top + padding_y;
+    to_center->right = to_center->left + to_width;
+    to_center->bottom = to_center->top + to_height;
+}
+
+static LRESULT
+win32_custom_title_bar_example_window_callback(
+    HWND handle,
+    UINT message,
+    WPARAM w_param,
+    LPARAM l_param
+) {
+    CustomTitleBarHoveredButton title_bar_hovered_button =
+        (CustomTitleBarHoveredButton)GetWindowLongPtrW(handle, GWLP_USERDATA);
+
+    switch (message) {
+        // Handling this event allows us to extend client (paintable) area into the title bar region
+        // The information is partially coming from:
+        // https://docs.microsoft.com/en-us/windows/win32/dwm/customframe#extending-the-client-frame
+        // Most important paragraph is:
+        //   To remove the standard window frame, you must handle the WM_NCCALCSIZE message,
+        //   specifically when its wParam value is TRUE and the return value is 0.
+        //   By doing so, your application uses the entire window region as the client area,
+        //   removing the standard frame.
+    case WM_NCCALCSIZE:
+    {
+        if (!w_param) return DefWindowProc(handle, message, w_param, l_param);
+        UINT dpi = GetDpiForWindow(handle);
+
+        int frame_x = GetSystemMetricsForDpi(SM_CXFRAME, dpi);
+        int frame_y = GetSystemMetricsForDpi(SM_CYFRAME, dpi);
+        int padding = GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi);
+
+        NCCALCSIZE_PARAMS* params = (NCCALCSIZE_PARAMS*)l_param;
+        RECT* requested_client_rect = params->rgrc;
+
+        requested_client_rect->right -= frame_x + padding;
+        requested_client_rect->left += frame_x + padding;
+        requested_client_rect->bottom -= frame_y + padding;
+
+        if (win32_window_is_maximized(handle)) {
+            requested_client_rect->top += padding;
         }
 
-        SendMessageW(rebar, RB_SETWINDOWTHEME, 0,
-            (LPARAM)L"NavbarComposited");
+        return 0;
+    }
+    case WM_CREATE:
+    {
+        RECT size_rect;
+        GetWindowRect(handle, &size_rect);
 
+        // Inform the application of the frame change to force redrawing with the new
+        // client area that is extended into the title bar
+        SetWindowPos(
+            handle, NULL,
+            0,0,0,0,
+            SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE
+        );
         break;
+    }
     case WM_ACTIVATE:
-        HR(DwmExtendFrameIntoClientArea(hwnd, &(m.realNonclientInsets)));
-        break;
-    case WM_NCCALCSIZE:
-        if (wParam != (WPARAM)FALSE) {
-            NCCALCSIZE_PARAMS* op = (NCCALCSIZE_PARAMS*)lParam;
-            NCCALCSIZE_PARAMS np;
+    {
+        RECT title_bar_rect = win32_titlebar_rect(handle);
+        InvalidateRect(handle, &title_bar_rect, FALSE);
+        return DefWindowProc(handle, message, w_param, l_param);
+    }
+    case WM_NCHITTEST:
+    {
+        // Let the default procedure handle resizing areas
+        LRESULT hit = DefWindowProc(handle, message, w_param, l_param);
+        switch (hit) {
+        case HTNOWHERE:
+        case HTRIGHT:
+        case HTLEFT:
+        case HTTOPLEFT:
+        case HTTOP:
+        case HTTOPRIGHT:
+        case HTBOTTOMRIGHT:
+        case HTBOTTOM:
+        case HTBOTTOMLEFT:
+        {
+            return hit;
+        }
+        }
+        // Check if hover button is on maximize to support SnapLayout on Windows 11
+        if (title_bar_hovered_button == CustomTitleBarHoveredButton_Maximize) {
+            return HTMAXBUTTON;
+        }
 
-            if (!defWindowProcFirst)
-                return 0;
-            np = *op;
-            DefWindowProcW(hwnd, uMsg, wParam, (LPARAM)(&np));
-            printf("old %ld %ld %ld %ld\nnew %ld %ld %ld %ld\n",
-                op->rgrc[0].left, op->rgrc[0].top, op->rgrc[0].right, op->rgrc[0].bottom,
-                np.rgrc[0].left, np.rgrc[0].top, np.rgrc[0].right, np.rgrc[0].bottom);
-            op->rgrc[0].left = np.rgrc[0].left;
-            op->rgrc[0].right = np.rgrc[0].right;
-            op->rgrc[0].bottom = np.rgrc[0].bottom;
+        // Looks like adjustment happening in NCCALCSIZE is messing with the detection
+        // of the top hit area so manually fixing that.
+        UINT dpi = GetDpiForWindow(handle);
+        int frame_y = GetSystemMetricsForDpi(SM_CYFRAME, dpi);
+        int padding = GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi);
+        POINT cursor_point = { 0 };
+        cursor_point.x = GET_X_PARAM(l_param);
+        cursor_point.y = GET_Y_PARAM(l_param);
+        ScreenToClient(handle, &cursor_point);
+        if (cursor_point.y > 0 && cursor_point.y < frame_y + padding) {
+            return HTTOP;
+        }
+
+        // Since we are drawing our own caption, this needs to be a custom test
+        if (cursor_point.y < win32_titlebar_rect(handle).bottom) {
+            return HTCAPTION;
+        }
+
+        return HTCLIENT;
+    }
+    case WM_PAINT:
+    {
+        bool has_focus = !!GetFocus();
+
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(handle, &ps);
+
+        // Paint Background
+        COLORREF bg_color = RGB(200, 250, 230);
+        HBRUSH bg_brush = CreateSolidBrush(bg_color);
+        FillRect(hdc, &ps.rcPaint, bg_brush);
+        DeleteObject(bg_brush);
+
+        // Paint Title Bar
+        HTHEME theme = OpenThemeData(handle, L"WINDOW");
+
+        COLORREF title_bar_color = RGB(150, 200, 180);
+        HBRUSH title_bar_brush = CreateSolidBrush(title_bar_color);
+        COLORREF title_bar_hover_color = RGB(130, 180, 160);
+        HBRUSH title_bar_hover_brush = CreateSolidBrush(title_bar_hover_color);
+
+        RECT title_bar_rect = win32_titlebar_rect(handle);
+
+        // Title Bar Background
+        //FillRect(hdc, &title_bar_rect, title_bar_brush);
+
+        COLORREF title_bar_item_color = has_focus ? RGB(33, 33, 33) : RGB(127, 127, 127);
+
+        HBRUSH button_icon_brush = CreateSolidBrush(title_bar_item_color);
+        HPEN button_icon_pen = CreatePen(PS_SOLID, 1, title_bar_item_color);
+
+        CustomTitleBarButtonRects button_rects =
+            win32_get_title_bar_button_rects(handle, &title_bar_rect);
+
+        UINT dpi = GetDpiForWindow(handle);
+        int icon_dimension = win32_dpi_scale(10, dpi);
+
+        { // Minimize button
+            if (title_bar_hovered_button == CustomTitleBarHoveredButton_Minimize) {
+                FillRect(hdc, &button_rects.minimize, title_bar_hover_brush);
+            }
+            RECT icon_rect = { 0 };
+            icon_rect.right = icon_dimension;
+            icon_rect.bottom = 1;
+            win32_center_rect_in_rect(&icon_rect, &button_rects.minimize);
+            FillRect(hdc, &icon_rect, button_icon_brush);
+        }
+
+        { // Maximize button
+            bool const is_hovered = title_bar_hovered_button == CustomTitleBarHoveredButton_Maximize;
+            if (is_hovered) {
+                FillRect(hdc, &button_rects.maximize, title_bar_hover_brush);
+            }
+            RECT icon_rect = { 0 };
+            icon_rect.right = icon_dimension;
+            icon_rect.bottom = icon_dimension;
+            win32_center_rect_in_rect(&icon_rect, &button_rects.maximize);
+            SelectObject(hdc, button_icon_pen);
+            SelectObject(hdc, GetStockObject(HOLLOW_BRUSH));
+            if (win32_window_is_maximized(handle)) {
+                // Draw the maximized icon
+                Rectangle(hdc,
+                    icon_rect.left + WIN32_MAXIMIZED_RECTANGLE_OFFSET,
+                    icon_rect.top - WIN32_MAXIMIZED_RECTANGLE_OFFSET,
+                    icon_rect.right + WIN32_MAXIMIZED_RECTANGLE_OFFSET,
+                    icon_rect.bottom - WIN32_MAXIMIZED_RECTANGLE_OFFSET
+                );
+                //FillRect(hdc, &icon_rect, is_hovered ? title_bar_hover_brush : title_bar_brush);
+            }
+            //Rectangle(hdc, icon_rect.left, icon_rect.top, icon_rect.right, icon_rect.bottom);
+        }
+
+        { // Close button
+            HPEN custom_pen = 0;
+            if (title_bar_hovered_button == CustomTitleBarHoveredButton_Close) {
+                HBRUSH fill_brush = CreateSolidBrush(RGB(0xCC, 0, 0));
+                FillRect(hdc, &button_rects.close, fill_brush);
+                DeleteObject(fill_brush);
+                custom_pen = CreatePen(PS_SOLID, 1, RGB(0xFF, 0xFF, 0xFF));
+                SelectObject(hdc, custom_pen);
+            }
+            RECT icon_rect = { 0 };
+            icon_rect.right = icon_dimension;
+            icon_rect.bottom = icon_dimension;
+            win32_center_rect_in_rect(&icon_rect, &button_rects.close);
+            MoveToEx(hdc, icon_rect.left, icon_rect.top, NULL);
+            LineTo(hdc, icon_rect.right + 1, icon_rect.bottom + 1);
+            MoveToEx(hdc, icon_rect.left, icon_rect.bottom, NULL);
+            LineTo(hdc, icon_rect.right + 1, icon_rect.top - 1);
+            if (custom_pen) DeleteObject(custom_pen);
+        }
+        DeleteObject(title_bar_hover_brush);
+        DeleteObject(button_icon_brush);
+        DeleteObject(button_icon_pen);
+        DeleteObject(title_bar_brush);
+
+        // Draw window title
+        LOGFONT logical_font;
+        HFONT old_font = NULL;
+        if (SUCCEEDED(SystemParametersInfoForDpi(SPI_GETICONTITLELOGFONT, sizeof(logical_font), &logical_font, false, dpi))) {
+            HFONT theme_font = CreateFontIndirect(&logical_font);
+            old_font = (HFONT)SelectObject(hdc, theme_font);
+        }
+
+        wchar_t title_text_buffer[255] = { 0 };
+        int buffer_length = sizeof(title_text_buffer) / sizeof(title_text_buffer[0]);
+        GetWindowTextW(handle, title_text_buffer, buffer_length);
+        RECT title_bar_text_rect = title_bar_rect;
+        // Add padding on the left
+        int text_padding = 10; // There seems to be no good way to get this offset
+        title_bar_text_rect.left += text_padding;
+        // Add padding on the right for the buttons
+        title_bar_text_rect.right = button_rects.minimize.left - text_padding;
+        DTTOPTS draw_theme_options = { sizeof(draw_theme_options) };
+        draw_theme_options.dwFlags = DTT_TEXTCOLOR;
+        draw_theme_options.crText = title_bar_item_color;
+        DrawThemeTextEx(
+            theme,
+            hdc,
+            0, 0,
+            title_text_buffer,
+            -1,
+            DT_VCENTER | DT_SINGLELINE | DT_WORD_ELLIPSIS,
+            &title_bar_text_rect,
+            &draw_theme_options
+        );
+        if (old_font) SelectObject(hdc, old_font);
+        CloseThemeData(theme);
+
+        // Paint fake top shadow. Original is missing because of the client rect extension.
+        // You might need to tweak the colors here based on the color scheme of your app
+        // or just remove it if you decide it is not worth it.
+        static const COLORREF shadow_color = RGB(100, 100, 100);
+        COLORREF fake_top_shadow_color = has_focus ? shadow_color : RGB(
+            (GetRValue(title_bar_color) + GetRValue(shadow_color)) / 2,
+            (GetGValue(title_bar_color) + GetGValue(shadow_color)) / 2,
+            (GetBValue(title_bar_color) + GetBValue(shadow_color)) / 2
+        );
+        HBRUSH fake_top_shadow_brush = CreateSolidBrush(fake_top_shadow_color);
+        RECT fake_top_shadow_rect = win32_fake_shadow_rect(handle);
+        FillRect(hdc, &fake_top_shadow_rect, fake_top_shadow_brush);
+        DeleteObject(fake_top_shadow_brush);
+
+        EndPaint(handle, &ps);
+        break;
+    }
+    // Track when mouse hovers each of the title bar buttons to draw the highlight correctly
+    case WM_NCMOUSEMOVE:
+    {
+        POINT cursor_point;
+        GetCursorPos(&cursor_point);
+        ScreenToClient(handle, &cursor_point);
+
+        RECT title_bar_rect = win32_titlebar_rect(handle);
+        CustomTitleBarButtonRects button_rects = win32_get_title_bar_button_rects(handle, &title_bar_rect);
+
+        CustomTitleBarHoveredButton new_hovered_button = CustomTitleBarHoveredButton_None;
+        if (PtInRect(&button_rects.close, cursor_point)) {
+            new_hovered_button = CustomTitleBarHoveredButton_Close;
+        }
+        else if (PtInRect(&button_rects.minimize, cursor_point)) {
+            new_hovered_button = CustomTitleBarHoveredButton_Minimize;
+        }
+        else if (PtInRect(&button_rects.maximize, cursor_point)) {
+            new_hovered_button = CustomTitleBarHoveredButton_Maximize;
+        }
+        if (new_hovered_button != title_bar_hovered_button) {
+            // You could do tighter invalidation here but probably doesn't matter
+            InvalidateRect(handle, &button_rects.close, FALSE);
+            InvalidateRect(handle, &button_rects.minimize, FALSE);
+            InvalidateRect(handle, &button_rects.maximize, FALSE);
+
+            SetWindowLongPtrW(handle, GWLP_USERDATA, (LONG_PTR)new_hovered_button);
+        }
+        return DefWindowProc(handle, message, w_param, l_param);
+    }
+    // If the mouse gets into the client area then no title bar buttons are hovered
+    // so need to reset the hover state
+    case WM_MOUSEMOVE:
+    {
+        if (title_bar_hovered_button) {
+            RECT title_bar_rect = win32_titlebar_rect(handle);
+            // You could do tighter invalidation here but probably doesn't matter
+            InvalidateRect(handle, &title_bar_rect, FALSE);
+            SetWindowLongPtrW(handle, GWLP_USERDATA, (LONG_PTR)CustomTitleBarHoveredButton_None);
+        }
+        return DefWindowProc(handle, message, w_param, l_param);
+    }
+    // Handle mouse down and mouse up in the caption area to handle clicks on the buttons
+    case WM_NCLBUTTONDOWN:
+    {
+        // Clicks on buttons will be handled in WM_NCLBUTTONUP, but we still need
+        // to remove default handling of the click to avoid it counting as drag.
+        //
+        // Ideally you also want to check that the mouse hasn't moved out or too much
+        // between DOWN and UP messages.
+        if (title_bar_hovered_button) {
             return 0;
         }
-        break;
-    case WM_NCHITTEST:
-        if (dwmHandled)
-            return lResult;
-        // DWM did not handle it; we have to do it ourselves
-        if (defWindowProcFirst) {
-            lResult = DefWindowProcW(hwnd, uMsg, wParam, lParam);
-            if (lResult != HTCLIENT) {
-                printf("them %s\n", htnames[lResult + 2]);
-                return lResult;
-            }
+        // Default handling allows for dragging and double click to maximize
+        return DefWindowProc(handle, message, w_param, l_param);
+    }
+    // Map button clicks to the right messages for the window
+    case WM_NCLBUTTONUP:
+    {
+        if (title_bar_hovered_button == CustomTitleBarHoveredButton_Close) {
+            PostMessageW(handle, WM_CLOSE, 0, 0);
+            return 0;
         }
-        {
-            POINT p;
-
-            p.x = GET_X_LPARAM(lParam);
-            p.y = GET_Y_LPARAM(lParam);
-
-            lResult = HTNOWHERE;
-            if (p.y >= m.windowRect.top && p.y < (m.windowRect.top + m.resizeFrameInsets.cyTopHeight))
-                lResult = HTTOP;
-            else if (p.y >= m.effectiveClientRect.bottom && p.y < m.windowRect.bottom)
-                lResult = HTBOTTOM;
-
-            if (p.x >= m.windowRect.left && p.x < m.effectiveClientRect.left)
-                switch (lResult) {
-                case HTNOWHERE:
-                    lResult = HTLEFT;
-                    break;
-                case HTTOP:
-                    lResult = HTTOPLEFT;
-                    break;
-                case HTBOTTOM:
-                    lResult = HTBOTTOMLEFT;
-                    break;
-                }
-            else if (p.x >= m.effectiveClientRect.right && p.x < m.windowRect.right)
-                switch (lResult) {
-                case HTNOWHERE:
-                    lResult = HTRIGHT;
-                    break;
-                case HTTOP:
-                    lResult = HTTOPRIGHT;
-                    break;
-                case HTBOTTOM:
-                    lResult = HTBOTTOMRIGHT;
-                    break;
-                }
-
-            if (lResult == HTNOWHERE)
-                if (p.y >= (m.windowRect.top + m.resizeFrameInsets.cyTopHeight) && p.y < m.effectiveClientRect.top)
-                    lResult = HTCAPTION;
-
-            if (defWindowProcFirst)
-                printf("us %s\n", htnames[lResult + 2]);
-            if (lResult != HTNOWHERE)
-                return lResult;
+        else if (title_bar_hovered_button == CustomTitleBarHoveredButton_Minimize) {
+            ShowWindow(handle, SW_MINIMIZE);
+            return 0;
         }
-        // we can't handle it; give it to DefWindowProcW() and hope for the best
+        else if (title_bar_hovered_button == CustomTitleBarHoveredButton_Maximize) {
+            int mode = win32_window_is_maximized(handle) ? SW_NORMAL : SW_MAXIMIZE;
+            ShowWindow(handle, mode);
+            return 0;
+        }
+        return DefWindowProc(handle, message, w_param, l_param);
+    }
+    case WM_SETCURSOR:
+    {
+        // Show an arrow instead of the busy cursor
+        SetCursor(LoadCursor(NULL, IDC_ARROW));
         break;
-    case WM_SIZE:
-        // TODO if defWindowProcFirst == FALSE, this seems to be wrong when shrinking the size on the right or bottom edges
-        // TODO without this call, the WM_PAINT never fills new areas
-        // we may need to handle WM_WINDOWPOSCHANGED and compute new metrics from there
-        // TODO what happens with defWindowProcFirst == TRUE? do we need to do anything else special? is this needed?
-        InvalidateRect(hwnd, &(m.relativeClientRect), FALSE);
-        break;
-    case WM_PAINT:
-        dc = BeginPaint(hwnd, &ps);
-        FillRect(dc, &(m.relativeClientRect), (HBRUSH)(COLOR_BTNFACE + 1));
-        EndPaint(hwnd, &ps);
-        break;
-    case WM_CLOSE:
+    }
+    case WM_DESTROY:
+    {
         PostQuitMessage(0);
-        break;
+        return 0;
     }
-    if (dwmHandled)
-        return lResult;
-    return DefWindowProcW(hwnd, uMsg, wParam, lParam);
-}
-
-int main(void) {
-    INITCOMMONCONTROLSEX icc;
-    WNDCLASSW wc;
-    HWND mainwin;
-    MSG msg;
-
-    ZeroMemory(&icc, sizeof(INITCOMMONCONTROLSEX));
-    icc.dwSize = sizeof(INITCOMMONCONTROLSEX);
-    icc.dwICC = (ICC_LISTVIEW_CLASSES | ICC_TREEVIEW_CLASSES | ICC_BAR_CLASSES | ICC_TAB_CLASSES | ICC_UPDOWN_CLASS | ICC_PROGRESS_CLASS | ICC_HOTKEY_CLASS | ICC_ANIMATE_CLASS | ICC_WIN95_CLASSES | ICC_DATE_CLASSES | ICC_USEREX_CLASSES | ICC_COOL_CLASSES | ICC_INTERNET_CLASSES | ICC_PAGESCROLLER_CLASS | ICC_NATIVEFNTCTL_CLASS | ICC_STANDARD_CLASSES | ICC_LINK_CLASS);
-    InitCommonControlsEx(&icc);
-
-    ZeroMemory(&wc, sizeof(WNDCLASSW));
-    wc.lpszClassName = L"mainwin";
-    wc.lpfnWndProc = wndproc;
-    wc.hInstance = GetModuleHandle(NULL);
-    wc.hIcon = LoadIconW(NULL, IDI_APPLICATION);
-    wc.hCursor = LoadCursorW(NULL, IDC_ARROW);
-    wc.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
-    RegisterClassW(&wc);
-
-    ZeroMemory(&wc, sizeof(WNDCLASSW));
-    wc.lpszClassName = L"rebarHost";
-    wc.lpfnWndProc = DefWindowProcW;
-    wc.hInstance = GetModuleHandle(NULL);
-    wc.hIcon = LoadIconW(NULL, IDI_APPLICATION);
-    wc.hCursor = LoadCursorW(NULL, IDC_ARROW);
-    wc.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
-    RegisterClassW(&wc);
-
-    mainwin = CreateWindowExW(0,
-        L"mainwin", L"Main Window",
-        WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, CW_USEDEFAULT,
-        400, 400,
-        NULL, NULL, GetModuleHandle(NULL), NULL);
-
-    ShowWindow(mainwin, SW_SHOWDEFAULT);
-    UpdateWindow(mainwin);
-
-    while (GetMessageW(&msg, NULL, 0, 0)) {
-        TranslateMessage(&msg);
-        DispatchMessageW(&msg);
     }
-    return 0;
+
+    return DefWindowProc(handle, message, w_param, l_param);
 }

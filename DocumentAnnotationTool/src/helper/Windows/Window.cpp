@@ -354,34 +354,47 @@ static WindowHandler::PointerInfo parse_pointer_info(const WindowHandler& w, WPA
 }
 
 LRESULT WindowHandler::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-	// The WM_CREATE msg must be translated before anything else
-	switch (uMsg) {
-	case WM_CREATE:
-	{	
-		// add this windows to the window stack
-		auto window = reinterpret_cast<CREATESTRUCT*>(lParam)->lpCreateParams; 
-		m_allWindowInstances->operator[](hWnd) = reinterpret_cast<WindowHandler*>(window);
-
-		// notify that the frame has changed
-		SetWindowPos(hWnd, nullptr, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE);
-		break;
-	}
-	}
-
 	WindowHandler* currentInstance = m_allWindowInstances->operator[](hWnd);
+	// The WM_CREATE msg must be translated before anything else
 	if (currentInstance == nullptr) {
+		if (uMsg == WM_CREATE) {
+			// add this windows to the window stack
+			auto window = reinterpret_cast<CREATESTRUCT*>(lParam)->lpCreateParams; 
+			m_allWindowInstances->operator[](hWnd) = reinterpret_cast<WindowHandler*>(window);
+
+			// notify that the frame has changed
+			SetWindowPos(hWnd, nullptr, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE);
+		} 
 		return DefWindowProc(hWnd, uMsg, wParam, lParam);
 	}
-	LRESULT result;
 
+	LRESULT result; 
 	auto dwm_has_processed = DwmDefWindowProc(hWnd, uMsg, wParam, lParam, &result);
-	if (dwm_has_processed) return result;
+	if (dwm_has_processed)
+		return result;
+
+	/*
+	 * NON CLIENT AREA
+	 */
+	auto windowsize = currentInstance->get_window_size();
+	auto dpi = currentInstance->get_dpi();
+	float caption_size = currentInstance->m_toolbar_margin * dpi / 96;
+
+	Math::Rectangle<int> close_btn(windowsize.width - caption_size, 0, caption_size, caption_size);
+	Math::Rectangle<int> max_btn(windowsize.width - caption_size * 2, 0, caption_size, caption_size);
+	Math::Rectangle<int> min_btn(windowsize.width - caption_size * 3, 0, caption_size, caption_size);
+	Math::Rectangle<int> toolbar(0, 0, windowsize.width, caption_size);
 
 	switch (uMsg) {
 	case WM_CLOSE:
 	{
 		currentInstance->m_closeRequest = true;
 		return NULL;
+	}
+	case WM_ACTIVATE:
+	{
+		currentInstance->invalidate_drawing_area();
+		break;
 	}
 	case WM_POINTERDOWN:
 	{
@@ -392,9 +405,26 @@ LRESULT WindowHandler::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam
 	}
 	case WM_POINTERUPDATE:
 	{
+		auto info = parse_pointer_info(*currentInstance, wParam, lParam); 
+		if (currentInstance->m_is_mouse_tracking_window == false) {
+			TRACKMOUSEEVENT e;
+			e.cbSize = sizeof(TRACKMOUSEEVENT);
+			e.dwFlags = TME_LEAVE;
+			e.hwndTrack = hWnd;
+			TrackMouseEvent(&e);
+			currentInstance->m_is_mouse_tracking_window = true;
+		}
+		if (currentInstance->m_is_mouse_tracking_nc == false and toolbar.intersects(info.pos)) {
+			TRACKMOUSEEVENT e;
+			e.cbSize = sizeof(TRACKMOUSEEVENT);
+			e.dwFlags = TME_NONCLIENT;
+			e.hwndTrack = hWnd;
+			TrackMouseEvent(&e);
+			currentInstance->m_is_mouse_tracking_nc = true;
+		}
 		if (currentInstance->m_callback_pointer_update == nullptr)
 			break;
-		currentInstance->m_callback_pointer_update(parse_pointer_info(*currentInstance, wParam, lParam));
+		currentInstance->m_callback_pointer_update(info); 
 		return 0;
 	}
 	case WM_POINTERUP:
@@ -446,40 +476,102 @@ LRESULT WindowHandler::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam
 
 		return 0;
 	}
-	case WM_NCCALCSIZE:
+	
+	case WM_NCCALCSIZE: 
 	{
-		// this code is needed so the border is rendered properly by windows
-		auto client_area_needs_calculating = static_cast<bool>(wParam);
-	
-		if (client_area_needs_calculating) {
-			auto parameters = reinterpret_cast<NCCALCSIZE_PARAMS*>(lParam);
-	
-			auto& requested_client_area   = parameters->rgrc[0];
-			requested_client_area.right   -= GetSystemMetrics(SM_CXFRAME) + GetSystemMetrics(SM_CXPADDEDBORDER);
-			requested_client_area.left    += GetSystemMetrics(SM_CXFRAME) + GetSystemMetrics(SM_CXPADDEDBORDER);
-			requested_client_area.bottom  -= GetSystemMetrics(SM_CYFRAME) + GetSystemMetrics(SM_CXPADDEDBORDER);
-	
-			return 0;
-	
-		}
-		break;
+		if (!wParam) return DefWindowProc(hWnd, uMsg, wParam, lParam);
+		UINT dpi = GetDpiForWindow(hWnd); 
+
+		int frame_x = GetSystemMetricsForDpi(SM_CXFRAME, dpi);
+		int frame_y = GetSystemMetricsForDpi(SM_CYFRAME, dpi);
+		int padding = GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi);
+
+		NCCALCSIZE_PARAMS* params = (NCCALCSIZE_PARAMS*)lParam; 
+		RECT* requested_client_rect = params->rgrc;
+
+		requested_client_rect->right   -= frame_x + padding;
+		requested_client_rect->left    += frame_x + padding;
+		requested_client_rect->bottom  -= frame_y + padding;
+
+		// we only need to add the padding if the window is maximized
+		requested_client_rect->top     += (frame_y + padding) * currentInstance->is_window_maximized();
+
+		return 0;
 	}
 	case WM_NCHITTEST:
 	{
+		LRESULT hit = DefWindowProc(hWnd, uMsg, wParam, lParam);
+		switch (hit) 
+		{
+		case HTNOWHERE:
+		case HTRIGHT:
+		case HTLEFT:
+		case HTTOPLEFT:
+		case HTTOP:
+		case HTTOPRIGHT:
+		case HTBOTTOMRIGHT:
+		case HTBOTTOM:
+		case HTBOTTOMLEFT:
+			return hit;
+		}
+
 		auto xPos = GET_X_LPARAM(lParam);
 		auto yPos = GET_Y_LPARAM(lParam);
 		Math::Point<long> mousepos = { xPos, yPos };
 		mousepos = mousepos - currentInstance->get_window_position();
-
-		auto windowsize = currentInstance->get_window_size(); 
-		if (currentInstance->m_callback_nchittest) {
-			auto result = currentInstance->m_callback_nchittest(mousepos, windowsize);
-			if (result != HTNOWHERE) {
-				return result;
-			}
-		}
 		
+		int frame_y = GetSystemMetricsForDpi(SM_CYFRAME, dpi);
+		int padding = GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi);
+
+		Math::Rectangle<int> top_frame(0, 0, windowsize.width, frame_y + padding);
+		if (top_frame.intersects(mousepos)) {
+			return HTTOP;
+		}
+
+		if (close_btn.intersects(mousepos)) {
+			return HTCLOSE;
+		}
+		if (max_btn.intersects(mousepos)) {
+			return HTMAXBUTTON;
+		}
+
+		if (min_btn.intersects(mousepos)) {
+			return HTMINBUTTON;
+		}
+				
+		if (toolbar.intersects(mousepos)) {
+			return HTCAPTION;
+		}
+			
 		break;
+	}
+	case WM_NCMOUSELEAVE:
+		currentInstance->m_is_mouse_tracking_nc = false;
+	case WM_NCMOUSEMOVE:
+	{
+		POINT p;
+		GetCursorPos(&p); 
+		Math::Point<long> mousepos = p;
+		mousepos = mousepos - currentInstance->get_window_position();
+
+		if (!currentInstance->m_callback_paint) {
+			break;
+		}
+
+		if (close_btn.intersects(mousepos)) {
+			currentInstance->m_callback_paint(WindowHandler::DRAW_EVENT::TOOLBAR_DRAW, reinterpret_cast<void*>(HTCLOSE));
+		}
+		else if (max_btn.intersects(mousepos)) {
+			currentInstance->m_callback_paint(WindowHandler::DRAW_EVENT::TOOLBAR_DRAW, reinterpret_cast<void*>(HTMAXBUTTON));
+		}
+		else if (min_btn.intersects(mousepos)) {
+			currentInstance->m_callback_paint(WindowHandler::DRAW_EVENT::TOOLBAR_DRAW, reinterpret_cast<void*>(HTMINBUTTON));
+		}
+		else {
+			currentInstance->m_callback_paint(WindowHandler::DRAW_EVENT::TOOLBAR_DRAW, reinterpret_cast<void*>(0));
+		}
+		break;
+
 	}
 	// We have to handle these by ourself since windows doesn't do it?
 	case WM_NCLBUTTONDOWN:
@@ -499,9 +591,7 @@ LRESULT WindowHandler::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam
 			ShowWindow(currentInstance->m_hwnd, SW_MINIMIZE);
 			return 0;
 		case HTMAXBUTTON:
-			WINDOWPLACEMENT wp;
-			GetWindowPlacement(currentInstance->m_hwnd, &wp); 
-			ShowWindow(currentInstance->m_hwnd, wp.showCmd == SW_MAXIMIZE ? SW_RESTORE : SW_MAXIMIZE);
+			ShowWindow(currentInstance->m_hwnd, currentInstance->is_window_maximized() ? SW_RESTORE : SW_MAXIMIZE);
 			return 0;
 		case HTCLOSE:
 			SendMessage(currentInstance->m_hwnd, WM_CLOSE, 0, 0); 
@@ -517,11 +607,10 @@ LRESULT WindowHandler::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam
 		}
 		return DefWindowProc(hWnd, uMsg, wParam, lParam);
 	}
-	case WM_ACTIVATE:
 	case WM_PAINT: 
 	{	
 		if (currentInstance->m_callback_paint) {
-			currentInstance->m_callback_paint(std::nullopt); 
+			currentInstance->m_callback_paint(WindowHandler::DRAW_EVENT::NORMAL_DRAW, nullptr);  
 		}
 		ValidateRect(currentInstance->m_hwnd, NULL);
 		return true;
@@ -538,7 +627,8 @@ LRESULT WindowHandler::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam
 	case WM_PDF_BITMAP_READY:
 	{
 		if (currentInstance->m_callback_paint) {
-			currentInstance->m_callback_paint((std::vector<CachedBitmap*>*)lParam);
+			currentInstance->m_callback_paint(WindowHandler::DRAW_EVENT::PDF_BITMAP_READ, 
+				reinterpret_cast<void*>(lParam));
 		}
 		return NULL;
 	}
@@ -601,6 +691,32 @@ Math::Point<long> WindowHandler::get_window_position() const {
 	return Math::Point<long>(r.x, r.y); 
 }
 
+bool WindowHandler::is_window_maximized() const { 
+	return IsZoomed(m_hwnd) != 0;
+}
+
+UINT WindowHandler::intersect_toolbar_button(Math::Point<long> p) const {
+	auto windowsize = get_window_size(); 
+	auto dpi = get_dpi(); 
+	float caption_size = m_toolbar_margin * dpi / 96; 
+
+	Math::Rectangle<int> close_btn(windowsize.width - caption_size, 0, caption_size, caption_size);
+	Math::Rectangle<int> max_btn(windowsize.width - caption_size * 2, 0, caption_size, caption_size);
+	Math::Rectangle<int> min_btn(windowsize.width - caption_size * 3, 0, caption_size, caption_size);
+	Math::Rectangle<int> toolbar(0, 0, windowsize.width, caption_size);
+
+	if (close_btn.intersects(p)) {
+		return HTCLOSE;
+	}
+	else if (max_btn.intersects(p)) {
+		return HTMAXBUTTON;
+	}
+	else if (min_btn.intersects(p)) {
+		return HTMINBUTTON;
+	}
+	return 0;
+}
+
 void WindowHandler::set_window_size(Math::Rectangle<long> r) {
 	SetWindowPos(m_hwnd, HWND_TOP, r.x, r.y, r.width, r.height, SWP_NOZORDER); 
 }
@@ -621,7 +737,7 @@ Math::Point<long> WindowHandler::get_mouse_pos() const {
 	return PxToDp(p);
 }
 
-void WindowHandler::set_callback_paint(std::function<void(std::optional<std::vector<CachedBitmap*>*>)> callback) {
+void WindowHandler::set_callback_paint(std::function<void(WindowHandler::DRAW_EVENT, void*)> callback) {
 	m_callback_paint = callback;
 }
 
@@ -657,10 +773,6 @@ void WindowHandler::set_callback_key_up(std::function<void(VK)> callback) {
 	m_callback_key_up = callback;
 }
 
-void WindowHandler::set_callback_nchittest(std::function<LRESULT(Math::Point<long>, Math::Rectangle<long>)> callback) {
-	m_callback_nchittest = callback;
-}
-
 void WindowHandler::invalidate_drawing_area() {
 	InvalidateRect(m_hwnd, NULL, FALSE); 
 }
@@ -691,9 +803,7 @@ void WindowHandler::get_window_messages(bool blocking) {
 bool WindowHandler::init(std::wstring windowName, HINSTANCE instance) {
 	if (m_allWindowInstances == nullptr) {
 		m_allWindowInstances = std::make_unique<std::map<HWND, WindowHandler*>>();
-		//ASSERT_WIN(SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_UNAWARE), "Could not set DPI awereness"); 
 		ASSERT_WIN(SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2), "Could not set DPI awereness"); 
-		//std::atexit(WindowHandler::cleanup);
 	}
 
 
@@ -708,17 +818,6 @@ bool WindowHandler::init(std::wstring windowName, HINSTANCE instance) {
 
 	m_hwnd = CreateWindowEx(WS_EX_OVERLAPPEDWINDOW, wc.lpszClassName, windowName.c_str(), WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, 0, 0, instance, this); 
 	ASSERT_WIN_RETURN_FALSE(m_hwnd, "Window creation was not succefull");
-
-	// set the margin
-	MARGINS m;
-	m.cxLeftWidth = 0;
-	m.cxRightWidth = 0;
-	m.cyTopHeight = 0; 
-	m.cyBottomHeight = 0;
-	// I'm so done with this. I have no idea how this should be implemented. Anything i try just doesnt seem to work.
-	// The only solution that i found is to just draw over the whole window and draw my own caption buttons and title bar.
-	HRESULT hr = DwmExtendFrameIntoClientArea(m_hwnd, &m);
-	ASSERT_WIN_RETURN_FALSE(SUCCEEDED(hr), "Could not extend frame into client area");  
 
 	m_hdc = GetDC(m_hwnd);
 	ASSERT_WIN_RETURN_FALSE(m_hwnd, "Could not retrieve device m_context");

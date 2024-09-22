@@ -13,36 +13,92 @@ std::shared_ptr<MuPDFHandler> g_mupdfcontext;
 PDFRenderHandler* g_pdfrenderhandler = nullptr;
 StrokeHandler* g_strokehandler = nullptr;
 
-CaptionHandler g_caption;
-
 GestureHandler g_gesturehandler;
 
 bool g_draw_annots = true;
 
-void callback_draw(std::optional<std::vector<CachedBitmap*>*> highres_bitmaps) {
+UINT toolbar_last_draw = 0;
+std::wstring window_title_msg = L"";
+std::wstring file_name;
+
+void draw_caption(UINT btn) {
+	constexpr int caption_line_width = 1;
+	g_main_renderer->begin_draw();
+	auto scale = g_main_renderer->get_dpi_scale();
+	g_main_renderer->set_identity_transform_active();
+	auto win_size = g_main_renderer->get_window_size();
+
+	float caption_height = g_main_window->get_toolbar_margin(); 
+	auto caption_width = win_size.width * scale;
+	g_main_renderer->draw_rect_filled({ 0, 0, caption_width, caption_height }, { 70, 70, 70 });
+	g_main_renderer->draw_text(window_title_msg, { 5, 0 }, *g_text_format, *g_brush);
+
+	// close button
+	Math::Rectangle<float> close_btn_rec(caption_width - caption_height, 0, caption_height, caption_height);
+	if (btn == HTCLOSE) {
+		g_main_renderer->draw_rect_filled(close_btn_rec, { 255, 0, 0 });
+	}
+	g_main_renderer->draw_line(
+		{ close_btn_rec.x + close_btn_rec.height / 4, close_btn_rec.height / 4 },
+		{ close_btn_rec.x + close_btn_rec.height * 3 / 4, close_btn_rec.height * 3 / 4 },
+		{ 255, 255, 255 }, caption_line_width);
+	g_main_renderer->draw_line(
+		{ close_btn_rec.x + close_btn_rec.height * 3 / 4, close_btn_rec.height / 4 },
+		{ close_btn_rec.x + close_btn_rec.height / 4, close_btn_rec.height * 3 / 4 },
+		{ 255, 255, 255 }, caption_line_width);
+
+	// Maximize button
+	Math::Rectangle<float> max_btn_rec(caption_width - caption_height * 2, 0, caption_height, caption_height);
+	if (btn == HTMAXBUTTON) {
+		g_main_renderer->draw_rect_filled(max_btn_rec, { 100, 100, 100 });
+	}
+	g_main_renderer->draw_rect(
+		{ { max_btn_rec.x + max_btn_rec.height / 4, max_btn_rec.height / 4 },
+		  { max_btn_rec.x + max_btn_rec.height * 3 / 4, max_btn_rec.height * 3 / 4} },
+		{ 255, 255, 255 }, caption_line_width);
+
+	// Minimize
+	Math::Rectangle<float> min_btn_rec(caption_width - caption_height * 3, 0, caption_height, caption_height);
+	if (btn == HTMINBUTTON) {
+		g_main_renderer->draw_rect_filled(min_btn_rec, { 100, 100, 100 });
+	}
+	g_main_renderer->draw_line(
+		{ min_btn_rec.x + min_btn_rec.height / 4, min_btn_rec.height / 2 },
+		{ min_btn_rec.x + min_btn_rec.height * 3 / 4, min_btn_rec.height / 2 },
+		{ 255, 255, 255 }, caption_line_width);
+
+	g_main_renderer->end_draw();
+}
+
+void callback_draw(WindowHandler::DRAW_EVENT event, void* data) {
 	// draw scaled elements
 	g_main_renderer->set_current_transform_active();
 	g_main_renderer->begin_draw();
+
 	PDFRenderHandler::RenderInstructions instructions;
 	instructions.draw_annots = g_draw_annots;
 	instructions.render_annots = g_draw_annots;
 
-	if (highres_bitmaps.has_value() == false) {
+	switch (event) {
+	case WindowHandler::NORMAL_DRAW:
+	{
 		g_main_renderer->clear(Renderer::Color(50, 50, 50));
 		// when the highres_bitmaps arg is nullopt then it is a normal draw call from windows
 		// but only call when no gesture is in progress
 		if (g_gesturehandler.is_gesture_active() == false) {
-			g_pdfrenderhandler->render(instructions);
+			g_pdfrenderhandler->render(instructions); 
 		}
 		else {
-			instructions.render_highres = false;
-			instructions.render_annots = false;
-			g_pdfrenderhandler->render(instructions);
+			instructions.render_highres = false; 
+			instructions.render_annots = false; 
+			g_pdfrenderhandler->render(instructions); 
 		}
+		break;
 	}
-	else {
+	case WindowHandler::PDF_BITMAP_READ:
+	{
 		//else there are new bitmaps to render that have been created by other threads
-		auto bitmaps = highres_bitmaps.value(); 
+		auto bitmaps = reinterpret_cast<std::vector<CachedBitmap*>*>(data); 
 		for (size_t i = 0; i < bitmaps->size(); i++) {
 			auto rec = g_pdf->get_pagerec()->get_read(); 
 			auto pagerec = bitmaps->at(i)->doc_coords + rec->at(bitmaps->at(i)->page).upperleft();
@@ -52,9 +108,13 @@ void callback_draw(std::optional<std::vector<CachedBitmap*>*> highres_bitmaps) {
 			}
 	
 		}
+		break;
+	}
+	case WindowHandler::TOOLBAR_DRAW:
+		toolbar_last_draw = reinterpret_cast<UINT>(data);
+		break;
 	}
 	g_strokehandler->render_strokes();
-
 	// selected page
 	g_main_renderer->set_current_transform_active();
 	auto selected_page = g_gesturehandler.get_selected_page();
@@ -63,12 +123,26 @@ void callback_draw(std::optional<std::vector<CachedBitmap*>*> highres_bitmaps) {
 		g_main_renderer->draw_rect(rec->at(selected_page.value()), { 0, 0, 255 }, 5);
 	}
 
-
 	// draw ui elements
 	g_main_renderer->set_identity_transform_active();
-	g_caption.draw_caption();
+
+	draw_caption(toolbar_last_draw);
 	
 	g_main_renderer->end_draw();
+}
+
+std::wstring getLoadingBar(float progress) {
+	int barWidth = 10; // size of the bar
+	int pos = progress * barWidth;
+
+	std::wstring bar = L"[";
+	for (int i = 0; i < barWidth; ++i) {
+		if (i < pos) bar += L"#";
+		else bar += L" ";
+	}
+	bar += L"]";
+
+	return bar;
 }
 
 void custom_msg(CUSTOM_WM_MESSAGE msg, void* data) {
@@ -78,9 +152,13 @@ void custom_msg(CUSTOM_WM_MESSAGE msg, void* data) {
 		auto progress = g_pdfrenderhandler->get_display_list_progress();
 		if (FLOAT_EQUAL(progress, 1)) {
 			g_main_window->set_window_title(APPLICATION_NAME);
+			window_title_msg = file_name;
 		}
 		else {
 			g_main_window->set_window_title(APPLICATION_NAME + std::wstring(L" | Parsing pages: ") + std::to_wstring(progress * 100) + L" % ");
+			window_title_msg = getLoadingBar(progress) + std::format( + L" {:.1f} %", progress * 100);
+			
+			g_main_window->invalidate_drawing_area();
 		}
 		return;
 	}
@@ -166,10 +244,12 @@ void callback_pointer_down(WindowHandler::PointerInfo p) {
 void callback_pointer_update(WindowHandler::PointerInfo p) {
 	if (p.type == WindowHandler::POINTER_TYPE::MOUSE and p.button3pressed) {
 		g_gesturehandler.update_select_page(p);
+		g_main_window->invalidate_drawing_area();
 	}
 
 	if (p.type == WindowHandler::POINTER_TYPE::TOUCH) {
 		g_gesturehandler.update_gesture(p);
+		g_main_window->invalidate_drawing_area();
 	}
 
 	// handle everything related to the pen
@@ -180,9 +260,10 @@ void callback_pointer_update(WindowHandler::PointerInfo p) {
 		else {
 			g_strokehandler->update_stroke(p);
 		}
+
+		g_main_window->invalidate_drawing_area();
 	}
 
-	g_main_window->invalidate_drawing_area();
 }
 
 
@@ -216,19 +297,22 @@ void callback_mousewheel(short delta, bool hwheel, Math::Point<int> center) {
 void main_window_loop_run(HINSTANCE h) {
 	Logger::log("Initializing main window loop");
 	g_main_window = std::make_unique<WindowHandler>(APPLICATION_NAME, h);
+	g_main_window->set_state(WindowHandler::WINDOW_STATE::NORMAL);
+	window_title_msg = L"Choosing .pdf";
 
 	g_main_renderer = std::make_unique<Direct2DRenderer>(*g_main_window.get());
-	g_caption = CaptionHandler(g_main_renderer.get());  
 
-	auto temp = std::bind(&CaptionHandler::handle_hittest, &g_caption, std::placeholders::_1, std::placeholders::_2); 
-	g_main_window->set_callback_nchittest(temp); 
-
-	auto default_brush = g_main_renderer->create_brush(Renderer::Color(255, 0, 0));
+	auto default_brush = g_main_renderer->create_brush(Renderer::Color(255, 255, 255));
 	g_brush = &default_brush;
-	auto default_text_format = g_main_renderer->create_text_format(L"Consolas", 100);
+	auto default_text_format = g_main_renderer->create_text_format(L"Courier New", g_main_window->get_toolbar_margin() * 0.95);
 	g_text_format = &default_text_format;
 
 	g_mupdfcontext = std::shared_ptr<MuPDFHandler>(new MuPDFHandler);
+
+	g_main_renderer->begin_draw();
+	g_main_renderer->clear(Renderer::Color(50, 50, 50));
+	draw_caption(0);
+	g_main_renderer->end_draw();
 
 	auto path = FileHandler::open_file_dialog(L"PDF\0*.pdf\0\0", *g_main_window);
 	Logger::log(L"Trying to open ", path);
@@ -238,6 +322,14 @@ void main_window_loop_run(HINSTANCE h) {
 		return;
 	}
 
+	file_name = std::filesystem::path(path.value()).filename(); 
+
+	window_title_msg = L"Opening " + file_name;
+	g_main_renderer->begin_draw();
+	g_main_renderer->clear(Renderer::Color(50, 50, 50));
+	draw_caption(0);
+	g_main_renderer->end_draw();
+
 	auto pdf = g_mupdfcontext->load_pdf(path.value());
 	g_pdf = &pdf.value();
 	g_gesturehandler = GestureHandler(g_main_renderer.get(), &pdf.value());
@@ -246,7 +338,6 @@ void main_window_loop_run(HINSTANCE h) {
 
 	auto pdf_handler = PDFRenderHandler(g_pdf, g_main_renderer.get(), g_main_window.get(), 2);
 	g_pdfrenderhandler = &pdf_handler;
-
 
 	Logger::success("Loaded PDF file in ", time);
 
@@ -263,7 +354,6 @@ void main_window_loop_run(HINSTANCE h) {
 	g_main_window->set_callback_key_down(callback_key_down);
 	g_main_window->set_callback_key_up(callback_key_up);
 
-	g_main_window->set_state(WindowHandler::WINDOW_STATE::NORMAL);
 
 	while(!g_main_window->close_request()) {
 		g_main_window->get_window_messages(true);

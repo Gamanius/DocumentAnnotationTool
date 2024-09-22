@@ -27,10 +27,12 @@ class WindowHandler {
 	HDC m_hdc = NULL;
 
 	bool m_closeRequest = false;
+	bool m_is_mouse_tracking_window = false;
+	bool m_is_mouse_tracking_nc = false;
 
 	static std::unique_ptr<std::map<HWND, WindowHandler*>> m_allWindowInstances;
 
-	const unsigned int m_toolbar_margin = APPLICATION_TOOLBAR_HEIGHT;
+	const unsigned int m_toolbar_margin = 30;
 
 public:
 
@@ -192,6 +194,12 @@ public:
 		UNKWON
 	};
 
+	enum DRAW_EVENT {
+		NORMAL_DRAW,
+		PDF_BITMAP_READ,
+		TOOLBAR_DRAW
+	};
+
 	struct PointerInfo {
 		UINT id = 0;
 		POINTER_TYPE type = POINTER_TYPE::UNKNOWN;
@@ -205,7 +213,7 @@ public:
 	};
 
 private:
-	std::function<void(std::optional<std::vector<CachedBitmap*>*>)> m_callback_paint;
+	std::function<void(DRAW_EVENT, void*)> m_callback_paint;
 	std::function<void(CUSTOM_WM_MESSAGE, void*)> m_callback_cutom_msg;
 	std::function<void(Math::Rectangle<long>)> m_callback_size;
 	std::function<void(PointerInfo)> m_callback_pointer_down;
@@ -214,8 +222,6 @@ private:
 	std::function<void(short, bool, Math::Point<int>)> m_callback_mousewheel;
 	std::function<void(VK)> m_callback_key_down;
 	std::function<void(VK)> m_callback_key_up;
-
-	std::function<LRESULT(Math::Point<long>, Math::Rectangle<long>)> m_callback_nchittest; 
 public:
 
 	static LRESULT parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -230,7 +236,7 @@ public:
 
 	void set_state(WINDOW_STATE state);
 
-	void set_callback_paint(std::function<void(std::optional<std::vector<CachedBitmap*>*>)> callback);
+	void set_callback_paint(std::function<void(DRAW_EVENT, void*)> callback);
 	void set_callback_custom_msg(std::function<void(CUSTOM_WM_MESSAGE, void*)> callback);
 	void set_callback_size(std::function<void(Math::Rectangle<long>)> callback);
 	void set_callback_pointer_down(std::function<void(PointerInfo)> callback);
@@ -240,8 +246,6 @@ public:
 	void set_callback_key_down(std::function<void(VK)> callback);
 	void set_callback_key_up(std::function<void(VK)> callback);
 	
-	void set_callback_nchittest(std::function<LRESULT(Math::Point<long>, Math::Rectangle<long>)> callback); 
-
 	void invalidate_drawing_area();
 	void invalidate_drawing_area(Math::Rectangle<long> rec);
 
@@ -284,6 +288,10 @@ public:
 	Math::Rectangle<long> get_window_size() const;
 
 	Math::Point<long> get_window_position() const;
+
+	bool is_window_maximized() const;
+
+	UINT intersect_toolbar_button(Math::Point<long> p) const; 
 
 	// Sets a new windowsize
 	void set_window_size(Math::Rectangle<long> r);
