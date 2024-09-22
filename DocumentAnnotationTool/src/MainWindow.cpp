@@ -151,8 +151,9 @@ void custom_msg(CUSTOM_WM_MESSAGE msg, void* data) {
 	{
 		auto progress = g_pdfrenderhandler->get_display_list_progress();
 		if (FLOAT_EQUAL(progress, 1)) {
-			g_main_window->set_window_title(APPLICATION_NAME);
+			g_main_window->set_window_title(file_name);
 			window_title_msg = file_name;
+
 		}
 		else {
 			g_main_window->set_window_title(APPLICATION_NAME + std::wstring(L" | Parsing pages: ") + std::to_wstring(progress * 100) + L" % ");
@@ -212,6 +213,11 @@ void callback_key_up(WindowHandler::VK k) {
 
 	if (k == WindowHandler::VK::F3) {
 		g_draw_annots = not g_draw_annots;
+	}
+
+	if (k == WindowHandler::VK::F1) {
+		// opens the roaming folder
+		ShellExecute(NULL, L"open", L"explorer.exe", FileHandler::get_appdata_path().c_str(), NULL, SW_SHOWDEFAULT);
 	}
 
 	g_main_window->invalidate_drawing_area();
@@ -294,11 +300,18 @@ void callback_mousewheel(short delta, bool hwheel, Math::Point<int> center) {
 	g_main_window->invalidate_drawing_area();
 }
 
-void main_window_loop_run(HINSTANCE h) {
+void main_window_loop_run(HINSTANCE h, std::filesystem::path p) {
+	auto update_caption = [](const std::wstring& input) {
+		window_title_msg = input;
+		g_main_renderer->begin_draw();
+		g_main_renderer->clear(Renderer::Color(50, 50, 50));
+		draw_caption(0);
+		g_main_renderer->end_draw();
+		};
+
 	Logger::log("Initializing main window loop");
 	g_main_window = std::make_unique<WindowHandler>(APPLICATION_NAME, h);
 	g_main_window->set_state(WindowHandler::WINDOW_STATE::NORMAL);
-	window_title_msg = L"Choosing .pdf";
 
 	g_main_renderer = std::make_unique<Direct2DRenderer>(*g_main_window.get());
 
@@ -306,32 +319,34 @@ void main_window_loop_run(HINSTANCE h) {
 	g_brush = &default_brush;
 	auto default_text_format = g_main_renderer->create_text_format(L"Courier New", g_main_window->get_toolbar_margin() * 0.95);
 	g_text_format = &default_text_format;
+	g_mupdfcontext = std::shared_ptr<MuPDFHandler>(new MuPDFHandler); 
 
-	g_mupdfcontext = std::shared_ptr<MuPDFHandler>(new MuPDFHandler);
-
-	g_main_renderer->begin_draw();
-	g_main_renderer->clear(Renderer::Color(50, 50, 50));
-	draw_caption(0);
-	g_main_renderer->end_draw();
-
-	auto path = FileHandler::open_file_dialog(L"PDF\0*.pdf\0\0", *g_main_window);
-	Logger::log(L"Trying to open ", path);
+	if (p.empty()) {
+	INVALID_PATH:
+		update_caption(L"Choosing .pdf");
+		auto op_path = FileHandler::open_file_dialog(L"PDF\0*.pdf\0\0", *g_main_window); 
+		if (!op_path.has_value()) {
+			return;
+		}
+		p = op_path.value();
+	}
+	Logger::log(L"Trying to open ", p);
+	update_caption(L"Opening " + p.filename().wstring());
 	Timer time;
+	auto pdf = g_mupdfcontext->load_pdf(p);
+	if (!pdf.has_value()) {
+		goto INVALID_PATH;
+	}
+	file_name = p.filename();
 
-	if (!path.has_value()) {
-		return;
+	g_pdf = &pdf.value(); 
+	{
+		// center the pdf in the middle
+		auto rec = g_pdf->get_pagerec()->get_read();
+		auto page = rec->at(0);
+		g_main_renderer->add_transform_matrix({ (static_cast<float>(g_main_renderer->get_window_size_normalized().width) - page.width) / 2.0f, static_cast<float>(g_main_window->get_toolbar_margin())});
 	}
 
-	file_name = std::filesystem::path(path.value()).filename(); 
-
-	window_title_msg = L"Opening " + file_name;
-	g_main_renderer->begin_draw();
-	g_main_renderer->clear(Renderer::Color(50, 50, 50));
-	draw_caption(0);
-	g_main_renderer->end_draw();
-
-	auto pdf = g_mupdfcontext->load_pdf(path.value());
-	g_pdf = &pdf.value();
 	g_gesturehandler = GestureHandler(g_main_renderer.get(), &pdf.value());
 	auto strok_handler = StrokeHandler(g_pdf, g_main_renderer.get(), g_main_window.get());
 	g_strokehandler = &strok_handler;
@@ -341,6 +356,10 @@ void main_window_loop_run(HINSTANCE h) {
 
 	Logger::success("Loaded PDF file in ", time);
 
+	// why do i have to do this here??
+	g_main_renderer->resize(g_main_window->get_client_size());
+
+		
 	// do the callbacks
 	g_main_window->set_callback_paint(callback_draw);
 	g_main_window->set_callback_size(callback_size);
@@ -353,7 +372,6 @@ void main_window_loop_run(HINSTANCE h) {
 	g_main_window->set_callback_mousewheel(callback_mousewheel);
 	g_main_window->set_callback_key_down(callback_key_down);
 	g_main_window->set_callback_key_up(callback_key_up);
-
 
 	while(!g_main_window->close_request()) {
 		g_main_window->get_window_messages(true);

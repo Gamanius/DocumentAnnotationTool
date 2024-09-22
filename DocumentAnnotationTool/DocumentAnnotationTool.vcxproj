@@ -189,6 +189,7 @@
     <ClCompile Include="src\helper\PDF\StrokeHandler.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="rsc\resource.h" />
     <ClInclude Include="src\dependencies\Macros.h" />
     <ClInclude Include="src\dependencies\MagicEnum.h" />
     <ClInclude Include="src\dependencies\magic_enum\magic_enum.hpp" />
@@ -219,15 +220,23 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\README.md" />
-    <None Include="rsc\Annotation pdf.pdf" />
-    <None Include="rsc\ENR6.3-9.slow.rendering.pdf" />
-    <None Include="rsc\Ghent_PDF_Output_Suite_V50_Testpages\GhentPDFOutputSuite50_ReadMes.pdf" />
-    <None Include="rsc\Ghent_PDF_Output_Suite_V50_Testpages\Ghent_PDF-Output-Test-V50_ALL_REFERENCE.pdf" />
-    <None Include="rsc\Ghent_PDF_Output_Suite_V50_Testpages\Ghent_PDF-Output-Test-V50_ALL_X4.pdf" />
-    <None Include="rsc\Ghent_PDF_Output_Suite_V50_Testpages\PR_Ghent-PDF-Output-Suite-5-Conformance-Certification.pdf" />
-    <None Include="rsc\Physikpraktikum_1-4.pdf" />
-    <None Include="rsc\second_measurement_red_sensor_HEAVY.pdf" />
+    <None Include="rsc\pdf_tests\Annotation pdf.pdf" />
+    <None Include="rsc\pdf_tests\ENR6.3-9.slow.rendering.pdf" />
+    <None Include="rsc\pdf_tests\Ghent_PDF_Output_Suite_V50_Testpages\GhentPDFOutputSuite50_ReadMes.pdf" />
+    <None Include="rsc\pdf_tests\Ghent_PDF_Output_Suite_V50_Testpages\Ghent_PDF-Output-Test-V50_ALL_REFERENCE.pdf" />
+    <None Include="rsc\pdf_tests\Ghent_PDF_Output_Suite_V50_Testpages\Ghent_PDF-Output-Test-V50_ALL_X4.pdf" />
+    <None Include="rsc\pdf_tests\Ghent_PDF_Output_Suite_V50_Testpages\PR_Ghent-PDF-Output-Suite-5-Conformance-Certification.pdf" />
+    <None Include="rsc\pdf_tests\Physikpraktikum_1-4.pdf" />
+    <None Include="rsc\pdf_tests\second_measurement_red_sensor_HEAVY.pdf" />
+    <None Include="src\resource.aps" />
     <None Include="TODO.md" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="rsc\resource.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="rsc\icon.ico" />
+    <Image Include="rsc\icon1.ico" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

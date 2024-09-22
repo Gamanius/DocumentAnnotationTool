@@ -1,0 +1,10 @@
+{
+  "FileVersion": 2,
+  "Id": "c8f1521f-63a0-4c7c-bcdb-407ef7671c72",
+  "Items": [
+    {
+      "Id": "84c98110-9913-4f35-b6b7-9833d2f40e3c",
+      "Command": "$(ProjectDir)rsc\\1.pdf"
+    }
+  ]
+}

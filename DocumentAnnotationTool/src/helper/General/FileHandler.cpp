@@ -53,7 +53,10 @@ std::optional<std::wstring> FileHandler::save_file_dialog(const wchar_t* filter,
 
 std::optional<FileHandler::File> FileHandler::open_file(const std::wstring& path) {
     HANDLE hFile = CreateFile(path.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-    ASSERT_WIN_RETURN_NULLOPT(hFile != INVALID_HANDLE_VALUE, "Could not open file " + std::string(path.begin(), path.end()));
+    if (hFile == INVALID_HANDLE_VALUE) {
+        Logger::warn("Could not open file ", path);
+        return std::nullopt;
+    }
 
     DWORD fileSize = GetFileSize(hFile, NULL);
     ASSERT_WIN_WITH_STATEMENT(fileSize != INVALID_FILE_SIZE,
@@ -114,6 +117,11 @@ std::filesystem::path FileHandler::get_appdata_path() {
     CoUninitialize();
 
     path = path / APPLICATION_NAME;
+    if (!std::filesystem::exists(path)) {
+	    auto result = std::filesystem::create_directories(path);
+		ASSERT(result, "Could not create Roaming Dir: ", path);
+    }
+
     return path;
 }
 

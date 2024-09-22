@@ -37,7 +37,10 @@ std::optional<MuPDFHandler::PDF> MuPDFHandler::load_pdf(const std::wstring& path
 
 	// load the pdf 
 	auto file = FileHandler::open_file(path);
-	ASSERT_RETURN_NULLOPT(file.has_value(), L"Could not open file ", path);
+	if (!file.has_value()) {
+		Logger::warn(L"Could not open file: ", path);
+		return std::nullopt;
+	};
 
 	auto stream = fz_open_memory(*ctx, file.value().data, file.value().size);
 	auto doc = fz_open_document_with_stream(*ctx, ".pdf", stream);

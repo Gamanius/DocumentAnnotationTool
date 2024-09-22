@@ -12,7 +12,8 @@ HANDLE create_console() {
 }
 
 HANDLE create_log_file() {
-	return CreateFile(L"docanto.log", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_FLAG_WRITE_THROUGH, NULL); 
+	auto path = FileHandler::get_appdata_path() / L"docanto.log";
+	return CreateFile(path.c_str(), GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_FLAG_WRITE_THROUGH, NULL); 
 }
 
 void init() {
@@ -25,7 +26,16 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 	Logger::unformated_log("---=== Starting Logging ===---");
 	init();
 
-	main_window_loop_run(hInstance);
+	int argc = 0;
+	auto cmdline = CommandLineToArgvW(GetCommandLine(), &argc);
+	std::filesystem::path p;
+
+	// possible path
+	if (argc > 1) {
+		p = cmdline[1]; 
+	}
+	
+	main_window_loop_run(hInstance, p);
 	
 	Logger::log("End of program");
 	return 0;

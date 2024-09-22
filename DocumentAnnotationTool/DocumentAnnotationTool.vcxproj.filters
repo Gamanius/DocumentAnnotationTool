@@ -134,17 +134,37 @@
     <ClInclude Include="src\dependencies\Macros.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="rsc\resource.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="rsc\ENR6.3-9.slow.rendering.pdf" />
-    <None Include="rsc\Physikpraktikum_1-4.pdf" />
-    <None Include="rsc\second_measurement_red_sensor_HEAVY.pdf" />
-    <None Include="rsc\Ghent_PDF_Output_Suite_V50_Testpages\PR_Ghent-PDF-Output-Suite-5-Conformance-Certification.pdf" />
-    <None Include="rsc\Ghent_PDF_Output_Suite_V50_Testpages\Ghent_PDF-Output-Test-V50_ALL_REFERENCE.pdf" />
-    <None Include="rsc\Ghent_PDF_Output_Suite_V50_Testpages\Ghent_PDF-Output-Test-V50_ALL_X4.pdf" />
-    <None Include="rsc\Ghent_PDF_Output_Suite_V50_Testpages\GhentPDFOutputSuite50_ReadMes.pdf" />
+    <None Include="rsc\pdf_tests\ENR6.3-9.slow.rendering.pdf" />
+    <None Include="rsc\pdf_tests\Physikpraktikum_1-4.pdf" />
+    <None Include="rsc\pdf_tests\second_measurement_red_sensor_HEAVY.pdf" />
+    <None Include="rsc\pdf_tests\Ghent_PDF_Output_Suite_V50_Testpages\PR_Ghent-PDF-Output-Suite-5-Conformance-Certification.pdf" />
+    <None Include="rsc\pdf_tests\Ghent_PDF_Output_Suite_V50_Testpages\Ghent_PDF-Output-Test-V50_ALL_REFERENCE.pdf" />
+    <None Include="rsc\pdf_tests\Ghent_PDF_Output_Suite_V50_Testpages\Ghent_PDF-Output-Test-V50_ALL_X4.pdf" />
+    <None Include="rsc\pdf_tests\Ghent_PDF_Output_Suite_V50_Testpages\GhentPDFOutputSuite50_ReadMes.pdf" />
     <None Include="TODO.md" />
-    <None Include="rsc\Annotation pdf.pdf" />
+    <None Include="rsc\pdf_tests\Annotation pdf.pdf" />
     <None Include="..\README.md" />
+    <None Include="src\resource.aps" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="rsc\resource.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
+    <ResourceCompile Include="rsc\resource.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="rsc\icon1.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="rsc\icon.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
   </ItemGroup>
 </Project>

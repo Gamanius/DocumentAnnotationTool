@@ -43,7 +43,7 @@ Direct2DRenderer::Direct2DRenderer(const WindowHandler& w) {
 	);
 
 	m_renderTarget->SetAntialiasMode(D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
-
+	resize(m_window_size);
 }
 
 Direct2DRenderer::~Direct2DRenderer() {

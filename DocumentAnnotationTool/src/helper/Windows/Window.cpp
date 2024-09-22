@@ -1,6 +1,7 @@
 #pragma once
 
 #include "WindowHandler.h"
+#include "../../rsc/resource.h"
 #include <dwmapi.h>
 #include <windowsx.h>
 #include <Vssym32.h>
@@ -814,6 +815,7 @@ bool WindowHandler::init(std::wstring windowName, HINSTANCE instance) {
 	wc.hCursor = LoadCursor(NULL, IDC_ARROW);
 	wc.hbrBackground = CreateSolidBrush(3289650);
 	wc.lpszClassName = windowName.c_str();
+	wc.hIcon = LoadIcon(instance, MAKEINTRESOURCE(IDI_ICON1));
 	ASSERT_WIN_RETURN_FALSE(RegisterClass(&wc), "Could not register Window");
 
 	m_hwnd = CreateWindowEx(WS_EX_OVERLAPPEDWINDOW, wc.lpszClassName, windowName.c_str(), WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, 0, 0, instance, this); 
