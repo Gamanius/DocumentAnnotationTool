@@ -166,6 +166,10 @@ void StrokeHandler::start_stroke(const WindowHandler::PointerInfo& p) {
 	Stroke s;
 	s.points.push_back(m_renderer->inv_transform_point(p.pos));
 	s.page = page.value();
+	
+	auto curr_pen = m_pens.get_pen();
+	s.color = curr_pen.color;
+	s.thickness = curr_pen.width; 
 
 	m_active_strokes[p.id] = std::move(s);
 }
@@ -203,9 +207,11 @@ void StrokeHandler::end_stroke(const WindowHandler::PointerInfo& p) {
 
 	// update for the last time
 	Stroke& s = m_active_strokes.at(p.id);
+
 	s.points.push_back(m_renderer->inv_transform_point(p.pos));
 	s.geometry = Renderer::create_bezier_geometry(m_active_strokes.at(p.id).points); // create the bezier geometry
 	s.path = m_renderer->create_bezier_path(m_active_strokes.at(p.id).geometry);
+
 	apply_stroke_to_pdf(s); // apply the stroke to the pdf document
 
 	// add the stroke to the list of strokes
@@ -334,6 +340,10 @@ void StrokeHandler::render_strokes() {
 	m_renderer->end_draw();
 }
 
+PenHandler& StrokeHandler::get_pen_handler() {
+	return m_pens;
+}
+
 void swap(StrokeHandler& first, StrokeHandler& second) {
 	using std::swap;
 
@@ -342,4 +352,7 @@ void swap(StrokeHandler& first, StrokeHandler& second) {
 	swap(first.m_window, second.m_window);
 
 	swap(first.m_strokes, second.m_strokes);
+	swap(first.m_active_strokes, second.m_active_strokes);
+	swap(first.m_earising_points, second.m_earising_points);
+	swap(first.m_pens, second.m_pens);
 }

@@ -157,6 +157,22 @@ void Direct2DRenderer::draw_rect_filled(Math::Rectangle<float> rec, BrushObject&
 	end_draw();
 }
 
+void Direct2DRenderer::draw_circle(Math::Point<float> center, float radius, BrushObject& brush, float thick) {
+	begin_draw();
+	m_renderTarget->DrawEllipse({ center, radius, radius }, brush.m_object, thick); 
+	end_draw();
+}
+
+void Direct2DRenderer::draw_circle(Math::Point<float> center, float radius, BrushObject& brush) {
+	draw_circle(center, radius, brush, 1.0f);
+}
+
+void Direct2DRenderer::draw_circle_filled(Math::Point<float> center, float radius, BrushObject& brush) {
+	begin_draw();
+	m_renderTarget->FillEllipse({ center, radius, radius }, brush.m_object); 
+	end_draw();
+}
+
 void Direct2DRenderer::draw_rect(Math::Rectangle<float> rec, Renderer::Color c, float thick) {
 	// create the brush object
 	auto temp_brush = create_brush(c);
@@ -171,6 +187,20 @@ void Direct2DRenderer::draw_rect_filled(Math::Rectangle<float> rec, Renderer::Co
 	// create brush object
 	auto temp_brush = create_brush(c);
 	draw_rect_filled(rec, temp_brush);
+}
+
+void Direct2DRenderer::draw_circle(Math::Point<float> center, float radius, Renderer::Color c, float thick) {
+	auto temp_brush = create_brush(c);
+	draw_circle(center, radius, temp_brush, thick);
+}
+
+void Direct2DRenderer::draw_circle(Math::Point<float> center, float radius, Renderer::Color c) {
+	draw_circle(center, radius, c, 1.0f);
+}
+
+void Direct2DRenderer::draw_circle_filled(Math::Point<float> center, float radius, Renderer::Color c) {
+	auto temp_brush = create_brush(c);
+	draw_circle_filled(center, radius, temp_brush); 
 }
 
 void Direct2DRenderer::set_current_transform_active() {

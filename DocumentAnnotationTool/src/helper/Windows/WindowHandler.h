@@ -32,7 +32,7 @@ class WindowHandler {
 
 	static std::unique_ptr<std::map<HWND, WindowHandler*>> m_allWindowInstances;
 
-	const unsigned int m_toolbar_margin = 30;
+	const unsigned int m_toolbar_margin = 25;
 
 public:
 

@@ -75,6 +75,10 @@ std::optional<FileHandler::File> FileHandler::open_file(const std::wstring& path
     return std::move(file);
 }
 
+std::optional<FileHandler::File> FileHandler::open_file_appdata(const std::wstring& path) {
+    return open_file(FileHandler::get_appdata_path() / path);
+}
+
 bool FileHandler::write_file(byte* data, size_t amount, const std::wstring& path, bool overwrite) {
     HANDLE h = CreateFile(path.c_str(), GENERIC_WRITE, 0, NULL, overwrite ? CREATE_ALWAYS : CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
     ASSERT_WIN_RETURN_FALSE(h != INVALID_HANDLE_VALUE, "Could not create file ", path);
@@ -86,7 +90,7 @@ bool FileHandler::write_file(byte* data, size_t amount, const std::wstring& path
 
 bool FileHandler::write_file_to_appdata(const File& f, std::filesystem::path path, bool overwrite) {
     auto file_path = get_appdata_path() / path;
-    HANDLE h = CreateFile(path.c_str(), GENERIC_WRITE, 0, NULL, overwrite ? CREATE_ALWAYS : CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
+    HANDLE h = CreateFile(file_path.c_str(), GENERIC_WRITE, 0, NULL, overwrite ? CREATE_ALWAYS : CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
 	ASSERT_WIN_RETURN_FALSE(h != INVALID_HANDLE_VALUE, "Could not create file ", path); 
 	bool succ = WriteFile(h, reinterpret_cast<void*>(f.data), static_cast<DWORD>(f.size), NULL, NULL);
 

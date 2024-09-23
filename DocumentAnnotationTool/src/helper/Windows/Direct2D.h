@@ -2,6 +2,7 @@
 #include "../General/General.h" 
 #include "WindowHandler.h"
 #include "../PDF/MuPDF.h"
+#include "json.hpp"
 
 // Direct2D
 #include <d2d1.h>
@@ -38,6 +39,27 @@ namespace Renderer {
 			return D2D1::ColorF(r / 255.0f, g / 255.0f, b / 255.0f, alpha / 255.0f);
 		}
 	};
+
+	inline void to_json(nlohmann::json& j, const Color& c) {
+		j = nlohmann::json{ {"r", c.r}, {"g", c.g}, {"b", c.b} };
+	}
+
+	inline void from_json(const nlohmann::json& j, Color& c) {
+		j.at("r").get_to(c.r);
+		j.at("g").get_to(c.g);
+		j.at("b").get_to(c.b);
+	}
+
+	inline void to_json(nlohmann::json& j, const AlphaColor& c) {
+		j = nlohmann::json{ {"r", c.r}, {"g", c.g}, {"b", c.b}, {"alpha", c.alpha} };
+	}
+
+	inline void from_json(const nlohmann::json& j, AlphaColor& c) {
+		j.at("r").get_to(c.r);
+		j.at("g").get_to(c.g);
+		j.at("b").get_to(c.b);
+		j.at("alpha").get_to(c.alpha);
+	}
 
 	// https://www.quantstart.com/articles/Tridiagonal-Matrix-Algorithm-Thomas-Algorithm-in-C/
 	inline void solveTridiagonal(std::vector<float>& a,
@@ -182,10 +204,18 @@ public:
 	void draw_rect(Math::Rectangle<float> rec, BrushObject& brush);
 	void draw_rect_filled(Math::Rectangle<float> rec, BrushObject& brush);
 
+	void draw_circle(Math::Point<float> center, float radius, BrushObject& brush, float thick);
+	void draw_circle(Math::Point<float> center, float radius, BrushObject& brush);
+	void draw_circle_filled(Math::Point<float> center, float radius, BrushObject& brush);
+
 	// draw calls that create the brushobjects. Is slower than the rest i guess?
 	void draw_rect(Math::Rectangle<float> rec, Renderer::Color c, float thick);
 	void draw_rect(Math::Rectangle<float> rec, Renderer::Color c);
 	void draw_rect_filled(Math::Rectangle<float> rec, Renderer::Color c);
+
+	void draw_circle(Math::Point<float> center, float radius, Renderer::Color c, float thick);
+	void draw_circle(Math::Point<float> center, float radius, Renderer::Color c);
+	void draw_circle_filled(Math::Point<float> center, float radius, Renderer::Color c);
 
 	void set_current_transform_active();
 	void set_identity_transform_active();

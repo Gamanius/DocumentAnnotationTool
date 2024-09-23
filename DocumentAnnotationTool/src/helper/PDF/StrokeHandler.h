@@ -3,6 +3,7 @@
 #include "../General/General.h" 
 #include "../Windows/Direct2D.h"
 #include "MuPDF.h"
+#include "PenHandler.h"
 
 #include <algorithm>
 #include <list>
@@ -32,15 +33,15 @@ class StrokeHandler {
 		friend void swap(Stroke& first, Stroke& second) {
 			using std::swap;
 
+			swap(first.ctx, second.ctx);
 			swap(first.points, second.points);
+			swap(first.annot, second.annot);
+			swap(first.page, second.page);
+			swap(first.geometry, second.geometry);
+			swap(first.bounding_box, second.bounding_box);
+			swap(first.path, second.path);
 			swap(first.thickness, second.thickness);
 			swap(first.color, second.color);
-			swap(first.path, second.path);
-			swap(first.geometry, second.geometry);
-			swap(first.page, second.page);
-			swap(first.annot, second.annot);
-			swap(first.ctx, second.ctx);
-			swap(first.bounding_box, second.bounding_box);
 			swap(first.to_be_erased, second.to_be_erased);
 		}
 	};
@@ -55,6 +56,8 @@ class StrokeHandler {
 	Direct2DRenderer* m_renderer = nullptr;
 	// not owned by this class!
 	WindowHandler* m_window = nullptr;
+
+	PenHandler m_pens;
 
 	void apply_stroke_to_pdf(Stroke& s);
 	void parse_all_strokes();
@@ -82,6 +85,7 @@ public:
 
 	void render_strokes();
 
+	PenHandler& get_pen_handler(); 
 
 	friend void swap(StrokeHandler& first, StrokeHandler& second);
 

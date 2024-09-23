@@ -175,6 +175,7 @@
     </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\helper\PDF\PenHandler.cpp" />
     <ClCompile Include="src\helper\Windows\Direct2D.cpp" />
     <ClCompile Include="src\helper\General\FileHandler.cpp" />
     <ClCompile Include="src\helper\PDF\GestureHandler.cpp" />
@@ -187,8 +188,11 @@
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\MainWindow.cpp" />
     <ClCompile Include="src\helper\PDF\StrokeHandler.cpp" />
+    <ClCompile Include="src\helper\UI\UIHandler.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\dependencies\json.hpp" />
+    <ClInclude Include="src\helper\PDF\PenHandler.h" />
     <ClInclude Include="rsc\resource.h" />
     <ClInclude Include="src\dependencies\Macros.h" />
     <ClInclude Include="src\dependencies\MagicEnum.h" />
@@ -213,10 +217,12 @@
     <ClInclude Include="src\helper\PDF\PDF.h" />
     <ClInclude Include="src\helper\PDF\PDFRenderHandler.h" />
     <ClInclude Include="src\helper\PDF\StrokeHandler.h" />
+    <ClInclude Include="src\helper\UI\UI.h" />
     <ClInclude Include="src\helper\Windows\Direct2D.h" />
     <ClInclude Include="src\dependencies\ReadWriteRecursiveMutex.h" />
     <ClInclude Include="src\helper\Windows\WindowHandler.h" />
     <ClInclude Include="src\MainWindow.h" />
+    <ClInclude Include="src\helper\UI\UIHandler.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\README.md" />

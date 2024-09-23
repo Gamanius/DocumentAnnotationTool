@@ -387,9 +387,14 @@ LRESULT WindowHandler::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam
 	Math::Rectangle<int> toolbar(0, 0, windowsize.width, caption_size);
 
 	switch (uMsg) {
+	case WM_ENDSESSION:
 	case WM_CLOSE:
 	{
 		currentInstance->m_closeRequest = true;
+
+		// If WM_ENDSESSION is called we need to put another message in the queue
+		// since the window will remain inactive and the message loop will not be called
+		PostMessage(hWnd, WM_USER, 0, 0); 
 		return NULL;
 	}
 	case WM_ACTIVATE:

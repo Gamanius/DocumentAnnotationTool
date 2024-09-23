@@ -3,6 +3,7 @@
 
 std::unique_ptr<WindowHandler> g_main_window;
 std::unique_ptr<Direct2DRenderer> g_main_renderer;
+std::unique_ptr<UIHandler> g_ui_handler;
 
 // will be automatically destroyed after main_window_loop_run
 Direct2DRenderer::TextFormatObject* g_text_format;
@@ -20,55 +21,6 @@ bool g_draw_annots = true;
 UINT toolbar_last_draw = 0;
 std::wstring window_title_msg = L"";
 std::wstring file_name;
-
-void draw_caption(UINT btn) {
-	constexpr int caption_line_width = 1;
-	g_main_renderer->begin_draw();
-	auto scale = g_main_renderer->get_dpi_scale();
-	g_main_renderer->set_identity_transform_active();
-	auto win_size = g_main_renderer->get_window_size();
-
-	float caption_height = g_main_window->get_toolbar_margin(); 
-	auto caption_width = win_size.width * scale;
-	g_main_renderer->draw_rect_filled({ 0, 0, caption_width, caption_height }, { 70, 70, 70 });
-	g_main_renderer->draw_text(window_title_msg, { 5, 0 }, *g_text_format, *g_brush);
-
-	// close button
-	Math::Rectangle<float> close_btn_rec(caption_width - caption_height, 0, caption_height, caption_height);
-	if (btn == HTCLOSE) {
-		g_main_renderer->draw_rect_filled(close_btn_rec, { 255, 0, 0 });
-	}
-	g_main_renderer->draw_line(
-		{ close_btn_rec.x + close_btn_rec.height / 4, close_btn_rec.height / 4 },
-		{ close_btn_rec.x + close_btn_rec.height * 3 / 4, close_btn_rec.height * 3 / 4 },
-		{ 255, 255, 255 }, caption_line_width);
-	g_main_renderer->draw_line(
-		{ close_btn_rec.x + close_btn_rec.height * 3 / 4, close_btn_rec.height / 4 },
-		{ close_btn_rec.x + close_btn_rec.height / 4, close_btn_rec.height * 3 / 4 },
-		{ 255, 255, 255 }, caption_line_width);
-
-	// Maximize button
-	Math::Rectangle<float> max_btn_rec(caption_width - caption_height * 2, 0, caption_height, caption_height);
-	if (btn == HTMAXBUTTON) {
-		g_main_renderer->draw_rect_filled(max_btn_rec, { 100, 100, 100 });
-	}
-	g_main_renderer->draw_rect(
-		{ { max_btn_rec.x + max_btn_rec.height / 4, max_btn_rec.height / 4 },
-		  { max_btn_rec.x + max_btn_rec.height * 3 / 4, max_btn_rec.height * 3 / 4} },
-		{ 255, 255, 255 }, caption_line_width);
-
-	// Minimize
-	Math::Rectangle<float> min_btn_rec(caption_width - caption_height * 3, 0, caption_height, caption_height);
-	if (btn == HTMINBUTTON) {
-		g_main_renderer->draw_rect_filled(min_btn_rec, { 100, 100, 100 });
-	}
-	g_main_renderer->draw_line(
-		{ min_btn_rec.x + min_btn_rec.height / 4, min_btn_rec.height / 2 },
-		{ min_btn_rec.x + min_btn_rec.height * 3 / 4, min_btn_rec.height / 2 },
-		{ 255, 255, 255 }, caption_line_width);
-
-	g_main_renderer->end_draw();
-}
 
 void callback_draw(WindowHandler::DRAW_EVENT event, void* data) {
 	// draw scaled elements
@@ -126,7 +78,9 @@ void callback_draw(WindowHandler::DRAW_EVENT event, void* data) {
 	// draw ui elements
 	g_main_renderer->set_identity_transform_active();
 
-	draw_caption(toolbar_last_draw);
+	g_ui_handler->draw_pen_selection(g_strokehandler->get_pen_handler().get_all_pens(), 
+		g_main_window->get_toolbar_margin() + 10, g_strokehandler->get_pen_handler().get_pen_index(), 35);
+	g_ui_handler->draw_caption(window_title_msg, g_main_window->get_toolbar_margin(), toolbar_last_draw); 
 	
 	g_main_renderer->end_draw();
 }
@@ -213,6 +167,10 @@ void callback_key_up(WindowHandler::VK k) {
 
 	if (k == WindowHandler::VK::F3) {
 		g_draw_annots = not g_draw_annots;
+	}
+
+	if (k == WindowHandler::VK::F2) { 
+		g_strokehandler->get_pen_handler().select_next_pen(); 
 	}
 
 	if (k == WindowHandler::VK::F1) {
@@ -305,15 +263,17 @@ void main_window_loop_run(HINSTANCE h, std::filesystem::path p) {
 		window_title_msg = input;
 		g_main_renderer->begin_draw();
 		g_main_renderer->clear(Renderer::Color(50, 50, 50));
-		draw_caption(0);
+		g_ui_handler->draw_caption(window_title_msg, g_main_window->get_toolbar_margin(), 0);
 		g_main_renderer->end_draw();
 		};
+
 
 	Logger::log("Initializing main window loop");
 	g_main_window = std::make_unique<WindowHandler>(APPLICATION_NAME, h);
 	g_main_window->set_state(WindowHandler::WINDOW_STATE::NORMAL);
 
 	g_main_renderer = std::make_unique<Direct2DRenderer>(*g_main_window.get());
+	g_ui_handler = std::make_unique<UIHandler>(g_main_renderer.get()); 
 
 	auto default_brush = g_main_renderer->create_brush(Renderer::Color(255, 255, 255));
 	g_brush = &default_brush;
