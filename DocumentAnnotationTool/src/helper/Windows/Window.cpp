@@ -379,7 +379,7 @@ LRESULT WindowHandler::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam
 	 */
 	auto windowsize = currentInstance->get_window_size();
 	auto dpi = currentInstance->get_dpi();
-	float caption_size = currentInstance->m_toolbar_margin * dpi / 96;
+	float caption_size = AppVariables::WINDOWLAYOUT_TOOLBAR_HEIGHT * dpi / 96;
 
 	Math::Rectangle<int> close_btn(windowsize.width - caption_size, 0, caption_size, caption_size);
 	Math::Rectangle<int> max_btn(windowsize.width - caption_size * 2, 0, caption_size, caption_size);
@@ -676,10 +676,6 @@ void WindowHandler::set_window_title(const std::wstring& s) {
 	SetWindowText(m_hwnd, s.c_str()); 
 }
 
-unsigned int WindowHandler::get_toolbar_margin() const {
-	return m_toolbar_margin;
-}
-
 Math::Rectangle<long> WindowHandler::get_client_size() const {
 	RECT r;
 	GetClientRect(m_hwnd, &r);
@@ -704,7 +700,7 @@ bool WindowHandler::is_window_maximized() const {
 UINT WindowHandler::intersect_toolbar_button(Math::Point<long> p) const {
 	auto windowsize = get_window_size(); 
 	auto dpi = get_dpi(); 
-	float caption_size = m_toolbar_margin * dpi / 96; 
+	float caption_size = AppVariables::WINDOWLAYOUT_TOOLBAR_HEIGHT * dpi / 96; 
 
 	Math::Rectangle<int> close_btn(windowsize.width - caption_size, 0, caption_size, caption_size);
 	Math::Rectangle<int> max_btn(windowsize.width - caption_size * 2, 0, caption_size, caption_size);

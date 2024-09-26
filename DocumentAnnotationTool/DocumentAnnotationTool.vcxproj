@@ -175,6 +175,7 @@
     </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\helper\General\AppVariables.cpp" />
     <ClCompile Include="src\helper\PDF\PenHandler.cpp" />
     <ClCompile Include="src\helper\Windows\Direct2D.cpp" />
     <ClCompile Include="src\helper\General\FileHandler.cpp" />
@@ -192,6 +193,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\dependencies\json.hpp" />
+    <ClInclude Include="src\helper\General\AppVariables.h" />
+    <ClInclude Include="src\helper\General\Renderer.h" />
     <ClInclude Include="src\helper\PDF\PenHandler.h" />
     <ClInclude Include="rsc\resource.h" />
     <ClInclude Include="src\dependencies\Macros.h" />

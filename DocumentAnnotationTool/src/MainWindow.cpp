@@ -19,8 +19,6 @@ GestureHandler g_gesturehandler;
 bool g_draw_annots = true;
 
 UINT toolbar_last_draw = 0;
-std::wstring window_title_msg = L"";
-std::wstring file_name;
 
 void callback_draw(WindowHandler::DRAW_EVENT event, void* data) {
 	// draw scaled elements
@@ -34,7 +32,7 @@ void callback_draw(WindowHandler::DRAW_EVENT event, void* data) {
 	switch (event) {
 	case WindowHandler::NORMAL_DRAW:
 	{
-		g_main_renderer->clear(Renderer::Color(50, 50, 50));
+		g_main_renderer->clear(AppVariables::COLOR_BACKGROUND); 
 		// when the highres_bitmaps arg is nullopt then it is a normal draw call from windows
 		// but only call when no gesture is in progress
 		if (g_gesturehandler.is_gesture_active() == false) {
@@ -78,9 +76,8 @@ void callback_draw(WindowHandler::DRAW_EVENT event, void* data) {
 	// draw ui elements
 	g_main_renderer->set_identity_transform_active();
 
-	g_ui_handler->draw_pen_selection(g_strokehandler->get_pen_handler().get_all_pens(), 
-		g_main_window->get_toolbar_margin() + 10, g_strokehandler->get_pen_handler().get_pen_index(), 35);
-	g_ui_handler->draw_caption(window_title_msg, g_main_window->get_toolbar_margin(), toolbar_last_draw); 
+	g_ui_handler->draw_pen_selection(g_strokehandler->get_pen_handler().get_all_pens(), g_strokehandler->get_pen_handler().get_pen_index());
+	g_ui_handler->draw_caption(toolbar_last_draw);
 	
 	g_main_renderer->end_draw();
 }
@@ -105,13 +102,13 @@ void custom_msg(CUSTOM_WM_MESSAGE msg, void* data) {
 	{
 		auto progress = g_pdfrenderhandler->get_display_list_progress();
 		if (FLOAT_EQUAL(progress, 1)) {
-			g_main_window->set_window_title(file_name);
-			window_title_msg = file_name;
+			g_main_window->set_window_title(SessionVariables::FILE_PATH.filename());
+			SessionVariables::WINDOW_TITLE = SessionVariables::FILE_PATH.filename();
 
 		}
 		else {
 			g_main_window->set_window_title(APPLICATION_NAME + std::wstring(L" | Parsing pages: ") + std::to_wstring(progress * 100) + L" % ");
-			window_title_msg = getLoadingBar(progress) + std::format( + L" {:.1f} %", progress * 100);
+			SessionVariables::WINDOW_TITLE = getLoadingBar(progress) + std::format( + L" {:.1f} %", progress * 100);
 			
 			g_main_window->invalidate_drawing_area();
 		}
@@ -151,10 +148,10 @@ void callback_key_up(WindowHandler::VK k) {
 	if (WindowHandler::is_key_pressed(WindowHandler::LEFT_CONTROL)) {
 		auto mouse_pos = g_main_window->get_mouse_pos();
 		if (k == WindowHandler::VK::OEM_PLUS ) {
-			g_main_renderer->add_scale_matrix(1.25, mouse_pos);
+			g_main_renderer->add_scale_matrix(AppVariables::CONRTOLS_MOUSE_ZOOM_SCALE, mouse_pos);
 		}
 		else if (k == WindowHandler::VK::OEM_MINUS) {
-			g_main_renderer->add_scale_matrix(0.8f, mouse_pos);
+			g_main_renderer->add_scale_matrix(1 / AppVariables::CONRTOLS_MOUSE_ZOOM_SCALE, mouse_pos);
 
 		}
 	}
@@ -180,9 +177,6 @@ void callback_key_up(WindowHandler::VK k) {
 
 	g_main_window->invalidate_drawing_area();
 }
-
-Math::Point<float> g_init_touch_pos = { 0, 0 };
-Math::Point<float> g_init_trans_pos = { 0, 0 };
 
 void callback_pointer_down(WindowHandler::PointerInfo p) {
 	if (p.type == WindowHandler::POINTER_TYPE::MOUSE and p.button3pressed) {
@@ -260,10 +254,10 @@ void callback_mousewheel(short delta, bool hwheel, Math::Point<int> center) {
 
 void main_window_loop_run(HINSTANCE h, std::filesystem::path p) {
 	auto update_caption = [](const std::wstring& input) {
-		window_title_msg = input;
+		SessionVariables::WINDOW_TITLE = input;
 		g_main_renderer->begin_draw();
-		g_main_renderer->clear(Renderer::Color(50, 50, 50));
-		g_ui_handler->draw_caption(window_title_msg, g_main_window->get_toolbar_margin(), 0);
+		g_main_renderer->clear(AppVariables::COLOR_BACKGROUND);
+		g_ui_handler->draw_caption(0);
 		g_main_renderer->end_draw();
 		};
 
@@ -275,10 +269,6 @@ void main_window_loop_run(HINSTANCE h, std::filesystem::path p) {
 	g_main_renderer = std::make_unique<Direct2DRenderer>(*g_main_window.get());
 	g_ui_handler = std::make_unique<UIHandler>(g_main_renderer.get()); 
 
-	auto default_brush = g_main_renderer->create_brush(Renderer::Color(255, 255, 255));
-	g_brush = &default_brush;
-	auto default_text_format = g_main_renderer->create_text_format(L"Courier New", g_main_window->get_toolbar_margin() * 0.95);
-	g_text_format = &default_text_format;
 	g_mupdfcontext = std::shared_ptr<MuPDFHandler>(new MuPDFHandler); 
 
 	if (p.empty()) {
@@ -290,6 +280,7 @@ void main_window_loop_run(HINSTANCE h, std::filesystem::path p) {
 		}
 		p = op_path.value();
 	}
+
 	Logger::log(L"Trying to open ", p);
 	update_caption(L"Opening " + p.filename().wstring());
 	Timer time;
@@ -297,14 +288,17 @@ void main_window_loop_run(HINSTANCE h, std::filesystem::path p) {
 	if (!pdf.has_value()) {
 		goto INVALID_PATH;
 	}
-	file_name = p.filename();
+	SessionVariables::FILE_PATH = p; 
 
 	g_pdf = &pdf.value(); 
 	{
 		// center the pdf in the middle
 		auto rec = g_pdf->get_pagerec()->get_read();
 		auto page = rec->at(0);
-		g_main_renderer->add_transform_matrix({ (static_cast<float>(g_main_renderer->get_window_size_normalized().width) - page.width) / 2.0f, static_cast<float>(g_main_window->get_toolbar_margin())});
+		g_main_renderer->add_transform_matrix({ 
+			(static_cast<float>(g_main_renderer->get_window_size_normalized().width) - page.width) / 2.0f,
+			AppVariables::WINDOWLAYOUT_TOOLBAR_HEIGHT
+			});
 	}
 
 	g_gesturehandler = GestureHandler(g_main_renderer.get(), &pdf.value());

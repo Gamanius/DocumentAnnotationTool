@@ -32,8 +32,6 @@ class WindowHandler {
 
 	static std::unique_ptr<std::map<HWND, WindowHandler*>> m_allWindowInstances;
 
-	const unsigned int m_toolbar_margin = 25;
-
 public:
 
 	enum WINDOW_STATE {
@@ -279,8 +277,6 @@ public:
 	T DptoPx(T dip) const {
 		return dip * (get_dpi() / 96.0f);
 	}
-
-	unsigned int get_toolbar_margin() const;
 
 	// Returns the window size
 	Math::Rectangle<long> get_client_size() const;

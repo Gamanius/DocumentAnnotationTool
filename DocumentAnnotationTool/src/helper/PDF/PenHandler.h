@@ -2,7 +2,6 @@
 #include "../General/General.h"
 #include "../Windows/Direct2D.h"
 
-const std::wstring PEN_SETTINGS_FILE_NAME = std::wstring(L"pen_settings.json"); 
 
 class PenHandler {
 public:

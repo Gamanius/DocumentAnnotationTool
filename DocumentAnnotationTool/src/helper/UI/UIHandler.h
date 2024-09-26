@@ -18,9 +18,13 @@ public:
 	UIHandler(const UIHandler& other) = delete;
 	UIHandler& operator=(const UIHandler& other) = delete;
 
-
-	void draw_caption(std::wstring title, size_t height = 30, UINT btn = 0);
-	void draw_pen_selection(const std::vector<PenHandler::Pen>& pens, float height, size_t selected = ~0, float dimension = 30);
+	/// <summary>
+	/// Draws the caption bar on the top
+	/// The title, height and color are defined in appvariables
+	/// </summary>
+	/// <param name="btn"></param>
+	void draw_caption(UINT btn = 0);
+	void draw_pen_selection(const std::vector<PenHandler::Pen>& pens, size_t selected = ~0);
 };
 
 #endif

@@ -15,7 +15,7 @@ PenHandler::PenHandler() {
 }
 
 void PenHandler::load_pens() {
-	auto settings = FileHandler::open_file_appdata(PEN_SETTINGS_FILE_NAME);
+	auto settings = FileHandler::open_file_appdata(AppVariables::PENSELECTION_SETTINGS_FILE_NAME);
 
 	if (settings.has_value() == false) {
 	JSON_PARSE_ERROR:
@@ -37,7 +37,7 @@ void PenHandler::load_pens() {
 		goto JSON_PARSE_ERROR;
 	}
 
-	Logger::log("Loaded ", m_pens.size(), " pens from settings file.");
+	Logger::success("Loaded ", m_pens.size(), " pens from settings file.");
 }
 
 void PenHandler::save_pens() { 
@@ -48,7 +48,7 @@ void PenHandler::save_pens() {
 	f.data = reinterpret_cast<byte*>(&data[0]);
 	f.size = data.size();
 
-	FileHandler::write_file_to_appdata(f, PEN_SETTINGS_FILE_NAME, true);
+	FileHandler::write_file_to_appdata(f, AppVariables::PENSELECTION_SETTINGS_FILE_NAME, true);
 
 	// file should not delete the data because it is a pointer to a string
 	f.data = nullptr;

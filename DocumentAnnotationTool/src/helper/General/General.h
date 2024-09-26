@@ -5,6 +5,8 @@
 #include "Math.h"
 #include "Timer.h"
 #include "ReadWriteRecursiveMutex.h" 
+#include "Renderer.h"
+#include "AppVariables.h"
 #include <deque>
 
 #define WIN_ERROR_MSG(...) Logger::error(__VA_ARGS__, " with Windows Error: \"", get_win_msg(), "\" in File:\"", __FILE__, "\" Line: ", __LINE__, " in ", __func__);

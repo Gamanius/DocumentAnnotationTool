@@ -57,6 +57,9 @@
     <ClCompile Include="src\helper\PDF\PenHandler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\helper\General\AppVariables.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\MainWindow.h">
@@ -153,6 +156,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\helper\UI\UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\helper\General\AppVariables.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\helper\General\Renderer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
