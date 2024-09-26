@@ -36,9 +36,11 @@ Direct2DRenderer::Direct2DRenderer(const WindowHandler& w) {
 		m_writeFactory->AddRef(); 
 	}
 
+	auto props = D2D1::HwndRenderTargetProperties(m_hwnd, m_window_size);
+	props.presentOptions = D2D1_PRESENT_OPTIONS_IMMEDIATELY;
 	result = m_factory->CreateHwndRenderTarget(
 		D2D1::RenderTargetProperties(),
-		D2D1::HwndRenderTargetProperties(m_hwnd, m_window_size),
+		props,
 		&m_renderTarget
 	);
 

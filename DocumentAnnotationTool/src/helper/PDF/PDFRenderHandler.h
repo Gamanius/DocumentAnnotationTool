@@ -135,7 +135,6 @@ private:
 
 	void create_render_job(RenderInstructions r);
 
-	void send_bitmaps(RenderInstructions r);
 
 	std::vector<PDFRenderHandler::RenderInfo> get_pdf_overlap(RenderInfo::JOB_TYPE type, std::vector<size_t>& cached_bitmap_index, std::optional<float> dpi_check, float dpi_margin = 0.0f, size_t limit = 0);
 	std::vector<size_t> get_page_overlap();
@@ -198,6 +197,8 @@ public:
 	/// </summary>
 	/// <param name="instruct"></param>
 	void render(RenderInstructions instruct);
+	void send_bitmaps(RenderInstructions r);
+
 	/// <summary>
 	/// This function should be called if the following render instructions change
 	/// <para>

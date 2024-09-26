@@ -36,13 +36,14 @@ void callback_draw(WindowHandler::DRAW_EVENT event, void* data) {
 		// when the highres_bitmaps arg is nullopt then it is a normal draw call from windows
 		// but only call when no gesture is in progress
 		if (g_gesturehandler.is_gesture_active() == false) {
-			g_pdfrenderhandler->render(instructions); 
+			g_pdfrenderhandler->render(instructions);
 		}
 		else {
-			instructions.render_highres = false; 
-			instructions.render_annots = false; 
-			g_pdfrenderhandler->render(instructions); 
+			instructions.render_highres = false;
+			instructions.render_annots = false;
+			g_pdfrenderhandler->render(instructions);
 		}
+		g_pdfrenderhandler->send_bitmaps(instructions); 
 		break;
 	}
 	case WindowHandler::PDF_BITMAP_READ:
@@ -54,16 +55,22 @@ void callback_draw(WindowHandler::DRAW_EVENT event, void* data) {
 			auto pagerec = bitmaps->at(i)->doc_coords + rec->at(bitmaps->at(i)->page).upperleft();
 			if (g_main_renderer->inv_transform_rect(g_main_renderer->get_window_size()).intersects(pagerec)) {
 				g_main_renderer->draw_bitmap(bitmaps->at(i)->bitmap, pagerec, Direct2DRenderer::INTERPOLATION_MODE::LINEAR);
-				//g_main_renderer->draw_rect(pagerec, { static_cast<byte>(i), static_cast<byte>(i + 40), static_cast<byte>(i + 80)}, 2);
 			}
 	
 		}
+		g_main_renderer->end_draw();
+		return;
+	}
+	case WindowHandler::PDF_BITMAP_READY:
+	{
+		g_pdfrenderhandler->send_bitmaps(instructions);
 		break;
 	}
 	case WindowHandler::TOOLBAR_DRAW:
 		toolbar_last_draw = reinterpret_cast<UINT>(data);
 		break;
 	}
+
 	g_strokehandler->render_strokes();
 	// selected page
 	g_main_renderer->set_current_transform_active();
@@ -78,7 +85,7 @@ void callback_draw(WindowHandler::DRAW_EVENT event, void* data) {
 
 	g_ui_handler->draw_pen_selection();
 	g_ui_handler->draw_caption(toolbar_last_draw);
-	
+
 	g_main_renderer->end_draw();
 }
 
@@ -159,20 +166,24 @@ void callback_key_up(WindowHandler::VK k) {
 			g_main_renderer->add_scale_matrix(1 / AppVariables::CONRTOLS_MOUSE_ZOOM_SCALE, mouse_pos);
 
 		}
+		g_main_window->invalidate_drawing_area();
 	}
 
 	if (k == WindowHandler::VK::F5) { 
 		// refresh
 		g_pdfrenderhandler->clear_render_cache();
 		g_pdfrenderhandler->update_annotations(0);
+		g_main_window->invalidate_drawing_area();
 	}
 
 	if (k == WindowHandler::VK::F3) {
 		g_draw_annots = not g_draw_annots;
+		g_main_window->invalidate_drawing_area();
 	}
 
 	if (k == WindowHandler::VK::F2) { 
 		g_strokehandler->get_pen_handler().select_next_pen(); 
+		g_main_window->invalidate_drawing_area();
 	}
 
 	if (k == WindowHandler::VK::F1) {
@@ -180,7 +191,6 @@ void callback_key_up(WindowHandler::VK k) {
 		ShellExecute(NULL, L"open", L"explorer.exe", FileHandler::get_appdata_path().c_str(), NULL, SW_SHOWDEFAULT);
 	}
 
-	g_main_window->invalidate_drawing_area();
 }
 
 void callback_pointer_down(WindowHandler::PointerInfo p) {

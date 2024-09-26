@@ -42,6 +42,11 @@ long long Timer::delta_h() const {
 }
 
 std::wostream& Timer::get_string_representation(std::wstringstream& sstream) const {
+	auto us = delta_us();
+	if (us < 1000) {
+		return sstream << us << L"µs";
+	}
+
 	auto ms = delta_ms();
 	if (ms < 1000) {
 		return sstream << ms << L"ms";

@@ -630,11 +630,18 @@ LRESULT WindowHandler::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam
 		return 0;
 	}
 	// custom messages
-	case WM_PDF_BITMAP_READY:
+	case WM_PDF_BITMAP_READ:
 	{
 		if (currentInstance->m_callback_paint) {
 			currentInstance->m_callback_paint(WindowHandler::DRAW_EVENT::PDF_BITMAP_READ, 
 				reinterpret_cast<void*>(lParam));
+		}
+		return NULL;
+	}
+	case WM_PDF_BITMAP_READY:
+	{
+		if (currentInstance->m_callback_paint) {
+			currentInstance->m_callback_paint(WindowHandler::DRAW_EVENT::PDF_BITMAP_READY, nullptr);
 		}
 		return NULL;
 	}

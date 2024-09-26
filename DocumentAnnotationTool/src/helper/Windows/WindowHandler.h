@@ -8,7 +8,8 @@
 #include <functional>
 
 /// Custom WM_APP message to signal that the bitmap is ready to be drawn
-#define WM_PDF_BITMAP_READY (WM_APP + 0x0BAD /*Magic number (rolled by fair dice)*/)
+#define WM_PDF_BITMAP_READ (WM_APP + 0x0BAD /*Magic number (rolled by fair dice)*/)
+#define WM_PDF_BITMAP_READY (WM_APP + 0x0BAD + 2)
 #define WM_CUSTOM_MESSAGE (WM_APP + 0x0BAD + 1)
 
 #ifndef _WINDOW_HANDLER_H_
@@ -195,6 +196,7 @@ public:
 	enum DRAW_EVENT {
 		NORMAL_DRAW,
 		PDF_BITMAP_READ,
+		PDF_BITMAP_READY,
 		TOOLBAR_DRAW
 	};
 

@@ -710,7 +710,7 @@ void PDFRenderHandler::async_render() {
 			}
 
 			// We have to do a non blocking call since the main thread could be busy waiting for the cached bitmaps
-			PostMessage(m_window->get_hwnd(), WM_PAINT, (WPARAM)nullptr, (LPARAM)nullptr);
+			PostMessage(m_window->get_hwnd(), WM_PDF_BITMAP_READY, (WPARAM)nullptr, (LPARAM)nullptr);
 
 		} fz_always(ctx) {
 			// drop all devices
@@ -784,7 +784,7 @@ void PDFRenderHandler::render_preview() {
 			}
 		}
 
-		SendMessage(m_window->get_hwnd(), WM_PDF_BITMAP_READY, (WPARAM)nullptr, (LPARAM)(&temp));
+		SendMessage(m_window->get_hwnd(), WM_PDF_BITMAP_READ, (WPARAM)nullptr, (LPARAM)(&temp));
 	}
 }
 
@@ -819,7 +819,7 @@ void PDFRenderHandler::send_bitmaps(RenderInstructions r) {
 			temp_cachedBitmaps.push_back(&cached->at(i));
 		}
 		// we can send some of the cached bitmaps already to the window
-		SendMessage(m_window->get_hwnd(), WM_PDF_BITMAP_READY, (WPARAM)nullptr, (LPARAM)(&temp_cachedBitmaps));
+		SendMessage(m_window->get_hwnd(), WM_PDF_BITMAP_READ, (WPARAM)nullptr, (LPARAM)(&temp_cachedBitmaps));
 	}
 
 	if (r.draw_content) {
@@ -830,7 +830,7 @@ void PDFRenderHandler::send_bitmaps(RenderInstructions r) {
 			temp_cachedBitmaps.push_back(&cached->at(i));
 		}
 		// we can send some of the cached bitmaps already to the window
-		SendMessage(m_window->get_hwnd(), WM_PDF_BITMAP_READY, (WPARAM)nullptr, (LPARAM)(&temp_cachedBitmaps));
+		SendMessage(m_window->get_hwnd(), WM_PDF_BITMAP_READ, (WPARAM)nullptr, (LPARAM)(&temp_cachedBitmaps));
 	}
 
 	if (r.draw_annots) {
@@ -885,7 +885,7 @@ void PDFRenderHandler::send_bitmaps(RenderInstructions r) {
 		}
 
 		// we can send some of the cached bitmaps already to the window
-		SendMessage(m_window->get_hwnd(), WM_PDF_BITMAP_READY, (WPARAM)nullptr, (LPARAM)(&temp_cachedBitmaps));
+		SendMessage(m_window->get_hwnd(), WM_PDF_BITMAP_READ, (WPARAM)nullptr, (LPARAM)(&temp_cachedBitmaps));
 	}
 }
 
@@ -898,7 +898,6 @@ void PDFRenderHandler::render(RenderInstructions instruct) {
 	if (m_display_list_processed) {
 		create_render_job(instruct);
 	}
-	send_bitmaps(instruct);
 }
 
 void PDFRenderHandler::clear_render_cache() {
