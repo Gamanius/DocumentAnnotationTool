@@ -162,6 +162,12 @@ void MuPDFHandler::PDF::save_pdf(const std::wstring& path) {
 	} fz_catch(*ctx) {
 		fz_report_error(*ctx);
 	}
+
+	SessionVariables::PDF_UNSAVED_CHANGES = false;
+
+	if (*(SessionVariables::WINDOW_TITLE.end() - 1) == '*') {
+		SessionVariables::WINDOW_TITLE.pop_back(); 
+	}
 }
 
 Math::Rectangle<float> MuPDFHandler::PDF::get_page_size(size_t page, float dpi) { 

@@ -9,16 +9,19 @@
 namespace SessionVariables {
 	inline std::filesystem::path FILE_PATH;
 	inline std::wstring WINDOW_TITLE = APPLICATION_NAME; 
+	inline size_t PENSELECTION_SELECTED_PEN = 0; 
+
+	inline bool PDF_UNSAVED_CHANGES = false;
 }
 
 namespace AppVariables {
 	inline const std::wstring APPVARIABLES_SETTINGS_FILE_NAME = std::wstring(L"app_settings.json");
 
-	inline float        WINDOWLAYOUT_TOOLBAR_HEIGHT     = 30.0f;
+	inline float        WINDOWLAYOUT_TOOLBAR_HEIGHT     = 24.0f;
 	inline std::wstring WINDOWLAYOUT_FONT               = L"Courier New";
 	
 	inline float        PENSELECTION_Y_POSITION         = 10.0f;
-	inline float        PENSELECTION_PENS_WIDTH         = 30.0f;
+	inline float        PENSELECTION_PENS_WIDTH         = 35.0f;
 	inline std::wstring PENSELECTION_SETTINGS_FILE_NAME = std::wstring(L"pen_settings.json");
 
 	
@@ -27,7 +30,7 @@ namespace AppVariables {
 
 	inline Renderer::Color COLOR_PRIMARY                = { 33, 118, 255 };
 	inline Renderer::Color COLOR_SECONDARY              = { 25, 183, 240 };
-	inline Renderer::Color COLOR_TERTIARY               = { 70, 70, 70 };
+	inline Renderer::Color COLOR_TERTIARY               = { 0, 214, 164 };
 
 	inline float CONRTOLS_MOUSE_ZOOM_SCALE              = 1.25f;
 

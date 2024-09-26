@@ -11,7 +11,6 @@ public:
 	};
 private:
 	std::vector<Pen> m_pens;
-	size_t m_current_pen_index = 0;
 public:
 
 	PenHandler();
@@ -25,8 +24,6 @@ public:
 
 	const Pen& get_pen() const;
 	const std::vector<Pen>& get_all_pens() const;
-
-	size_t get_pen_index() const;
 };
 
 void to_json(nlohmann::json& j, const PenHandler::Pen& p);

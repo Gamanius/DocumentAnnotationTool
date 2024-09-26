@@ -23,6 +23,7 @@ class StrokeHandler {
 		float thickness = 1.0f;
 		Renderer::Color color = { 0, 0, 0 };
 		bool to_be_erased = false;
+		bool applied = false;
 
 		Stroke() = default;
 		Stroke(const Stroke& s) = delete;
@@ -43,6 +44,7 @@ class StrokeHandler {
 			swap(first.thickness, second.thickness);
 			swap(first.color, second.color);
 			swap(first.to_be_erased, second.to_be_erased);
+			swap(first.applied, second.applied);
 		}
 	};
 
@@ -84,6 +86,8 @@ public:
 	void end_earsing_stroke(const WindowHandler::PointerInfo& p);
 
 	void render_strokes();
+
+	bool is_stroke_active() const;
 
 	PenHandler& get_pen_handler(); 
 

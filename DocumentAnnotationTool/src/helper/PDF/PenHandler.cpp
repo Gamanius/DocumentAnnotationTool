@@ -55,17 +55,13 @@ void PenHandler::save_pens() {
 }
 
 void PenHandler::select_next_pen() {
-	m_current_pen_index = (m_current_pen_index + 1) % m_pens.size(); 
+	SessionVariables::PENSELECTION_SELECTED_PEN = (SessionVariables::PENSELECTION_SELECTED_PEN + 1) % m_pens.size();
 }
 
 const PenHandler::Pen& PenHandler::get_pen() const {
-	return m_pens[m_current_pen_index]; 
+	return m_pens[SessionVariables::PENSELECTION_SELECTED_PEN];
 }
 
 const std::vector<PenHandler::Pen>& PenHandler::get_all_pens() const {
 	return m_pens; 
-}
-
-size_t PenHandler::get_pen_index() const {
-	return m_current_pen_index;
 }

@@ -76,10 +76,21 @@ void callback_draw(WindowHandler::DRAW_EVENT event, void* data) {
 	// draw ui elements
 	g_main_renderer->set_identity_transform_active();
 
-	g_ui_handler->draw_pen_selection(g_strokehandler->get_pen_handler().get_all_pens(), g_strokehandler->get_pen_handler().get_pen_index());
+	g_ui_handler->draw_pen_selection();
 	g_ui_handler->draw_caption(toolbar_last_draw);
 	
 	g_main_renderer->end_draw();
+}
+
+void save_dialoge() {
+	auto path = FileHandler::save_file_dialog(L"PDF\0*.pdf\0\0", *g_main_window);
+	if (path == std::nullopt)
+		return;
+	if (std::filesystem::path(path.value()).extension() != ".pdf") {
+		path.value().append(L".pdf");
+	}
+	g_pdf->save_pdf(path.value());
+	Logger::success("Saved PDF to ", path.value());
 }
 
 std::wstring getLoadingBar(float progress) {
@@ -126,20 +137,14 @@ void custom_msg(CUSTOM_WM_MESSAGE msg, void* data) {
 
 void callback_size(Math::Rectangle<long> r) {
 	g_main_renderer->resize(r);
+	g_main_window->invalidate_drawing_area();
 	g_gesturehandler.check_bounds();
 }
 
 void callback_key_down(WindowHandler::VK key) {
 	if (WindowHandler::is_key_pressed(WindowHandler::LEFT_CONTROL)) {
 		if (key == WindowHandler::VK::S) {
-			auto path = FileHandler::save_file_dialog(L"PDF\0*.pdf\0\0", *g_main_window);
-			if (path == std::nullopt)
-				return;
-			if (std::filesystem::path(path.value()).extension() != ".pdf") {
-				path.value().append(L".pdf");
-			}
-			g_pdf->save_pdf(path.value()); 
-			Logger::success("Saved PDF to ", path.value());
+			save_dialoge();
 		}
 	}
 }
@@ -179,16 +184,42 @@ void callback_key_up(WindowHandler::VK k) {
 }
 
 void callback_pointer_down(WindowHandler::PointerInfo p) {
-	if (p.type == WindowHandler::POINTER_TYPE::MOUSE and p.button3pressed) {
-		g_gesturehandler.start_select_page(p);
+	//if (p.type == WindowHandler::POINTER_TYPE::MOUSE and p.button3pressed) {
+	//	g_gesturehandler.start_select_page(p);
+	//}
+	auto ui_hit = g_ui_handler->check_ui_hit(p.pos);
+	switch (ui_hit.type) {
+	case UIHandler::UI_HIT::PEN_SELECTION:
+	{
+		SessionVariables::PENSELECTION_SELECTED_PEN = ui_hit.data; 
+		g_main_window->invalidate_drawing_area(); 
+		return;
 	}
+	case UIHandler::UI_HIT::SAVE_BUTTON:
+	{
+		if ((p.type == WindowHandler::POINTER_TYPE::MOUSE  and p.button2pressed)
+		 or (p.type == WindowHandler::POINTER_TYPE::STYLUS and p.button1pressed)) {
+			save_dialoge();
+		}
+		else {
+			g_pdf->save_pdf(SessionVariables::FILE_PATH);
+		}
+		return;
+	}
+	default:
+		break;
+	}
+	
+
 	// handle hand
 	if (p.type == WindowHandler::POINTER_TYPE::TOUCH) {
 		g_gesturehandler.start_gesture(p);
 	}
+
 	// handle everything related to the pen
 	if (p.type == WindowHandler::POINTER_TYPE::STYLUS and p.pressure > 0) {
-		if (p.button2pressed) {
+		
+		if (p.button2pressed or SessionVariables::PENSELECTION_SELECTED_PEN == ~0) {
 			g_strokehandler->earsing_stroke(p);
 		} 
 		else {
@@ -200,10 +231,11 @@ void callback_pointer_down(WindowHandler::PointerInfo p) {
 }
 
 void callback_pointer_update(WindowHandler::PointerInfo p) {
-	if (p.type == WindowHandler::POINTER_TYPE::MOUSE and p.button3pressed) {
-		g_gesturehandler.update_select_page(p);
-		g_main_window->invalidate_drawing_area();
+	if (g_ui_handler->check_ui_hit(p.pos).type != UIHandler::UI_HIT::NONE
+		and (g_strokehandler->is_stroke_active() == false and g_gesturehandler.is_gesture_active() == false)) {
+		return;
 	}
+
 
 	if (p.type == WindowHandler::POINTER_TYPE::TOUCH) {
 		g_gesturehandler.update_gesture(p);
@@ -212,7 +244,7 @@ void callback_pointer_update(WindowHandler::PointerInfo p) {
 
 	// handle everything related to the pen
 	if (p.type == WindowHandler::POINTER_TYPE::STYLUS and p.pressure > 0) {
-		if (p.button2pressed) {
+		if (p.button2pressed or SessionVariables::PENSELECTION_SELECTED_PEN == ~0) {
 			g_strokehandler->earsing_stroke(p);
 		} 
 		else {
@@ -226,17 +258,13 @@ void callback_pointer_update(WindowHandler::PointerInfo p) {
 
 
 void callback_pointer_up(WindowHandler::PointerInfo p) {
-	if (p.type == WindowHandler::POINTER_TYPE::MOUSE and not p.button3pressed) { 
-		g_gesturehandler.stop_select_page(p); 
-	}
-
 	if (p.type == WindowHandler::POINTER_TYPE::TOUCH) {
 		g_gesturehandler.end_gesture(p);
 	}
 
 	// handle everything related to the pen
 	if (p.type == WindowHandler::POINTER_TYPE::STYLUS) {
-		if (p.button2pressed) {
+		if (p.button2pressed or SessionVariables::PENSELECTION_SELECTED_PEN == ~0) {
 			g_strokehandler->end_earsing_stroke(p);
 		}
 		else {
@@ -305,6 +333,8 @@ void main_window_loop_run(HINSTANCE h, std::filesystem::path p) {
 	auto strok_handler = StrokeHandler(g_pdf, g_main_renderer.get(), g_main_window.get());
 	g_strokehandler = &strok_handler;
 
+	g_ui_handler->add_penhandler(&strok_handler.get_pen_handler()); 
+
 	auto pdf_handler = PDFRenderHandler(g_pdf, g_main_renderer.get(), g_main_window.get(), 2);
 	g_pdfrenderhandler = &pdf_handler;
 
@@ -312,8 +342,7 @@ void main_window_loop_run(HINSTANCE h, std::filesystem::path p) {
 
 	// why do i have to do this here??
 	g_main_renderer->resize(g_main_window->get_client_size());
-
-		
+			
 	// do the callbacks
 	g_main_window->set_callback_paint(callback_draw);
 	g_main_window->set_callback_size(callback_size);
@@ -330,6 +359,7 @@ void main_window_loop_run(HINSTANCE h, std::filesystem::path p) {
 	while(!g_main_window->close_request()) {
 		g_main_window->get_window_messages(true);
 	}
+
 	Logger::log(L"Got close request. Cleaning up...");
 	// this is creating a 1 byte memory leak
 	std::thread t([] {

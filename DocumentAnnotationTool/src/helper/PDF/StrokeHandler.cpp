@@ -37,6 +37,12 @@ void StrokeHandler::apply_stroke_to_pdf(Stroke& s) {
 	float b[] = { s.color.r/255.0f, s.color.g / 255.0f, s.color.b / 255.0f };
 	pdf_set_annot_color(*ctx, s.annot, 3, b); 
 	pdf_set_annot_border_width(*ctx, s.annot, s.thickness); 
+
+	SessionVariables::PDF_UNSAVED_CHANGES = true;
+
+	if (*(SessionVariables::WINDOW_TITLE.end() - 1) != '*') {
+		SessionVariables::WINDOW_TITLE += '*';
+	}
 }
 
 std::vector<Math::Point<float>> get_points_from_annot(MuPDFHandler::PDF* pdf, pdf_annot* a) {
@@ -119,11 +125,10 @@ void StrokeHandler::parse_all_strokes() {
 			if (FLOAT_EQUAL(0, s.thickness)) {
 				s.thickness = 1;
 			}
-				
+
 			m_strokes.push_back(std::move(s));
 		} while ((annot = pdf_next_annot(*ctx, annot)) != NULL);
 	}
-	Logger::log("Found ", m_strokes.size(), " ink annotations in the document");
 }
 
 std::optional<size_t> StrokeHandler::get_page_from_point(Math::Point<float> p) {
@@ -209,8 +214,14 @@ void StrokeHandler::end_stroke(const WindowHandler::PointerInfo& p) {
 	Stroke& s = m_active_strokes.at(p.id);
 
 	s.points.push_back(m_renderer->inv_transform_point(p.pos));
+	// we have not enough points to create a bezier curve
+	Logger::log(s.points);
+	if (s.points.size() <= 2) {
+		m_active_strokes.erase(p.id);
+		return;
+	}
 	s.geometry = Renderer::create_bezier_geometry(m_active_strokes.at(p.id).points); // create the bezier geometry
-	s.path = m_renderer->create_bezier_path(m_active_strokes.at(p.id).geometry);
+	s.path = m_renderer->create_line_path(m_active_strokes.at(p.id).points);
 
 	apply_stroke_to_pdf(s); // apply the stroke to the pdf document
 
@@ -291,8 +302,11 @@ void StrokeHandler::end_earsing_stroke(const WindowHandler::PointerInfo& p) {
 
 	// update the page
 	std::sort(pages_to_update.begin(), pages_to_update.end());
+	std::vector<size_t> temp_pages;
+
 	size_t last_index = ~0; 
 	for (auto& page : pages_to_update) {
+		temp_pages.push_back(page);
 		if (page == last_index) {
 			continue;
 		}
@@ -301,6 +315,21 @@ void StrokeHandler::end_earsing_stroke(const WindowHandler::PointerInfo& p) {
 		last_index = page;
 
 		SendMessage(m_window->get_hwnd(), WM_CUSTOM_MESSAGE, reinterpret_cast<WPARAM>(&page), CUSTOM_WM_MESSAGE::PDF_HANDLER_ANNOTAION_CHANGE); 
+
+		if (*(SessionVariables::WINDOW_TITLE.end() - 1) != '*') {
+			SessionVariables::WINDOW_TITLE += '*';
+		}
+		SessionVariables::PDF_UNSAVED_CHANGES = true; 
+	}
+
+	// check the apply flag to all strokes
+	for (auto& stroke : m_strokes) {
+		for (auto& page : pages_to_update) { 
+			if (page == stroke.page) {
+				stroke.applied = true;
+				continue;
+			}
+		}
 	}
 }
 
@@ -319,9 +348,9 @@ void StrokeHandler::render_strokes() {
 			m_renderer->draw_path(stroke.path, {255, 0, 0}, stroke.thickness * 2);
 		}
 
-		// TODO: we dont need to draw new strokes that have been applied to the pdf
-		// if we updated the page due to a erasing event
-		m_renderer->draw_path(stroke.path, stroke.color, stroke.thickness); 
+		if (stroke.to_be_erased == false and stroke.applied == false) {
+			m_renderer->draw_path(stroke.path, stroke.color, stroke.thickness); 
+		}
 		
 	}
 
@@ -338,6 +367,10 @@ void StrokeHandler::render_strokes() {
 		m_renderer->draw_line(m_earising_points.at(i), m_earising_points.at(i + 1), {0, 255, 255}, 1);
 	}
 	m_renderer->end_draw();
+}
+
+bool StrokeHandler::is_stroke_active() const {
+	return m_active_strokes.size() != 0;
 }
 
 PenHandler& StrokeHandler::get_pen_handler() {

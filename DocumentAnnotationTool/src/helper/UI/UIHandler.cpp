@@ -7,6 +7,7 @@ UIHandler::UIHandler(Direct2DRenderer* renderer) {
 
 UIHandler::UIHandler(UIHandler&& other) noexcept {
 	m_renderer = other.m_renderer;
+	m_penhandler = other.m_penhandler;
 	m_text_brush = std::move(other.m_text_brush);
 	other.m_renderer = nullptr;
 }
@@ -14,10 +15,15 @@ UIHandler::UIHandler(UIHandler&& other) noexcept {
 UIHandler& UIHandler::operator=(UIHandler&& other) noexcept {
 	if (this != &other) {
 		m_renderer = other.m_renderer;
+		m_penhandler = other.m_penhandler;
 		m_text_brush = std::move(other.m_text_brush);
 		other.m_renderer = nullptr;
 	}
 	return *this;
+}
+
+void UIHandler::add_penhandler(PenHandler* pen) {
+	m_penhandler = pen;
 }
 
 void UIHandler::draw_caption(UINT btn) {
@@ -71,14 +77,19 @@ void UIHandler::draw_caption(UINT btn) {
 	m_renderer->end_draw();
 }
 
-void UIHandler::draw_pen_selection(const std::vector<PenHandler::Pen>& pens, size_t selected) {
+void UIHandler::draw_pen_selection() {
+	if (m_penhandler == nullptr) {
+		return;
+	}
 	m_renderer->begin_draw();
 	m_renderer->set_identity_transform_active();
 	
 	auto scale = m_renderer->get_dpi_scale();
 	auto win_size = m_renderer->get_window_size();
 
-	float caption_width = pens.size() * AppVariables::PENSELECTION_PENS_WIDTH;
+	auto pens = m_penhandler->get_all_pens();
+	float caption_width = pens.size() * AppVariables::PENSELECTION_PENS_WIDTH
+		+ AppVariables::PENSELECTION_PENS_WIDTH * 3; // margin and savebuton / eraser
 	float x0 = (win_size.width * scale - caption_width) / 2.0f;
 	float y0 = AppVariables::PENSELECTION_Y_POSITION + AppVariables::WINDOWLAYOUT_TOOLBAR_HEIGHT;
 	float dimension = AppVariables::PENSELECTION_PENS_WIDTH;
@@ -88,16 +99,74 @@ void UIHandler::draw_pen_selection(const std::vector<PenHandler::Pen>& pens, siz
 	m_renderer->draw_circle_filled({ x0 + caption_width, y0 + dimension / 2 }, dimension / 2, AppVariables::COLOR_PRIMARY);
 
 	auto text = m_renderer->create_text_format(AppVariables::WINDOWLAYOUT_FONT, dimension * 0.475);
+	auto save_text = m_renderer->create_text_format(AppVariables::WINDOWLAYOUT_FONT, dimension * 0.4);
 
-	float offset = 0;
+	// draw safe button
+	m_renderer->draw_rect_filled({ x0, y0, dimension, dimension }, AppVariables::COLOR_SECONDARY);  
+	m_renderer->draw_text(L"Save", { x0, y0 + dimension * 0.6f }, save_text, m_text_brush); 
+
+	// draw erase button
+	m_renderer->draw_rect_filled({ x0 + caption_width - dimension, y0, dimension, dimension }, AppVariables::COLOR_SECONDARY); 
+	m_renderer->draw_text(L"Erase", { x0 + caption_width - dimension, y0 + dimension * 0.6f }, save_text, m_text_brush); 
+
+	float offset = 3 * AppVariables::PENSELECTION_PENS_WIDTH / 2.0f;
 	for (const auto& pen : pens) {
 		m_renderer->draw_rect_filled({ x0 + offset, y0, dimension, dimension }, pen.color);
 		m_renderer->draw_text(std::format(L"{:.1f}", pen.width), {x0 + offset, y0 + dimension / 2}, text, m_text_brush); 
 		offset += dimension;
 	}
 
+	auto selected = SessionVariables::PENSELECTION_SELECTED_PEN;
 	if (selected != ~0) {
-		m_renderer->draw_rect({ x0 + selected * dimension, y0, dimension, dimension }, { 255, 0, 0 }, 2);
+		m_renderer->draw_rect({ x0 + selected * dimension + 3 * AppVariables::PENSELECTION_PENS_WIDTH / 2.0f , y0, dimension, dimension }, AppVariables::COLOR_TERTIARY, 2);
+	}
+	else {
+		m_renderer->draw_rect({ x0 + caption_width - dimension, y0, dimension, dimension }, AppVariables::COLOR_TERTIARY, 2);
 	}
 	m_renderer->end_draw();
 }
+
+UIHandler::UI_HIT UIHandler::check_ui_hit(Math::Point<float> mousepos) {
+	UI_HIT hit_event;
+	hit_event.type = UI_HIT::NONE;
+	if (m_penhandler == nullptr) {
+		return hit_event;
+	}
+
+	auto scale = m_renderer->get_dpi_scale();
+	auto win_size = m_renderer->get_window_size();
+	auto pens = m_penhandler->get_all_pens(); 
+
+	float caption_width = pens.size() * AppVariables::PENSELECTION_PENS_WIDTH
+		+ AppVariables::PENSELECTION_PENS_WIDTH * 3; // margin and savebuton / eraser
+	float x0 = (win_size.width * scale - caption_width) / 2.0f;
+	float y0 = AppVariables::PENSELECTION_Y_POSITION + AppVariables::WINDOWLAYOUT_TOOLBAR_HEIGHT;
+	float dimension = AppVariables::PENSELECTION_PENS_WIDTH;
+
+	float offset = 3 * AppVariables::PENSELECTION_PENS_WIDTH / 2.0f;
+	for (const auto& pen : pens) {
+		auto rect = Math::Rectangle<float>(x0 + offset, y0, dimension, dimension);
+		if (rect.intersects(mousepos)) { 
+			hit_event.data = offset / dimension - 1;
+			hit_event.type = UI_HIT::PEN_SELECTION;
+			return hit_event;
+		}
+		offset += dimension;
+	}
+
+	auto rect = Math::Rectangle<float>(x0, y0, dimension, dimension); 
+	if (rect.intersects(mousepos)) {
+		hit_event.type = UI_HIT::SAVE_BUTTON;
+		return hit_event;
+	}
+
+	rect = Math::Rectangle<float>(x0 + caption_width - dimension, y0, dimension, dimension);
+	if (rect.intersects(mousepos)) {
+		hit_event.type = UI_HIT::PEN_SELECTION;
+		hit_event.data = -1;
+		return hit_event;
+	}
+
+	return hit_event;
+}
+

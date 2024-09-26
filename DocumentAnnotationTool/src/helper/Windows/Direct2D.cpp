@@ -440,6 +440,7 @@ Direct2DRenderer::PathObject Direct2DRenderer::create_line_path(const std::vecto
 	sink->BeginFigure(line[0], D2D1_FIGURE_BEGIN_FILLED);
 	// the cast is possible since the d2d1_point has the same memory layout as the line
 	sink->AddLines(reinterpret_cast<const D2D1_POINT_2F*>(&line[1]), static_cast<UINT>(line.size() - 1));
+	
 	sink->EndFigure(D2D1_FIGURE_END_OPEN);
 	sink->Close();
 
