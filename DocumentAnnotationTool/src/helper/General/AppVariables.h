@@ -16,6 +16,7 @@ namespace SessionVariables {
 
 namespace AppVariables {
 	inline const std::wstring APPVARIABLES_SETTINGS_FILE_NAME = std::wstring(L"app_settings.json");
+	inline size_t             APPVARIABLES_MAX_LOG_FILES = 20;
 
 	inline float        WINDOWLAYOUT_TOOLBAR_HEIGHT     = 24.0f;
 	inline std::wstring WINDOWLAYOUT_FONT               = L"Courier New";
