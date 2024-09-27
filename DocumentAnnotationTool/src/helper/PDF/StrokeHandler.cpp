@@ -196,7 +196,11 @@ void StrokeHandler::update_stroke(const WindowHandler::PointerInfo& p) {
 		return;
 	}
 
-	m_active_strokes[p.id].points.push_back(m_renderer->inv_transform_point(p.pos));
+	auto last_point = *(m_active_strokes[p.id].points.end() - 1);
+	if ((last_point - m_renderer->inv_transform_point(p.pos)).distance() < m_active_strokes[p.id].thickness * 0.5) {
+		return; 
+	}
+	m_active_strokes[p.id].points.push_back(m_renderer->inv_transform_point(p.pos)); 
 }
 
 void StrokeHandler::end_stroke(const WindowHandler::PointerInfo& p) {
@@ -215,13 +219,11 @@ void StrokeHandler::end_stroke(const WindowHandler::PointerInfo& p) {
 
 	s.points.push_back(m_renderer->inv_transform_point(p.pos));
 	// we have not enough points to create a bezier curve
-	Logger::log(s.points);
-	if (s.points.size() <= 2) {
-		m_active_strokes.erase(p.id);
-		return;
+	while (s.points.size() <= 2) {
+		s.points.push_back(m_renderer->inv_transform_point({p.pos.x + EPSILON, p.pos.y + EPSILON}));  
 	}
 	s.geometry = Renderer::create_bezier_geometry(m_active_strokes.at(p.id).points); // create the bezier geometry
-	s.path = m_renderer->create_line_path(m_active_strokes.at(p.id).points);
+	s.path = m_renderer->create_bezier_path(s.geometry);
 
 	apply_stroke_to_pdf(s); // apply the stroke to the pdf document
 

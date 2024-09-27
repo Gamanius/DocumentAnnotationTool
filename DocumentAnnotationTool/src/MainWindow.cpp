@@ -39,8 +39,8 @@ void callback_draw(WindowHandler::DRAW_EVENT event, void* data) {
 			g_pdfrenderhandler->render(instructions);
 		}
 		else {
-			instructions.render_highres = false;
-			instructions.render_annots = false;
+			instructions.render_highres = false; 
+			instructions.render_annots = false; 
 			g_pdfrenderhandler->render(instructions);
 		}
 		g_pdfrenderhandler->send_bitmaps(instructions); 
