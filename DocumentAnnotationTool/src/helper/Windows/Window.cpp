@@ -734,6 +734,10 @@ bool WindowHandler::close_request() const {
 	return m_closeRequest;
 }
 
+void WindowHandler::send_close_request() {
+	SendMessage(m_hwnd, WM_CLOSE, 0, 0);
+}
+
 bool WindowHandler::is_key_pressed(VK key) {
 	return GetKeyState(vk_to_winkey(key)) & 0x8000;
 	

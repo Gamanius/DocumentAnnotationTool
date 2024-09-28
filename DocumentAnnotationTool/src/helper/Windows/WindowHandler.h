@@ -299,6 +299,7 @@ public:
 	/// </summary>
 	/// <returns>true if there has been a close request</returns>
 	bool close_request() const;
+	void send_close_request();
 
 	static bool is_key_pressed(VK key);
 

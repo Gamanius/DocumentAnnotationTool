@@ -149,48 +149,114 @@ void callback_size(Math::Rectangle<long> r) {
 }
 
 void callback_key_down(WindowHandler::VK key) {
-	if (WindowHandler::is_key_pressed(WindowHandler::LEFT_CONTROL)) {
-		if (key == WindowHandler::VK::S) {
+	using VK = WindowHandler::VK;
+	switch (key) {
+	case VK::S:
+	{
+		if (not WindowHandler::is_key_pressed(VK::LEFT_CONTROL)) { 
+			break;
+		}
+		if (WindowHandler::is_key_pressed(VK::LEFT_SHIFT)) {
 			save_dialoge();
 		}
+		else {
+			g_pdf->save_pdf(SessionVariables::FILE_PATH);
+		}
+		break;
+	}
+	case VK::OEM_PLUS:
+	{
+		if (not WindowHandler::is_key_pressed(WindowHandler::LEFT_CONTROL)) {
+			break;
+		}
+		auto mouse_pos = g_main_window->get_mouse_pos();
+		g_main_renderer->add_scale_matrix(AppVariables::CONRTOLS_MOUSE_ZOOM_SCALE, mouse_pos);
+
+		g_main_window->invalidate_drawing_area();
+		break;
+	}
+	case VK::OEM_MINUS:
+	{
+		if (not WindowHandler::is_key_pressed(WindowHandler::LEFT_CONTROL)) {
+			break;
+		}
+		auto mouse_pos = g_main_window->get_mouse_pos();
+		g_main_renderer->add_scale_matrix(1 / AppVariables::CONRTOLS_MOUSE_ZOOM_SCALE, mouse_pos);
+
+		g_main_window->invalidate_drawing_area();
+		break;
+	}
+	case VK::F1:
+	{
+		// opens the roaming folder
+		ShellExecute(NULL, L"open", L"explorer.exe", FileHandler::get_appdata_path().c_str(), NULL, SW_SHOWDEFAULT);
+		break;
+	}
+	case VK::F3:
+	{
+		g_draw_annots = not g_draw_annots;
+		g_main_window->invalidate_drawing_area();
+		break;
+	}
+	case VK::F4:
+	{
+		if (not WindowHandler::is_key_pressed(VK::ALT)) {
+			break;
+		}
+	}
+	case VK::ESCAPE:
+	{
+		g_main_window->send_close_request();
+	}
+	case VK::F5:
+	{
+		g_pdfrenderhandler->clear_render_cache();
+		g_pdfrenderhandler->update_annotations(0);
+		g_main_window->invalidate_drawing_area();
+		break;
+	}
+	case VK::NUMPAD_0:
+	case VK::KEY_0:
+	{
+		SessionVariables::PENSELECTION_SELECTED_PEN = ~0;
+		g_main_window->invalidate_drawing_area();
+		break;
+	}
+	case VK::KEY_1:
+	case VK::KEY_2:
+	case VK::KEY_3:
+	case VK::KEY_4:
+	case VK::KEY_5:
+	case VK::KEY_6:
+	case VK::KEY_7:
+	case VK::KEY_8:
+	case VK::KEY_9:
+	{
+		auto amount_of_pens = g_strokehandler->get_pen_handler().get_all_pens().size();
+		SessionVariables::PENSELECTION_SELECTED_PEN = (key - VK::KEY_1) % amount_of_pens;
+		g_main_window->invalidate_drawing_area();
+		break;
+	}
+	case VK::NUMPAD_1:
+	case VK::NUMPAD_2:
+	case VK::NUMPAD_3:
+	case VK::NUMPAD_4:
+	case VK::NUMPAD_5:
+	case VK::NUMPAD_6:
+	case VK::NUMPAD_7:
+	case VK::NUMPAD_8:
+	case VK::NUMPAD_9:
+	{
+		auto amount_of_pens = g_strokehandler->get_pen_handler().get_all_pens().size();
+		SessionVariables::PENSELECTION_SELECTED_PEN = (key - VK::NUMPAD_1) % amount_of_pens;
+		g_main_window->invalidate_drawing_area();
+		break;
+	}
 	}
 }
 
 void callback_key_up(WindowHandler::VK k) {
-	if (WindowHandler::is_key_pressed(WindowHandler::LEFT_CONTROL)) {
-		auto mouse_pos = g_main_window->get_mouse_pos();
-		if (k == WindowHandler::VK::OEM_PLUS ) {
-			g_main_renderer->add_scale_matrix(AppVariables::CONRTOLS_MOUSE_ZOOM_SCALE, mouse_pos);
-		}
-		else if (k == WindowHandler::VK::OEM_MINUS) {
-			g_main_renderer->add_scale_matrix(1 / AppVariables::CONRTOLS_MOUSE_ZOOM_SCALE, mouse_pos);
-
-		}
-		g_main_window->invalidate_drawing_area();
-	}
-
-	if (k == WindowHandler::VK::F5) { 
-		// refresh
-		g_pdfrenderhandler->clear_render_cache();
-		g_pdfrenderhandler->update_annotations(0);
-		g_main_window->invalidate_drawing_area();
-	}
-
-	if (k == WindowHandler::VK::F3) {
-		g_draw_annots = not g_draw_annots;
-		g_main_window->invalidate_drawing_area();
-	}
-
-	if (k == WindowHandler::VK::F2) { 
-		g_strokehandler->get_pen_handler().select_next_pen(); 
-		g_main_window->invalidate_drawing_area();
-	}
-
-	if (k == WindowHandler::VK::F1) {
-		// opens the roaming folder
-		ShellExecute(NULL, L"open", L"explorer.exe", FileHandler::get_appdata_path().c_str(), NULL, SW_SHOWDEFAULT);
-	}
-
+	// its now all in key down
 }
 
 void callback_pointer_down(WindowHandler::PointerInfo p) {
