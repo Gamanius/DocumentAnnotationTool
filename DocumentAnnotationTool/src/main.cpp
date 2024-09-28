@@ -2,6 +2,7 @@
 
 #include "helper/include.h"
 #include "MainWindow.h"
+#include <wininet.h>
 
 #define _CRTDBG_MAP_ALLOC
 
@@ -59,6 +60,47 @@ HANDLE create_log_file() {
 	return CreateFile(path.c_str(), GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_FLAG_WRITE_THROUGH, NULL); 
 }
 
+void check_updates() {
+	// Check in GitHub if there is a new version available
+	HINTERNET hInternet = InternetOpen(L"GitHubReleaseChecker", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
+	ASSERT_WIN_WITH_STATEMENT(hInternet != 0, return, "Failed to check for updates:");
+
+	const std::wstring url = L"https://api.github.com/repos/Gamanius/DocumentAnnotationTool/releases/latest";
+	HINTERNET hConnect = InternetOpenUrl(hInternet, url.c_str(), NULL, 0, INTERNET_FLAG_RELOAD, 0); 
+	ASSERT_WIN_WITH_STATEMENT(hConnect != 0, return, "Failed to check for updates:");
+
+	char buffer[1024];
+	DWORD bytesRead;
+	std::string response;
+
+	while (InternetReadFile(hConnect, buffer, sizeof(buffer), &bytesRead) and bytesRead != 0) {
+		response.append(buffer, bytesRead);
+	}
+
+	InternetCloseHandle(hConnect);
+	InternetCloseHandle(hInternet);
+
+	using json = nlohmann::json;
+	json j;
+	try {
+		j = json::parse(response);
+		std::string tag = j.at("tag_name").get<std::string>(); 
+		if (tag != APPLICATION_VERSION) {
+			Logger::log("New version available: ", tag);
+			auto msg = MessageBox(NULL, L"New version available!\nOpen Download link?", L"Docanto", MB_YESNO | MB_ICONINFORMATION);
+			if (msg == IDYES) {
+				ShellExecute(NULL, L"open", L"https://github.com/Gamanius/DocumentAnnotationTool/releases/latest", NULL, NULL, SW_SHOWNORMAL);
+			}
+		}
+		else {
+			Logger::log("No new version available");
+		}
+	}
+	catch (json::exception& e) {
+		Logger::error("JSON error when checking for updated: ", e.what()); 
+	}
+}
+
 void init() {
 	// this is used for memory leak detection
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
@@ -71,12 +113,14 @@ void init() {
 	remove_oldest_log_file();
 
 	Logger::set_handle(create_log_file());
+	Logger::unformated_log("---=== Starting Logging ===---");
 
+	// check for updates
+	check_updates();
 }
 
 int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nCmdShow) {
 	init();
-	Logger::unformated_log("---=== Starting Logging ===---");
 
 
 	int argc = 0;
