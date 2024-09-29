@@ -130,6 +130,13 @@ void Direct2DRenderer::draw_line(Math::Point<float> p1, Math::Point<float> p2, R
 	end_draw();
 }
 
+void Direct2DRenderer::draw_line(Math::Point<float> p1, Math::Point<float> p2, Renderer::AlphaColor c, float thick) {
+	begin_draw();
+	auto brush = create_brush(c);
+	draw_line(p1, p2, brush, thick);
+	end_draw();
+}
+
 void Direct2DRenderer::draw_path(PathObject& obj, BrushObject& brush, float thick) {
 	begin_draw();
 	m_renderTarget->DrawGeometry(obj.m_object, brush.m_object, thick); 
@@ -137,6 +144,13 @@ void Direct2DRenderer::draw_path(PathObject& obj, BrushObject& brush, float thic
 }
 
 void Direct2DRenderer::draw_path(PathObject& obj, Renderer::Color c, float thick) {
+	begin_draw();
+	auto brush = create_brush(c); 
+	draw_path(obj, brush, thick);
+	end_draw();
+}
+
+void Direct2DRenderer::draw_path(PathObject& obj, Renderer::AlphaColor c, float thick) {
 	begin_draw();
 	auto brush = create_brush(c);
 	draw_path(obj, brush, thick);
@@ -345,6 +359,16 @@ Direct2DRenderer::TextFormatObject Direct2DRenderer::create_text_format(std::wst
 Direct2DRenderer::BrushObject Direct2DRenderer::create_brush(Renderer::Color c) {
 	BrushObject obj;
 	ID2D1SolidColorBrush* brush = nullptr; 
+	auto result = m_renderTarget->CreateSolidColorBrush(c, &brush);
+	ASSERT_WIN(result == S_OK, "Could not create brush!");
+	obj.m_object = brush;
+
+	return std::move(obj);
+}
+
+Direct2DRenderer::BrushObject Direct2DRenderer::create_brush(Renderer::AlphaColor c) {
+	BrushObject obj;
+	ID2D1SolidColorBrush* brush = nullptr;
 	auto result = m_renderTarget->CreateSolidColorBrush(c, &brush);
 	ASSERT_WIN(result == S_OK, "Could not create brush!");
 	obj.m_object = brush;

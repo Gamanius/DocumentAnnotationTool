@@ -31,6 +31,9 @@ class WindowHandler {
 	bool m_is_mouse_tracking_window = false;
 	bool m_is_mouse_tracking_nc = false;
 
+	Timer m_last_paint;
+	bool m_paint_timer_active = false;
+
 	static std::unique_ptr<std::map<HWND, WindowHandler*>> m_allWindowInstances;
 
 public:

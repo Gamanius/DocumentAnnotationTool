@@ -97,9 +97,11 @@ public:
 
 	void draw_line(Math::Point<float> p1, Math::Point<float> p2, BrushObject& brush, float thick);
 	void draw_line(Math::Point<float> p1, Math::Point<float> p2, Renderer::Color c, float thick);
+	void draw_line(Math::Point<float> p1, Math::Point<float> p2, Renderer::AlphaColor c, float thick);
 
 	void draw_path(PathObject& obj, BrushObject& brush, float thick);
 	void draw_path(PathObject& obj, Renderer::Color c, float thick);
+	void draw_path(PathObject& obj, Renderer::AlphaColor c, float thick);
 
 	void draw_rect(Math::Rectangle<float> rec, BrushObject& brush, float thick);
 	void draw_rect(Math::Rectangle<float> rec, BrushObject& brush);
@@ -217,6 +219,7 @@ public:
 
 	TextFormatObject create_text_format(std::wstring font, float size);
 	BrushObject create_brush(Renderer::Color c);
+	BrushObject create_brush(Renderer::AlphaColor c);
 	BitmapObject create_bitmap(const std::wstring& path);
 	BitmapObject create_bitmap(const byte* const data, Math::Rectangle<unsigned int> size, unsigned int stride, float dpi);
 	PathObject create_bezier_path(const Renderer::CubicBezierGeometry& cub);

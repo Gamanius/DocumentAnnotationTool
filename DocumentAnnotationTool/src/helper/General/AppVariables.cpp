@@ -49,6 +49,9 @@ void AppVariables::load() {
 	try {
 		j = json::parse(reinterpret_cast<char*>(settings->data), reinterpret_cast<char*>(settings->data) + settings->size);
 
+		JSON_LOAD(j, APPVARIABLES_MAX_LOG_FILES);
+		JSON_LOAD(j, APPVARIABLES_REFRESHTIME_MS);
+
 		JSON_LOAD(j, WINDOWLAYOUT_TOOLBAR_HEIGHT);
 		JSON_LOAD(j, WINDOWLAYOUT_FONT);
 		
@@ -74,6 +77,9 @@ void AppVariables::load() {
 
 void AppVariables::save() {
 	json j;
+
+	JSON_SAVE(j, APPVARIABLES_MAX_LOG_FILES);
+	JSON_SAVE(j, APPVARIABLES_REFRESHTIME_MS);
 
     JSON_SAVE(j, WINDOWLAYOUT_TOOLBAR_HEIGHT); 
     JSON_SAVE(j, WINDOWLAYOUT_FONT);

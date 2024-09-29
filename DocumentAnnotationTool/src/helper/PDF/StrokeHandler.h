@@ -21,7 +21,7 @@ class StrokeHandler {
 		Math::Rectangle<float> bounding_box;
 		Direct2DRenderer::PathObject path;
 		float thickness = 1.0f;
-		Renderer::Color color = { 0, 0, 0 };
+		Renderer::AlphaColor color = {0, 0, 0, 255};
 		bool to_be_erased = false;
 		bool applied = false;
 

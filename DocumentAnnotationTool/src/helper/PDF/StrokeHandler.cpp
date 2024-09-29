@@ -36,6 +36,8 @@ void StrokeHandler::apply_stroke_to_pdf(Stroke& s) {
 
 	float b[] = { s.color.r/255.0f, s.color.g / 255.0f, s.color.b / 255.0f };
 	pdf_set_annot_color(*ctx, s.annot, 3, b); 
+	pdf_set_annot_opacity(*ctx, s.annot, s.color.alpha / 255.0f); 
+	
 	pdf_set_annot_border_width(*ctx, s.annot, s.thickness); 
 
 	SessionVariables::PDF_UNSAVED_CHANGES = true;
@@ -58,28 +60,30 @@ std::vector<Math::Point<float>> get_points_from_annot(MuPDFHandler::PDF* pdf, pd
 	return all_points; 
 }
 
-Renderer::Color get_color_from_annot(MuPDFHandler::PDF* pdf, pdf_annot* a) {
+Renderer::AlphaColor get_color_from_annot(MuPDFHandler::PDF* pdf, pdf_annot* a) {
 	auto ctx = pdf->get_context();
 	int n = 0;
 	float c[4];
 	pdf_annot_color(*ctx, a, &n, c);
+	auto alpha = static_cast<byte>(pdf_annot_opacity(*ctx, a) * 255);
 	// grey
 	if (n == 1) {
-		byte col = static_cast<byte>(c[0] * 255.0f);
-		return Renderer::Color(col, col, col);
+		byte col = static_cast<byte>(c[0] * 255.0f); 
+		return Renderer::AlphaColor(col, col, col, alpha); 
 	}
 	else if (n == 3) {
-		return Renderer::Color(
+		return Renderer::AlphaColor(
 			static_cast<byte>(c[0] * 255.0f),
 			static_cast<byte>(c[1] * 255.0f),
-			static_cast<byte>(c[2] * 255.0f)
+			static_cast<byte>(c[2] * 255.0f),
+			alpha
 		);
 	}
 	else {
 		// TODO
 		Logger::error("Annot colorspace not supported");
 	}
-	return Renderer::Color(0, 0, 0);
+	return Renderer::AlphaColor(0, 0, 0, 255);
 }
 
 void StrokeHandler::parse_all_strokes() {
@@ -115,6 +119,7 @@ void StrokeHandler::parse_all_strokes() {
 			s.page = i;
 			s.ctx = m_pdf->get_context_wrapper();
 			s.color = get_color_from_annot(m_pdf, annot);
+			
 			s.points = get_points_from_annot(m_pdf, annot);
 			// transform the points into clip space
 			for (size_t j = 0; j < s.points.size(); j++) {

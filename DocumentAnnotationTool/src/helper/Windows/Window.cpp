@@ -613,8 +613,28 @@ LRESULT WindowHandler::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam
 		}
 		return DefWindowProc(hWnd, uMsg, wParam, lParam);
 	}
+	case WM_TIMER:
+	{
+		if (wParam == WM_PAINT) { 
+			SendMessage(hWnd, WM_PAINT, 0, 0); 
+			currentInstance->m_paint_timer_active = false;
+			KillTimer(hWnd, WM_PAINT);
+		}
+		break;
+	}
 	case WM_PAINT: 
 	{	
+		// we have to limit the amount of draw calls
+		// so we dont overstress the gpu and induce 
+		// high battery usage 
+		if (currentInstance->m_last_paint.delta_ms() < AppVariables::APPVARIABLES_REFRESHTIME_MS) {
+			if (currentInstance->m_paint_timer_active == false) {
+				currentInstance->m_paint_timer_active = true;
+				SetTimer(hWnd, WM_PAINT, AppVariables::APPVARIABLES_REFRESHTIME_MS, NULL); 
+			}
+			return true;
+		}
+		currentInstance->m_last_paint = Timer();
 		if (currentInstance->m_callback_paint) {
 			currentInstance->m_callback_paint(WindowHandler::DRAW_EVENT::NORMAL_DRAW, nullptr);  
 		}
@@ -838,6 +858,12 @@ bool WindowHandler::init(std::wstring windowName, HINSTANCE instance) {
 
 	bool temp = EnableMouseInPointer(true);
 	ASSERT_WIN_RETURN_FALSE(temp, "Couldn't add Mouse input into Pointer Input Stack API");
+
+	// Does not work but i keep it
+	// https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setuserobjectinformationw
+	BOOL b = FALSE;
+	auto res = SetUserObjectInformation(GetProcessWindowStation(), UOI_TIMERPROC_EXCEPTION_SUPPRESSION, &b, sizeof(BOOL));
+	//ASSERT_WIN_RETURN_FALSE(res != 0, "Could not set timer exception suppression"); 
 
 	return true;
 }

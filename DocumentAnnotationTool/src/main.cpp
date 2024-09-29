@@ -63,11 +63,17 @@ HANDLE create_log_file() {
 void check_updates() {
 	// Check in GitHub if there is a new version available
 	HINTERNET hInternet = InternetOpen(L"GitHubReleaseChecker", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
-	ASSERT_WIN_WITH_STATEMENT(hInternet != 0, return, "Failed to check for updates:");
+	if (hInternet == 0) {
+		Logger::error("Failed to check for updates:", " with Windows Error: \"", get_win_msg());
+		return;
+	}
 
 	const std::wstring url = L"https://api.github.com/repos/Gamanius/DocumentAnnotationTool/releases/latest";
 	HINTERNET hConnect = InternetOpenUrl(hInternet, url.c_str(), NULL, 0, INTERNET_FLAG_RELOAD, 0); 
-	ASSERT_WIN_WITH_STATEMENT(hConnect != 0, return, "Failed to check for updates:");
+	if (hConnect == 0) {
+		Logger::error("Failed to check for updates:", " with Windows Error: \"", get_win_msg());
+		return;
+	}
 
 	char buffer[1024];
 	DWORD bytesRead;
