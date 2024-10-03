@@ -3,6 +3,7 @@
 #include "helper/include.h"
 #include "MainWindow.h"
 #include <wininet.h>
+#include <DbgHelp.h>
 
 #define _CRTDBG_MAP_ALLOC
 
@@ -107,9 +108,50 @@ void check_updates() {
 	}
 }
 
+LONG WINAPI Win32ExceptionFilter(_In_ struct _EXCEPTION_POINTERS* ExceptionInfo) {
+	Logger::error("Abnormal Exception ", ExceptionInfo->ExceptionRecord->ExceptionCode);
+
+	// create location for dump file
+	auto path = FileHandler::get_appdata_path() / L"dump.dmp"; 
+
+	HANDLE file = CreateFile(path.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (file == INVALID_HANDLE_VALUE) {
+		Logger::error(L"Couldn't dump program");
+	}
+
+	// Initialize the minidump information
+	MINIDUMP_EXCEPTION_INFORMATION mdei;
+	mdei.ThreadId = GetCurrentThreadId();
+	mdei.ExceptionPointers = ExceptionInfo; 
+	mdei.ClientPointers = FALSE;
+
+	// Write the dump
+	BOOL success = MiniDumpWriteDump(
+		GetCurrentProcess(),
+		GetCurrentProcessId(),
+		file,
+	    (MINIDUMP_TYPE)(MiniDumpWithDataSegs | MiniDumpWithHandleData | MiniDumpWithThreadInfo),  
+		(ExceptionInfo ? &mdei : NULL),
+		NULL,
+		NULL
+	);
+
+	if (success) {
+		Logger::log(L"Dumped core at ", path);
+	}
+	else {
+		Logger::error(L"Couldn't dump program");
+	}
+
+	CloseHandle(file);
+	return EXCEPTION_EXECUTE_HANDLER;
+}
+
 void init() {
 	// this is used for memory leak detection
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+
+	SetUnhandledExceptionFilter(Win32ExceptionFilter);
 
 	// load in all settings
 	AppVariables::load();
@@ -128,7 +170,6 @@ void init() {
 int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nCmdShow) {
 	init();
 
-
 	int argc = 0;
 	auto cmdline = CommandLineToArgvW(GetCommandLine(), &argc);
 	std::filesystem::path p;
@@ -137,7 +178,7 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 	if (argc > 1) {
 		p = cmdline[1]; 
 	}
-	
+		
 	main_window_loop_run(hInstance, p);
 	
 	Logger::log("End of program");

@@ -147,8 +147,9 @@ void MuPDFHandler::PDF::save_pdf(const std::wstring& path) {
 	fz_try(*ctx) {
 		pdf_write_options opt = {0};
 		opt.permissions = ~0;
-		opt.do_compress_images = 0;
-		opt.do_compress = 0;
+		opt.do_compress_images = 1;
+		opt.do_compress = 1;
+		opt.do_garbage = 1;
 
 		fz_buffer* buffer = fz_new_buffer(*ctx, 0); 
 		fz_output* output = fz_new_output_with_buffer(*ctx, buffer);
