@@ -20,6 +20,28 @@ bool g_draw_annots = true;
 
 UINT toolbar_last_draw = 0;
 
+void crash_callback() {
+	auto path = FileHandler::get_appdata_path() / L"crash" / SessionVariables::FILE_PATH.filename(); 
+	Logger::log("Trying to save PDF at ", path);
+	
+
+	if (g_pdf != nullptr) {
+		g_pdf->save_pdf(path);
+		Logger::success("Saved PDF"); 
+	}
+	else {
+		Logger::error("Could not save PDF");
+	}
+
+	// create message box asking to go to the log folder
+	auto msg = std::wstring(L"An fatal error occured which prevents further program execution. A save of the PDF has been made. Open log folder?");
+	auto res = MessageBox(NULL, msg.c_str(), L"Error", MB_YESNO | MB_ICONERROR);
+	if (res == IDYES) {
+		ShellExecute(NULL, L"open", path.parent_path().c_str(), NULL, NULL, SW_SHOWDEFAULT);
+	}
+
+}
+
 void callback_draw(WindowHandler::DRAW_EVENT event, void* data) {
 	// draw scaled elements
 	g_main_renderer->set_current_transform_active();
@@ -329,7 +351,6 @@ void callback_pointer_update(WindowHandler::PointerInfo p) {
 
 		g_main_window->invalidate_drawing_area();
 	}
-
 }
 
 
@@ -357,6 +378,9 @@ void callback_mousewheel(short delta, bool hwheel, Math::Point<int> center) {
 }
 
 void main_window_loop_run(HINSTANCE h, std::filesystem::path p) {
+	// add callback to possible crash
+	ABNORMAL_PROGRAM_EXIT_CALLBACK = crash_callback;
+
 	auto update_caption = [](const std::wstring& input) {
 		SessionVariables::WINDOW_TITLE = input;
 		g_main_renderer->begin_draw();

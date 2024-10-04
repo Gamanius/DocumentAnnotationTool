@@ -22,7 +22,8 @@ void PenHandler::load_pens() {
 		Logger::log("Generating new pen settings file with default settings.");
 		// There are no pens to load 
 		// because the file does not exist. just generate a new one
-		m_pens.push_back({ 1.0f, {0, 0, 0, 1} });
+		m_pens.push_back({ 0.5f, {0, 0, 0, 255} });
+		m_pens.push_back({ 0.5f, {23, 212, 193, 255} });
 		save_pens();
 		return;
 	}

@@ -6,6 +6,8 @@
 
 #undef COLOR_BACKGROUND 
 
+inline std::function<void()> ABNORMAL_PROGRAM_EXIT_CALLBACK; 
+
 namespace SessionVariables {
 	inline std::filesystem::path FILE_PATH;
 	inline std::wstring WINDOW_TITLE = APPLICATION_NAME; 
@@ -26,7 +28,8 @@ namespace AppVariables {
 	inline float        PENSELECTION_PENS_WIDTH         = 35.0f;
 	inline std::wstring PENSELECTION_SETTINGS_FILE_NAME = std::wstring(L"pen_settings.json");
 
-	
+	inline std::wstring PDFTEMPLATE_FOLDER_NAME = std::wstring(L"templates");
+		
 	inline Renderer::Color COLOR_BACKGROUND             = { 50, 50, 50 };
 	inline Renderer::Color COLOR_TEXT                   = { 255, 255, 255 };
 

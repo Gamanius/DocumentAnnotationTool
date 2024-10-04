@@ -112,9 +112,13 @@ LONG WINAPI Win32ExceptionFilter(_In_ struct _EXCEPTION_POINTERS* ExceptionInfo)
 	Logger::error("Abnormal Exception ", ExceptionInfo->ExceptionRecord->ExceptionCode);
 
 	// create location for dump file
-	auto path = FileHandler::get_appdata_path() / L"dump.dmp"; 
+	auto path = FileHandler::get_appdata_path() / L"crash"; 
+	if (std::filesystem::exists(path) == false) {
+		std::filesystem::create_directories(path);
+	}
+	auto file_path = path / L"dump.dmp";
 
-	HANDLE file = CreateFile(path.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	HANDLE file = CreateFile(file_path.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (file == INVALID_HANDLE_VALUE) {
 		Logger::error(L"Couldn't dump program");
 	}
@@ -137,13 +141,18 @@ LONG WINAPI Win32ExceptionFilter(_In_ struct _EXCEPTION_POINTERS* ExceptionInfo)
 	);
 
 	if (success) {
-		Logger::log(L"Dumped core at ", path);
+		Logger::log(L"Dumped core at ", file_path);
 	}
 	else {
 		Logger::error(L"Couldn't dump program");
 	}
-
 	CloseHandle(file);
+
+	// call the callback
+	if (ABNORMAL_PROGRAM_EXIT_CALLBACK) {
+		ABNORMAL_PROGRAM_EXIT_CALLBACK();
+	}
+
 	return EXCEPTION_EXECUTE_HANDLER;
 }
 
