@@ -86,7 +86,6 @@ public:
 
 		// Position and dimensions of the pages 
 		std::shared_ptr<ThreadSafeVector<Math::Rectangle<float>>> m_pagerec;
-		float m_seperation_distance = 10;
 
 	public:
 
@@ -131,6 +130,7 @@ public:
 		size_t get_page_count() const;
 
 		void save_pdf(const std::wstring& path);
+		void add_page(PDF& pdf);
 
 		Math::Rectangle<float> get_page_size(size_t page, float dpi = 72);
 		Math::Rectangle<float> get_bounds() const;

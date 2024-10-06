@@ -62,7 +62,9 @@ ThreadSafeContextWrapper MuPDFHandler::get_context() {
 	return m_context->get_item();
 }
 
-MuPDFHandler::~MuPDFHandler() {}
+MuPDFHandler::~MuPDFHandler() {
+
+}
 
 MuPDFHandler::PDF::PDF(std::shared_ptr<ContextWrapper> ctx, std::shared_ptr<DocumentWrapper> doc) {
 	m_ctx = ctx;
@@ -86,20 +88,17 @@ MuPDFHandler::PDF::PDF(std::shared_ptr<ContextWrapper> ctx, std::shared_ptr<Docu
 }
 
 MuPDFHandler::PDF::PDF(PDF&& t) noexcept {
+	m_ctx = std::move(t.m_ctx);
 	m_document = std::move(t.m_document);
 
-	m_ctx = std::move(t.m_ctx);
-
 	m_pages = std::move(t.m_pages);
+	m_pagerec = std::move(t.m_pagerec);
 
 	data = t.data;
 	t.data = nullptr;
 
-	m_seperation_distance = t.m_seperation_distance;
-	t.m_seperation_distance = 0;
-
-	m_pagerec = std::move(t.m_pagerec);
-
+	size = t.size;
+	t.size = 0;
 }
 
 
@@ -171,6 +170,18 @@ void MuPDFHandler::PDF::save_pdf(const std::wstring& path) {
 	}
 }
 
+void MuPDFHandler::PDF::add_page(PDF& pdf) {
+	auto c = m_ctx->get_context();
+	auto d = m_document->get_document();
+	auto page = pdf.get_page(0);
+
+	fz_try(*c) {
+		pdf_insert_page(*c, reinterpret_cast<pdf_document*>(*d), INT_MAX, reinterpret_cast<pdf_obj*>(*page));
+	} fz_catch(*c) {
+		fz_report_error(*c);
+	}
+}
+
 Math::Rectangle<float> MuPDFHandler::PDF::get_page_size(size_t page, float dpi) { 
 	auto c = m_ctx->get_context();
 	auto d = m_document->get_document();
@@ -207,6 +218,6 @@ void MuPDFHandler::PDF::sort_page_positions() {
 		auto size = get_page_size(i);
 		dest->push_back(Math::Rectangle<double>(0, height, size.width, size.height));
 		height += get_page_size(i).height;
-		height += m_seperation_distance;
+		height += AppVariables::PDF_SEPERATION_DISTANCE; 
 	}
 }

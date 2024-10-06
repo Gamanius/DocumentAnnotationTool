@@ -11,6 +11,7 @@ Direct2DRenderer::BrushObject* g_brush;
 
 MuPDFHandler::PDF* g_pdf;
 std::shared_ptr<MuPDFHandler> g_mupdfcontext;
+std::vector<MuPDFHandler::PDF> g_template_pdfs;
 PDFRenderHandler* g_pdfrenderhandler = nullptr;
 StrokeHandler* g_strokehandler = nullptr;
 
@@ -118,6 +119,10 @@ void save_dialoge() {
 	if (std::filesystem::path(path.value()).extension() != ".pdf") {
 		path.value().append(L".pdf");
 	}
+	
+	SessionVariables::FILE_PATH = path.value();
+	SessionVariables::WINDOW_TITLE = SessionVariables::FILE_PATH.filename();
+
 	g_pdf->save_pdf(path.value());
 	Logger::success("Saved PDF to ", path.value());
 }
@@ -353,7 +358,6 @@ void callback_pointer_update(WindowHandler::PointerInfo p) {
 	}
 }
 
-
 void callback_pointer_up(WindowHandler::PointerInfo p) {
 	if (p.type == WindowHandler::POINTER_TYPE::TOUCH) {
 		g_gesturehandler.end_gesture(p);
@@ -377,6 +381,32 @@ void callback_mousewheel(short delta, bool hwheel, Math::Point<int> center) {
 	g_main_window->invalidate_drawing_area();
 }
 
+void load_template_pdfs() {
+	auto path = FileHandler::get_appdata_path() / AppVariables::PDF_TEMPLATE_FOLDER_NAME;
+
+	if (std::filesystem::exists(path) == false) {
+		Logger::log("No template folder found. Creating one...");
+		std::filesystem::create_directory(path);
+		return;
+	}
+
+    for (const auto& entry : std::filesystem::directory_iterator(path)) { 
+		if (entry.is_regular_file() == false or entry.path().extension() != ".pdf") {
+			continue;
+		}
+
+        // Load the PDF file here
+        std::wstring pdf_path = entry.path().wstring();
+        // Call the function to load the PDF file
+		auto pdf = g_mupdfcontext->load_pdf(pdf_path);
+		if (pdf.has_value() == false) {
+			continue;
+		}
+
+		g_template_pdfs.push_back(std::move(pdf.value())); 
+    }
+}
+
 void main_window_loop_run(HINSTANCE h, std::filesystem::path p) {
 	// add callback to possible crash
 	ABNORMAL_PROGRAM_EXIT_CALLBACK = crash_callback;
@@ -398,6 +428,8 @@ void main_window_loop_run(HINSTANCE h, std::filesystem::path p) {
 	g_ui_handler = std::make_unique<UIHandler>(g_main_renderer.get()); 
 
 	g_mupdfcontext = std::shared_ptr<MuPDFHandler>(new MuPDFHandler); 
+
+	load_template_pdfs();
 
 	if (p.empty()) {
 	INVALID_PATH:
@@ -455,6 +487,8 @@ void main_window_loop_run(HINSTANCE h, std::filesystem::path p) {
 	g_main_window->set_callback_mousewheel(callback_mousewheel);
 	g_main_window->set_callback_key_down(callback_key_down);
 	g_main_window->set_callback_key_up(callback_key_up);
+
+	g_pdf->add_page(g_template_pdfs[0]);
 
 	while(!g_main_window->close_request()) {
 		g_main_window->get_window_messages(true);

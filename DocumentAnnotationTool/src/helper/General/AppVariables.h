@@ -28,7 +28,8 @@ namespace AppVariables {
 	inline float        PENSELECTION_PENS_WIDTH         = 35.0f;
 	inline std::wstring PENSELECTION_SETTINGS_FILE_NAME = std::wstring(L"pen_settings.json");
 
-	inline std::wstring PDFTEMPLATE_FOLDER_NAME = std::wstring(L"templates");
+	inline std::wstring PDF_TEMPLATE_FOLDER_NAME = std::wstring(L"templates");
+	inline float		PDF_SEPERATION_DISTANCE = 10.0f;
 		
 	inline Renderer::Color COLOR_BACKGROUND             = { 50, 50, 50 };
 	inline Renderer::Color COLOR_TEXT                   = { 255, 255, 255 };

@@ -39,8 +39,7 @@ void AppVariables::load() {
 	if (settings.has_value() == false) {
 	JSON_PARSE_ERROR:
 		Logger::log("Generating default setting json.");
-		// There are no pens to load 
-		// because the file does not exist. just generate a new one
+		// Settings file may be faulty. lets resave it
 		save();
 		return;
 	}
@@ -58,9 +57,13 @@ void AppVariables::load() {
 		JSON_LOAD(j, PENSELECTION_Y_POSITION);
 		JSON_LOAD(j, PENSELECTION_PENS_WIDTH);
 		JSON_LOAD(j, PENSELECTION_SETTINGS_FILE_NAME);
+
+		JSON_LOAD(j, PDF_TEMPLATE_FOLDER_NAME);
+		JSON_LOAD(j, PDF_SEPERATION_DISTANCE);
 		
 		JSON_LOAD(j, COLOR_BACKGROUND);
 		JSON_LOAD(j, COLOR_TEXT);
+
 		JSON_LOAD(j, COLOR_PRIMARY);
 		JSON_LOAD(j, COLOR_SECONDARY);
 		JSON_LOAD(j, COLOR_TERTIARY);
@@ -87,6 +90,9 @@ void AppVariables::save() {
     JSON_SAVE(j, PENSELECTION_Y_POSITION);
     JSON_SAVE(j, PENSELECTION_PENS_WIDTH);
     JSON_SAVE(j, PENSELECTION_SETTINGS_FILE_NAME);
+
+	JSON_SAVE(j, PDF_TEMPLATE_FOLDER_NAME);
+	JSON_SAVE(j, PDF_SEPERATION_DISTANCE);
 
     JSON_SAVE(j, COLOR_BACKGROUND);
     JSON_SAVE(j, COLOR_TEXT);
