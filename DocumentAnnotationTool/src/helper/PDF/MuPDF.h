@@ -130,7 +130,7 @@ public:
 		size_t get_page_count() const;
 
 		void save_pdf(const std::wstring& path);
-		void add_page(PDF& pdf);
+		void add_page(PDF& pdf, int page = INT_MAX);
 
 		Math::Rectangle<float> get_page_size(size_t page, float dpi = 72);
 		Math::Rectangle<float> get_bounds() const;

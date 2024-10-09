@@ -170,16 +170,42 @@ void MuPDFHandler::PDF::save_pdf(const std::wstring& path) {
 	}
 }
 
-void MuPDFHandler::PDF::add_page(PDF& pdf) {
+void MuPDFHandler::PDF::add_page(PDF& pdf, int page_num) {
 	auto c = m_ctx->get_context();
 	auto d = m_document->get_document();
-	auto page = pdf.get_page(0);
+
+	fz_device* page_write = nullptr;
+	pdf_obj* obj = nullptr; 
+	pdf_obj* page = nullptr;
+	fz_buffer* content = nullptr; 
 
 	fz_try(*c) {
-		pdf_insert_page(*c, reinterpret_cast<pdf_document*>(*d), INT_MAX, reinterpret_cast<pdf_obj*>(*page));
-	} fz_catch(*c) {
-		fz_report_error(*c);
+		auto rec = pdf.get_page_size(0);
+		auto new_page_doc = pdf.get_document();
+
+		page_write = pdf_page_write(*c, reinterpret_cast<pdf_document*>(*d), rec, &obj, &content); 
+
+		fz_run_page(*c, reinterpret_cast<fz_page*>(*pdf.get_page(0)), page_write, fz_identity, nullptr); 
+
+		page = pdf_add_page(*c, reinterpret_cast<pdf_document*>(*d), rec, 0, obj, content);
+		
+		pdf_insert_page(*c, reinterpret_cast<pdf_document*>(*d), INT_MAX, page);
+	} 
+	fz_always(*c) { 
+		fz_close_device(*c, page_write);
+		fz_drop_device(*c, page_write);
+		pdf_drop_obj(*c, obj); 
+		pdf_drop_obj(*c, page); 
+		fz_drop_buffer(*c, content); 
 	}
+	fz_catch(*c) {
+		fz_report_error(*c);
+	} 
+
+	m_pages.push_back(std::shared_ptr<PageWrapper>(new PageWrapper(m_ctx, fz_load_page(*c, *d, static_cast<int>(get_page_count() - 1))))); 
+
+	// TODO in the future we need to do this dynamically since pages can be moved around
+	sort_page_positions();
 }
 
 Math::Rectangle<float> MuPDFHandler::PDF::get_page_size(size_t page, float dpi) { 
