@@ -49,7 +49,7 @@ public:
 	void end_gesture(const WindowHandler::PointerInfo& p);
 
 	// scrolling with mouse
-	void update_mouse(short delta, bool hwheel, Math::Point<int> center);
+	void update_page_pos(bool dir, bool hor, std::optional<Math::Point<int>> center = std::nullopt);
 
 	void start_select_page(const WindowHandler::PointerInfo& p);
 	void update_select_page(const WindowHandler::PointerInfo& p);

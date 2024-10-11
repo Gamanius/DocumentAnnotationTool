@@ -212,19 +212,32 @@ void GestureHandler::end_gesture(const WindowHandler::PointerInfo& p) {
 	}
 }
 
-void GestureHandler::update_mouse(short delta, bool hwheel, Math::Point<int> center) {
-	if (is_gesture_active()) { 
+void GestureHandler::update_page_pos(bool dir, bool hor, std::optional<Math::Point<int>> center) {
+	if (is_gesture_active()) {
 		return;
 	}
 
-	double offset = (double)delta / m_renderer->get_transform_scale();
-	if (WindowHandler::is_key_pressed(WindowHandler::LEFT_CONTROL)) {
-		m_renderer->add_scale_matrix(delta > 0 ? 1.25 : 0.8, center);
+	// if we get a center it means it is zoom
+	auto delta = AppVariables::CONTROLS_ARROWS_OFFSET / m_renderer->get_transform_scale();
+	if (center.has_value()) {
+		m_renderer->add_scale_matrix(dir ? AppVariables::CONRTOLS_MOUSE_ZOOM_SCALE : 1/AppVariables::CONRTOLS_MOUSE_ZOOM_SCALE, center.value());
+	} 
+	else if (hor) {
+		if (dir) {
+			m_renderer->add_transform_matrix({ delta, 0 }); 
+		}
+		else {
+			m_renderer->add_transform_matrix({ -delta, 0 }); 
+		}
 	}
-	else if (WindowHandler::is_key_pressed(WindowHandler::LEFT_SHIFT) or hwheel)
-		m_renderer->add_transform_matrix({ (float)offset, 0 });
-	else
-		m_renderer->add_transform_matrix({ 0, (float)offset });
+	else {
+		if (dir) {
+			m_renderer->add_transform_matrix({ 0, delta });
+		}
+		else {
+			m_renderer->add_transform_matrix({ 0, -delta });
+		}
+	}
 
 	check_bounds();
 }

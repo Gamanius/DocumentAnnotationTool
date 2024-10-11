@@ -193,23 +193,41 @@ void callback_key_down(WindowHandler::VK key) {
 	}
 	case VK::OEM_PLUS:
 	{
-		if (not WindowHandler::is_key_pressed(WindowHandler::LEFT_CONTROL)) {
-			break;
-		}
 		auto mouse_pos = g_main_window->get_mouse_pos();
-		g_main_renderer->add_scale_matrix(AppVariables::CONRTOLS_MOUSE_ZOOM_SCALE, mouse_pos);
+		g_gesturehandler.update_page_pos(true, true, mouse_pos);
 
 		g_main_window->invalidate_drawing_area();
 		break;
 	}
 	case VK::OEM_MINUS:
 	{
-		if (not WindowHandler::is_key_pressed(WindowHandler::LEFT_CONTROL)) {
-			break;
-		}
 		auto mouse_pos = g_main_window->get_mouse_pos();
-		g_main_renderer->add_scale_matrix(1 / AppVariables::CONRTOLS_MOUSE_ZOOM_SCALE, mouse_pos);
+		g_gesturehandler.update_page_pos(false, true, mouse_pos);
 
+		g_main_window->invalidate_drawing_area();
+		break;
+	}
+	case VK::UPARROW:
+	{
+		g_gesturehandler.update_page_pos(true, false);
+		g_main_window->invalidate_drawing_area();
+		break;
+	}
+	case VK::DOWNARROW:
+	{
+		g_gesturehandler.update_page_pos(false, false);
+		g_main_window->invalidate_drawing_area();
+		break;
+	}
+	case VK::LEFTARROW:
+	{
+		g_gesturehandler.update_page_pos(true, true);
+		g_main_window->invalidate_drawing_area();
+		break;
+	}
+	case VK::RIGHTARROW:
+	{
+		g_gesturehandler.update_page_pos(false, true);
 		g_main_window->invalidate_drawing_area();
 		break;
 	}
@@ -229,11 +247,13 @@ void callback_key_down(WindowHandler::VK key) {
 	{
 		if (not WindowHandler::is_key_pressed(VK::ALT)) {
 			break;
-		}
+		} 
+		[[fallthrough]]; 
 	}
 	case VK::ESCAPE:
 	{
 		g_main_window->send_close_request();
+		break;
 	}
 	case VK::F5:
 	{
@@ -377,7 +397,12 @@ void callback_pointer_up(WindowHandler::PointerInfo p) {
 }
 
 void callback_mousewheel(short delta, bool hwheel, Math::Point<int> center) {
-	g_gesturehandler.update_mouse(static_cast<float>(delta)/2.0f, hwheel, center);
+	std::optional<Math::Point<int>> zoom_center = std::nullopt;
+	if (WindowHandler::is_key_pressed(WindowHandler::VK::LEFT_CONTROL)) {
+		zoom_center = center;
+	}
+
+	g_gesturehandler.update_page_pos(delta > 0, hwheel or WindowHandler::is_key_pressed(WindowHandler::VK::LEFT_SHIFT), zoom_center);
 	g_main_window->invalidate_drawing_area();
 }
 
@@ -488,7 +513,7 @@ void main_window_loop_run(HINSTANCE h, std::filesystem::path p) {
 	g_main_window->set_callback_key_down(callback_key_down);
 	g_main_window->set_callback_key_up(callback_key_up);
 
-	g_pdf->add_page(g_template_pdfs[0]);
+	//g_pdf->add_page(g_template_pdfs[0]);
 
 	while(!g_main_window->close_request()) {
 		g_main_window->get_window_messages(true);

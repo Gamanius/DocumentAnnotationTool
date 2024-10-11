@@ -39,6 +39,7 @@ namespace AppVariables {
 	inline Renderer::Color COLOR_TERTIARY               = { 0, 214, 164 };
 
 	inline float CONRTOLS_MOUSE_ZOOM_SCALE              = 1.25f;
+	inline int   CONTROLS_ARROWS_OFFSET                 = 50;
 
 	void load();
 	void save();

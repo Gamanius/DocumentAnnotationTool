@@ -69,6 +69,7 @@ void AppVariables::load() {
 		JSON_LOAD(j, COLOR_TERTIARY);
 		
 		JSON_LOAD(j, CONRTOLS_MOUSE_ZOOM_SCALE);
+		JSON_LOAD(j, CONTROLS_ARROWS_OFFSET);
 	}
 	catch (json::exception& e) { 
 		Logger::error("Could not parse settings file: ", e.what()); 
@@ -101,6 +102,7 @@ void AppVariables::save() {
     JSON_SAVE(j, COLOR_TERTIARY);
 
     JSON_SAVE(j, CONRTOLS_MOUSE_ZOOM_SCALE);
+    JSON_SAVE(j, CONTROLS_ARROWS_OFFSET);
 
 	FileHandler::File f;
 	std::string data = j.dump(4);
