@@ -171,8 +171,13 @@ void MuPDFHandler::PDF::save_pdf(const std::wstring& path) {
 }
 
 void MuPDFHandler::PDF::add_page(PDF& pdf, int page_num) {
+	Timer t;
 	auto c = m_ctx->get_context();
 	auto d = m_document->get_document();
+
+	if (page_num >= get_page_count()) {
+		page_num = get_page_count();
+	}
 
 	fz_device* page_write = nullptr;
 	pdf_obj* obj = nullptr; 
@@ -181,15 +186,15 @@ void MuPDFHandler::PDF::add_page(PDF& pdf, int page_num) {
 
 	fz_try(*c) {
 		auto rec = pdf.get_page_size(0);
+		auto other_page = pdf.get_page(0);
 		auto new_page_doc = pdf.get_document();
-
+		 
 		page_write = pdf_page_write(*c, reinterpret_cast<pdf_document*>(*d), rec, &obj, &content); 
 
-		fz_run_page(*c, reinterpret_cast<fz_page*>(*pdf.get_page(0)), page_write, fz_identity, nullptr); 
-
-		page = pdf_add_page(*c, reinterpret_cast<pdf_document*>(*d), rec, 0, obj, content);
+		fz_run_page(*c, *other_page, page_write, fz_identity, nullptr);
+		page = pdf_add_page(*c, reinterpret_cast<pdf_document*>(*d), rec, 0, obj, content); 
 		
-		pdf_insert_page(*c, reinterpret_cast<pdf_document*>(*d), INT_MAX, page);
+		pdf_insert_page(*c, reinterpret_cast<pdf_document*>(*d), page_num, page);
 	} 
 	fz_always(*c) { 
 		fz_close_device(*c, page_write);
@@ -202,10 +207,23 @@ void MuPDFHandler::PDF::add_page(PDF& pdf, int page_num) {
 		fz_report_error(*c);
 	} 
 
-	m_pages.push_back(std::shared_ptr<PageWrapper>(new PageWrapper(m_ctx, fz_load_page(*c, *d, static_cast<int>(get_page_count() - 1))))); 
+	m_pages.push_back(std::shared_ptr<PageWrapper>(new PageWrapper(m_ctx, fz_load_page(*c, *d, page_num))));
 
 	// TODO in the future we need to do this dynamically since pages can be moved around
 	sort_page_positions();
+
+	DisplaylistChangeInfo info;
+	info.page_info.push_back({ DisplaylistChangeInfo::CHANGE_TYPE::ADDITION, page_num, -1}); 
+
+	SendMessage(static_cast<HWND>(SessionVariables::WINDOW_HANDLE), WM_CUSTOM_MESSAGE,
+		(WPARAM)(&info), CUSTOM_WM_MESSAGE::PDF_HANDLER_PAGE_CHANGE);
+
+	SessionVariables::PDF_UNSAVED_CHANGES = true;
+	if (*(SessionVariables::WINDOW_TITLE.end() - 1) != '*') {
+		SessionVariables::WINDOW_TITLE += L"*";
+	}
+
+	Logger::log("Added new page in ", t);
 }
 
 Math::Rectangle<float> MuPDFHandler::PDF::get_page_size(size_t page, float dpi) { 

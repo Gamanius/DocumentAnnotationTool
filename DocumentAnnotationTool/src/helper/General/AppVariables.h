@@ -14,6 +14,8 @@ namespace SessionVariables {
 	inline size_t PENSELECTION_SELECTED_PEN = 0; 
 
 	inline bool PDF_UNSAVED_CHANGES = false;
+
+	inline void*  WINDOW_HANDLE = nullptr; // of type HWND
 }
 
 namespace AppVariables {
@@ -40,6 +42,7 @@ namespace AppVariables {
 
 	inline float CONRTOLS_MOUSE_ZOOM_SCALE              = 1.25f;
 	inline int   CONTROLS_ARROWS_OFFSET                 = 50;
+	inline int   CONTROLS_TOUCH_TAP_MIN_PIXEL_DISTANCE  = 5;
 
 	void load();
 	void save();

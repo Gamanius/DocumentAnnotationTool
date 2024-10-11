@@ -72,7 +72,7 @@ void check_updates() {
 	const std::wstring url = L"https://api.github.com/repos/Gamanius/DocumentAnnotationTool/releases/latest";
 	HINTERNET hConnect = InternetOpenUrl(hInternet, url.c_str(), NULL, 0, INTERNET_FLAG_RELOAD, 0); 
 	if (hConnect == 0) {
-		Logger::error("Failed to check for updates:", " with Windows Error: \"", get_win_msg());
+		Logger::error("Failed to check for updates with Windows Error: \"", get_win_msg(), "\"");
 		return;
 	}
 

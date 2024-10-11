@@ -17,6 +17,9 @@ inline std::wstring get_win_msg() {
 	LPWSTR buffer = nullptr;
 	FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
 		NULL, error, LANG_SYSTEM_DEFAULT, (LPWSTR)&buffer, 0, NULL);
+	if (buffer == nullptr) {
+		return std::to_wstring(error);
+	}
 	std::wstring msg = buffer;
 	LocalFree(buffer); // Free the buffer.
 	// remove newline and carriage return

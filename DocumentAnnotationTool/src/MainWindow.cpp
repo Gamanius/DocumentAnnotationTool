@@ -106,6 +106,9 @@ void callback_draw(WindowHandler::DRAW_EVENT event, void* data) {
 	// draw ui elements
 	g_main_renderer->set_identity_transform_active();
 
+	if (g_template_pdfs.empty() == false) {
+		g_ui_handler->draw_new_page_button(); 
+	}
 	g_ui_handler->draw_pen_selection();
 	g_ui_handler->draw_caption(toolbar_last_draw);
 
@@ -164,6 +167,11 @@ void custom_msg(CUSTOM_WM_MESSAGE msg, void* data) {
 		// The data is in this case a size_t* 
 		g_pdfrenderhandler->update_annotations(*static_cast<size_t*>(data));
 		g_main_window->invalidate_drawing_area();
+		return;
+	}
+	case PDF_HANDLER_PAGE_CHANGE:
+	{
+		g_pdfrenderhandler->update_displaylist(static_cast<MuPDFHandler::DisplaylistChangeInfo*>(data));
 		return;
 	}
 	}
@@ -258,7 +266,6 @@ void callback_key_down(WindowHandler::VK key) {
 	case VK::F5:
 	{
 		g_pdfrenderhandler->clear_render_cache();
-		g_pdfrenderhandler->update_annotations(0);
 		g_main_window->invalidate_drawing_area();
 		break;
 	}
@@ -310,15 +317,16 @@ void callback_pointer_down(WindowHandler::PointerInfo p) {
 	//if (p.type == WindowHandler::POINTER_TYPE::MOUSE and p.button3pressed) {
 	//	g_gesturehandler.start_select_page(p);
 	//}
+	using UI_HIT = UIHandler::UI_HIT;
 	auto ui_hit = g_ui_handler->check_ui_hit(p.pos);
 	switch (ui_hit.type) {
-	case UIHandler::UI_HIT::PEN_SELECTION:
+	case UI_HIT::PEN_SELECTION:
 	{
 		SessionVariables::PENSELECTION_SELECTED_PEN = ui_hit.data; 
 		g_main_window->invalidate_drawing_area(); 
 		return;
 	}
-	case UIHandler::UI_HIT::SAVE_BUTTON:
+	case UI_HIT::SAVE_BUTTON:
 	{
 		if ((p.type == WindowHandler::POINTER_TYPE::MOUSE  and p.button2pressed)
 		 or (p.type == WindowHandler::POINTER_TYPE::STYLUS and p.button1pressed)) {
@@ -329,6 +337,7 @@ void callback_pointer_down(WindowHandler::PointerInfo p) {
 		}
 		return;
 	}
+
 	default:
 		break;
 	}
@@ -359,7 +368,6 @@ void callback_pointer_update(WindowHandler::PointerInfo p) {
 		return;
 	}
 
-
 	if (p.type == WindowHandler::POINTER_TYPE::TOUCH) {
 		g_gesturehandler.update_gesture(p);
 		g_main_window->invalidate_drawing_area();
@@ -379,6 +387,20 @@ void callback_pointer_update(WindowHandler::PointerInfo p) {
 }
 
 void callback_pointer_up(WindowHandler::PointerInfo p) {
+	using UI_HIT = UIHandler::UI_HIT;
+	auto ui_hit = g_ui_handler->check_ui_hit(p.pos);
+	switch (ui_hit.type) {
+	case UI_HIT::NEW_PAGE:
+	{
+		if (g_gesturehandler.is_moving() or g_template_pdfs.empty()) {
+			break;
+		}
+		g_pdf->add_page(g_template_pdfs[0]); 
+		g_pdfrenderhandler->clear_render_cache(); 
+		g_main_window->invalidate_drawing_area(); 
+	}
+	}
+
 	if (p.type == WindowHandler::POINTER_TYPE::TOUCH) {
 		g_gesturehandler.end_gesture(p);
 	}
@@ -491,6 +513,7 @@ void main_window_loop_run(HINSTANCE h, std::filesystem::path p) {
 	g_strokehandler = &strok_handler;
 
 	g_ui_handler->add_penhandler(&strok_handler.get_pen_handler()); 
+	g_ui_handler->add_pdf(g_pdf);  
 
 	auto pdf_handler = PDFRenderHandler(g_pdf, g_main_renderer.get(), g_main_window.get(), 2);
 	g_pdfrenderhandler = &pdf_handler;
@@ -513,10 +536,17 @@ void main_window_loop_run(HINSTANCE h, std::filesystem::path p) {
 	g_main_window->set_callback_key_down(callback_key_down);
 	g_main_window->set_callback_key_up(callback_key_up);
 
-	//g_pdf->add_page(g_template_pdfs[0]);
-
+	WINDOW_LOOP:
 	while(!g_main_window->close_request()) {
 		g_main_window->get_window_messages(true);
+	}
+
+	if (SessionVariables::PDF_UNSAVED_CHANGES) {
+		auto ans = MessageBox(NULL, L"Unsaved changes. Do you want to quit?", L"Unsaved changes", MB_ICONWARNING | MB_YESNO); 
+		if (ans == IDNO) { 
+			g_main_window->rest_close_request() ;
+			goto WINDOW_LOOP;
+		}
 	}
 
 	Logger::log(L"Got close request. Cleaning up...");

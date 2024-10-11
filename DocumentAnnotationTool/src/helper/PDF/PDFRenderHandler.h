@@ -38,6 +38,7 @@ public:
 			PREVIEW,
 			ANNOTATION,
 			RELOAD_ANNOTATIONS,
+			RELOAD_DISPLAY_LIST,
 			UNKNOWN
 		};
 
@@ -132,9 +133,9 @@ private:
 	std::shared_ptr<ThreadSafeDeque<CachedBitmap>> m_annotation_bitmaps_old = nullptr;
 
 	void create_display_list();
+	void create_display_list(size_t page);
 
 	void create_render_job(RenderInstructions r);
-
 
 	std::vector<PDFRenderHandler::RenderInfo> get_pdf_overlap(RenderInfo::JOB_TYPE type, std::vector<size_t>& cached_bitmap_index, std::optional<float> dpi_check, float dpi_margin = 0.0f, size_t limit = 0);
 	std::vector<size_t> get_page_overlap();
@@ -215,6 +216,7 @@ public:
 	void clear_render_cache();
 	void clear_annotation_cache();
 	void update_annotations(size_t page);
+	void update_displaylist(const MuPDFHandler::DisplaylistChangeInfo* info);
 	float get_display_list_progress();
 
 };

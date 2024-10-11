@@ -70,6 +70,7 @@ void AppVariables::load() {
 		
 		JSON_LOAD(j, CONRTOLS_MOUSE_ZOOM_SCALE);
 		JSON_LOAD(j, CONTROLS_ARROWS_OFFSET);
+		JSON_LOAD(j, CONTROLS_TOUCH_TAP_MIN_PIXEL_DISTANCE);
 	}
 	catch (json::exception& e) { 
 		Logger::error("Could not parse settings file: ", e.what()); 
@@ -103,6 +104,7 @@ void AppVariables::save() {
 
     JSON_SAVE(j, CONRTOLS_MOUSE_ZOOM_SCALE);
     JSON_SAVE(j, CONTROLS_ARROWS_OFFSET);
+    JSON_SAVE(j, CONTROLS_TOUCH_TAP_MIN_PIXEL_DISTANCE);
 
 	FileHandler::File f;
 	std::string data = j.dump(4);

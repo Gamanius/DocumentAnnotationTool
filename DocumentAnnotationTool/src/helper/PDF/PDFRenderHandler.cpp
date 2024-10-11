@@ -182,6 +182,67 @@ void PDFRenderHandler::create_display_list() {
 	Logger::log(L"Finished Displaylist in ", time);
 }
 
+void PDFRenderHandler::create_display_list(size_t page) {
+	// for each rec create a display list
+	fz_display_list* list_annot = nullptr;
+	fz_display_list* list_widget = nullptr;
+	fz_display_list* list_content = nullptr;
+	fz_device* dev_annot = nullptr;
+	fz_device* dev_widget = nullptr;
+	fz_device* dev_content = nullptr;
+
+	auto display_list = m_display_list->get_write();
+
+	// get the page that will be rendered
+	auto doc = m_pdf->get_document();
+	auto ctx = m_pdf->get_context();
+	// we have to do a fz call since we want to use the ctx.
+	// we can't use any other calls (like m_pdf->get_page()) since we would need to create a ctx
+	// wrapper which would be overkill for this scenario.
+	auto p = fz_load_page(*ctx, *doc, static_cast<int>(page)); 
+	fz_try(*ctx) {
+		// create a display list with all the draw calls and so on
+		list_annot = fz_new_display_list(*ctx, fz_bound_page(*ctx, p)); 
+		list_widget = fz_new_display_list(*ctx, fz_bound_page(*ctx, p)); 
+		list_content = fz_new_display_list(*ctx, fz_bound_page(*ctx, p)); 
+
+		dev_annot = fz_new_list_device(*ctx, list_annot);
+		dev_widget = fz_new_list_device(*ctx, list_widget);
+		dev_content = fz_new_list_device(*ctx, list_content);
+
+		// run all three devices
+		fz_run_page_annots(*ctx, p, dev_annot, fz_identity, nullptr);
+		fz_run_page_widgets(*ctx, p, dev_widget, fz_identity, nullptr);
+		fz_run_page_contents(*ctx, p, dev_content, fz_identity, nullptr);
+
+		// add list to array
+		DisplayListContent c;
+		c.m_page_annots = std::shared_ptr<DisplayListWrapper>(new DisplayListWrapper(m_pdf->get_context_wrapper(), list_annot));
+		c.m_page_widgets = std::shared_ptr<DisplayListWrapper>(new DisplayListWrapper(m_pdf->get_context_wrapper(), list_widget));
+		c.m_page_content = std::shared_ptr<DisplayListWrapper>(new DisplayListWrapper(m_pdf->get_context_wrapper(), list_content));
+
+		if (display_list->begin() + page == display_list->end()) {
+			display_list->push_back(c); 
+		}
+		else {
+			display_list->insert(display_list->begin() + page, c); 
+		}
+	} fz_always(*ctx) {
+		// flush the device
+		fz_close_device(*ctx, dev_annot);
+		fz_close_device(*ctx, dev_widget);
+		fz_close_device(*ctx, dev_content);
+		fz_drop_device(*ctx, dev_annot);
+		fz_drop_device(*ctx, dev_widget);
+		fz_drop_device(*ctx, dev_content);
+	} fz_catch(*ctx) {
+		ASSERT(false, "Could not create display list");
+	}
+	// always drop page at the end
+	fz_drop_page(*ctx, p);
+
+}
+
 PDFRenderHandler::PDFRenderHandler(MuPDFHandler::PDF* const pdf, Direct2DRenderer* const renderer, WindowHandler* const window, size_t amount_threads) : m_pdf(pdf), m_renderer(renderer), m_window(window) {
 	// --- Render queue ---
 	m_render_queue = std::shared_ptr<ThreadSafeDeque<std::shared_ptr<RenderInfo>>>
@@ -603,6 +664,7 @@ void PDFRenderHandler::async_render() {
 
 			// get the first item that need rendering
 			for (size_t i = 0; i < queue->size(); i++) {
+				// --- Here we can check what item is in the queue and only look at the ones that need to be processed ---
 				if (queue->at(i)->job == RenderInfo::JOB_TYPE::RELOAD_ANNOTATIONS) {
 					// check if this thread already reloaded the annotations
 					bool already_reloaded = false;
@@ -626,6 +688,36 @@ void PDFRenderHandler::async_render() {
 					// at the end add the id to the render queue
 					queue->at(i)->thread_ids.push_back(std::this_thread::get_id());
 				} 
+				else if (queue->at(i)->job == RenderInfo::JOB_TYPE::RELOAD_DISPLAY_LIST) {
+					// check if this thread already reloaded the annotations
+					bool already_reloaded = false; 
+					for (size_t j = 0; j < queue->at(i)->thread_ids.size(); j++) {
+						if (queue->at(i)->thread_ids.at(j) == std::this_thread::get_id()) {
+							already_reloaded = true;
+							break;
+						}
+					}
+					if (already_reloaded)
+						continue;
+
+					auto list_array = m_display_list->get_read();
+					// reload the entire array
+					for (size_t j = 0; j < cloned_lists.size(); j++) {
+						delete_list(cloned_lists.at(j).content);
+						delete_list(cloned_lists.at(j).annots);
+						delete_list(cloned_lists.at(j).widgets);
+					}
+
+					cloned_lists.clear();
+					cloned_lists.reserve(list_array->size());
+
+					for (size_t j = 0; j < list_array->size(); j++) {
+						cloned_lists.push_back({ copy_list(*(list_array->at(j).m_page_content.get()->get_item())),  
+												 copy_list(*(list_array->at(j).m_page_annots. get()->get_item())),  
+												 copy_list(*(list_array->at(j).m_page_widgets.get()->get_item())) }); 
+					}
+					
+				}
 				else if (queue->at(i)->stat == RenderInfo::STATUS::WAITING) {
 					info = queue->at(i);
 					info->stat = RenderInfo::STATUS::IN_PROGRESS;
@@ -961,6 +1053,26 @@ void PDFRenderHandler::update_annotations(size_t page) {
 	queue->push_back(std::make_shared<RenderInfo>(std::move(info))); 
 	m_render_queue_condition_var.notify_all(); 
 	clear_annotation_cache();
+}
+
+void PDFRenderHandler::update_displaylist(const MuPDFHandler::DisplaylistChangeInfo* info) {
+	using CHANGE_TYPE = MuPDFHandler::DisplaylistChangeInfo::CHANGE_TYPE;
+	for (const auto& page : info->page_info) {
+		switch (page.type) {
+		case CHANGE_TYPE::ADDITION:
+		{
+			create_display_list(page.page1);
+
+			auto queue = m_render_queue->get_write();
+			RenderInfo info; 
+			info.job = RenderInfo::JOB_TYPE::RELOAD_DISPLAY_LIST;  
+			info.page = page.page1; 
+			queue->push_back(std::make_shared<RenderInfo>(std::move(info)));
+			 
+			m_render_queue_condition_var.notify_all(); 
+		}
+		}
+	}
 }
 
 unsigned long long PDFRenderHandler::get_cache_memory_usage(std::shared_ptr<ThreadSafeDeque<CachedBitmap>> target) const {

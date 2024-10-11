@@ -25,3 +25,10 @@ using ThreadSafeVector = ReadWriteThreadSafeClass<std::vector<T>>;
 
 template <typename T>
 using ThreadSafeDeque = ReadWriteThreadSafeClass<std::deque<T>>;
+
+#define WM_CUSTOM_MESSAGE (WM_APP + 0x0BAD + 1) 
+enum CUSTOM_WM_MESSAGE {
+	PDF_HANDLER_DISPLAY_LIST_UPDATE,
+	PDF_HANDLER_ANNOTAION_CHANGE,
+	PDF_HANDLER_PAGE_CHANGE
+};

@@ -157,10 +157,21 @@ void Direct2DRenderer::draw_path(PathObject& obj, Renderer::AlphaColor c, float 
 	end_draw();
 }
 
-void Direct2DRenderer::draw_rect(Math::Rectangle<float> rec, BrushObject& brush, float thicc) {
+void Direct2DRenderer::draw_rect(Math::Rectangle<float> rec, BrushObject& brush, float thick, std::vector<float> dashes) {
 	begin_draw();
-	m_renderTarget->DrawRectangle(rec, brush.m_object, thicc);
+
+	if (dashes.empty()) {
+		m_renderTarget->DrawRectangle(rec, brush.m_object, thick);
+	}
+	else {
+		auto style = create_stroke_style(dashes); 
+		m_renderTarget->DrawRectangle(rec, brush.m_object, thick, style);  
+	}
 	end_draw();
+}
+
+void Direct2DRenderer::draw_rect(Math::Rectangle<float> rec, BrushObject& brush, float thicc) {
+	draw_rect(rec, brush, thicc, {});
 }
 
 void Direct2DRenderer::draw_rect(Math::Rectangle<float> rec, BrushObject& brush) {
@@ -187,6 +198,11 @@ void Direct2DRenderer::draw_circle_filled(Math::Point<float> center, float radiu
 	begin_draw();
 	m_renderTarget->FillEllipse({ center, radius, radius }, brush.m_object); 
 	end_draw();
+}
+
+void Direct2DRenderer::draw_rect(Math::Rectangle<float> rec, Renderer::Color c, float thick, std::vector<float> dashes) {
+	auto temp_brush = create_brush(c);
+	draw_rect(rec, temp_brush, thick, dashes);
 }
 
 void Direct2DRenderer::draw_rect(Math::Rectangle<float> rec, Renderer::Color c, float thick) {
@@ -364,6 +380,24 @@ Direct2DRenderer::BrushObject Direct2DRenderer::create_brush(Renderer::Color c) 
 	obj.m_object = brush;
 
 	return std::move(obj);
+}
+
+Direct2DRenderer::StrokeStyle Direct2DRenderer::create_stroke_style(std::vector<float> dashes) {
+	StrokeStyle obj;
+	ID2D1StrokeStyle* style = nullptr;
+
+	auto props = D2D1::StrokeStyleProperties(
+		D2D1_CAP_STYLE_FLAT,
+		D2D1_CAP_STYLE_FLAT,
+		D2D1_CAP_STYLE_ROUND,
+		D2D1_LINE_JOIN_ROUND,
+		10.0f,
+		D2D1_DASH_STYLE_CUSTOM,
+		0.0f);
+	m_factory->CreateStrokeStyle(props, dashes.data(), static_cast<UINT32>(dashes.size()), &style);
+	obj.m_object = style; 
+
+	return std::move(obj); 
 }
 
 Direct2DRenderer::BrushObject Direct2DRenderer::create_brush(Renderer::AlphaColor c) {

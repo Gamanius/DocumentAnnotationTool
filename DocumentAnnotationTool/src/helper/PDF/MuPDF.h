@@ -75,6 +75,22 @@ class MuPDFHandler {
 	static void error_callback(void* user, const char* message);
 	static void warning_callback(void* user, const char* message);
 public:
+	struct DisplaylistChangeInfo {
+		enum CHANGE_TYPE {
+			SWITCH,
+			ADDITION,
+			REMOVAL,
+			UNKNOWN
+		};
+
+		struct DisplaylistChangeType {
+			CHANGE_TYPE type = CHANGE_TYPE::UNKNOWN;
+			int page1 = 0;
+			int page2 = 0;
+		};
+
+		std::vector<DisplaylistChangeType> page_info;
+	};
 
 	struct PDF : public FileHandler::File {
 	private:

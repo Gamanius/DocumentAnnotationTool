@@ -31,6 +31,8 @@ class GestureHandler {
 
 	std::optional<std::pair<size_t, Math::Point<float>>> m_selected_page = std::nullopt;
 
+	bool m_moved = false;
+
 	void process_one_finger(GestureFinger& finger);
 	void process_two_finger(GestureFinger& finger1, GestureFinger& finger2);
 
@@ -58,6 +60,12 @@ public:
 
 	byte amount_finger_active() const;
 	bool is_gesture_active() const;
+	/// <summary>
+	/// This function will return true if the distance between the initial position and the last position is to be considered a movement
+	/// If more than one fingr is active this will always return true
+	/// </summary>
+	/// <returns></returns>
+	bool is_moving() const;
 	void check_bounds();
 };
 

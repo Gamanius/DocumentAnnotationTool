@@ -10,18 +10,12 @@
 /// Custom WM_APP message to signal that the bitmap is ready to be drawn
 #define WM_PDF_BITMAP_READ (WM_APP + 0x0BAD /*Magic number (rolled by fair dice)*/)
 #define WM_PDF_BITMAP_READY (WM_APP + 0x0BAD + 2)
-#define WM_CUSTOM_MESSAGE (WM_APP + 0x0BAD + 1)
 
 #ifndef _WINDOW_HANDLER_H_
 #define _WINDOW_HANDLER_H_
 
 struct CachedBitmap;
 class CaptionHandler;
-
-enum CUSTOM_WM_MESSAGE {
-	PDF_HANDLER_DISPLAY_LIST_UPDATE,
-	PDF_HANDLER_ANNOTAION_CHANGE
-};
 
 class WindowHandler {
 	HWND m_hwnd = NULL;
@@ -302,6 +296,7 @@ public:
 	/// </summary>
 	/// <returns>true if there has been a close request</returns>
 	bool close_request() const;
+	void rest_close_request();
 	void send_close_request();
 
 	static bool is_key_pressed(VK key);

@@ -754,6 +754,10 @@ bool WindowHandler::close_request() const {
 	return m_closeRequest;
 }
 
+void WindowHandler::rest_close_request() {
+	m_closeRequest = false;
+}
+
 void WindowHandler::send_close_request() {
 	SendMessage(m_hwnd, WM_CLOSE, 0, 0);
 }
@@ -852,6 +856,7 @@ bool WindowHandler::init(std::wstring windowName, HINSTANCE instance) {
 
 	m_hwnd = CreateWindowEx(WS_EX_OVERLAPPEDWINDOW, wc.lpszClassName, windowName.c_str(), WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, 0, 0, instance, this); 
 	ASSERT_WIN_RETURN_FALSE(m_hwnd, "Window creation was not succefull");
+	SessionVariables::WINDOW_HANDLE = m_hwnd;  
 
 	m_hdc = GetDC(m_hwnd);
 	ASSERT_WIN_RETURN_FALSE(m_hwnd, "Could not retrieve device m_context");

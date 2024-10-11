@@ -1,6 +1,14 @@
 #include "GestureHandler.h"
 #include "cmath"
 
+bool GestureHandler::is_moving() const {
+	if (amount_finger_active() > 1) {
+		return true;
+	}
+
+	return m_moved;
+}
+
 void GestureHandler::check_bounds() {
 	auto bounds     = m_pdf->get_bounds(); 
 	auto clip_space = m_renderer->inv_transform_rect(m_renderer->get_window_size_normalized());
@@ -43,8 +51,13 @@ void GestureHandler::check_bounds() {
 
 void GestureHandler::process_one_finger(GestureFinger& finger) {
 	auto scale = m_renderer->get_transform_scale();
-	Math::Point<float> new_pos = (1 / scale) * (finger.last_position - finger.initial_position);
+	auto offst = finger.last_position - finger.initial_position;
+	Math::Point<float> new_pos = (1 / scale) * offst;
 	m_renderer->set_transform_matrix(new_pos + m_initial_offset);
+
+	if (offst.distance() > AppVariables::CONTROLS_TOUCH_TAP_MIN_PIXEL_DISTANCE) {
+		m_moved = true;
+	}
 }
 
 void GestureHandler::process_two_finger(GestureFinger& firstfinger, GestureFinger& secondfinger) {
@@ -93,13 +106,11 @@ GestureHandler& GestureHandler::operator=(GestureHandler&& a) noexcept {
 }
 
 void GestureHandler::start_gesture(const WindowHandler::PointerInfo& p) {
-	size_t just_active = 0;
 	for (size_t i = 0; i < m_gesturefinger.size(); i++) {
 		if (m_gesturefinger.at(i).active) {
 			continue;
 		}
 
-		just_active = i;
 		m_gesturefinger.at(i).active = true;
 		m_gesturefinger.at(i).id = p.id; 
 		m_gesturefinger.at(i).initial_position = p.pos;
@@ -111,11 +122,13 @@ void GestureHandler::start_gesture(const WindowHandler::PointerInfo& p) {
 	switch (amount_finger) {
 	case 1: 
 	{
+		m_moved = false;
 		m_initial_offset = m_renderer->get_transform_pos();// - m_renderer->inv_transform_point({ 0, 0 });
 		return;
 	};
 	case 2:
 	{
+		m_moved = true;
 		m_initial_offset = m_renderer->get_transform_pos();
 		m_initialScaleMatrix = m_renderer->get_scale_matrix();
 		

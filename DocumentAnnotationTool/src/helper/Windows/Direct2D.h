@@ -68,9 +68,14 @@ public:
 		~RenderObject() {
 			SafeRelease(m_object);
 		}
+
+		operator T*() const {
+			return m_object;
+		}
 	};
 
 	typedef RenderObject<ID2D1SolidColorBrush> BrushObject;
+	typedef RenderObject<ID2D1StrokeStyle> StrokeStyle;
 	typedef RenderObject<ID2D1Bitmap> BitmapObject;
 	typedef RenderObject<IDWriteTextFormat> TextFormatObject;
 	typedef RenderObject<ID2D1PathGeometry> PathObject;
@@ -103,6 +108,7 @@ public:
 	void draw_path(PathObject& obj, Renderer::Color c, float thick);
 	void draw_path(PathObject& obj, Renderer::AlphaColor c, float thick);
 
+	void draw_rect(Math::Rectangle<float> rec, BrushObject& brush, float thick, std::vector<float> dashes);
 	void draw_rect(Math::Rectangle<float> rec, BrushObject& brush, float thick);
 	void draw_rect(Math::Rectangle<float> rec, BrushObject& brush);
 	void draw_rect_filled(Math::Rectangle<float> rec, BrushObject& brush);
@@ -112,6 +118,7 @@ public:
 	void draw_circle_filled(Math::Point<float> center, float radius, BrushObject& brush);
 
 	// draw calls that create the brushobjects. Is slower than the rest i guess?
+	void draw_rect(Math::Rectangle<float> rec, Renderer::Color c, float thick, std::vector<float> dashes); 
 	void draw_rect(Math::Rectangle<float> rec, Renderer::Color c, float thick);
 	void draw_rect(Math::Rectangle<float> rec, Renderer::Color c);
 	void draw_rect_filled(Math::Rectangle<float> rec, Renderer::Color c);
@@ -220,6 +227,7 @@ public:
 	TextFormatObject create_text_format(std::wstring font, float size);
 	BrushObject create_brush(Renderer::Color c);
 	BrushObject create_brush(Renderer::AlphaColor c);
+	StrokeStyle create_stroke_style(std::vector<float> dashes);
 	BitmapObject create_bitmap(const std::wstring& path);
 	BitmapObject create_bitmap(const byte* const data, Math::Rectangle<unsigned int> size, unsigned int stride, float dpi);
 	PathObject create_bezier_path(const Renderer::CubicBezierGeometry& cub);
