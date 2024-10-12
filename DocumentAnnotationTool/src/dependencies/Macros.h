@@ -1,2 +1,2 @@
 #define APPLICATION_NAME L"Docanto"
-#define APPLICATION_VERSION "v2"
+#define APPLICATION_VERSION "v3"

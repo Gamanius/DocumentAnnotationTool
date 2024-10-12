@@ -150,8 +150,14 @@ void custom_msg(CUSTOM_WM_MESSAGE msg, void* data) {
 	{
 		auto progress = g_pdfrenderhandler->get_display_list_progress();
 		if (FLOAT_EQUAL(progress, 1)) {
-			g_main_window->set_window_title(SessionVariables::FILE_PATH.filename());
-			SessionVariables::WINDOW_TITLE = SessionVariables::FILE_PATH.filename();
+			if (SessionVariables::FILE_PATH.empty()) {
+				SessionVariables::WINDOW_TITLE = L"New PDF";
+				g_main_window->set_window_title(L"New PDF");
+			}
+			else {
+				g_main_window->set_window_title(SessionVariables::FILE_PATH.filename());
+				SessionVariables::WINDOW_TITLE = SessionVariables::FILE_PATH.filename();
+			}
 
 		}
 		else {
@@ -191,7 +197,7 @@ void callback_key_down(WindowHandler::VK key) {
 		if (not WindowHandler::is_key_pressed(VK::LEFT_CONTROL)) { 
 			break;
 		}
-		if (WindowHandler::is_key_pressed(VK::LEFT_SHIFT)) {
+		if (WindowHandler::is_key_pressed(VK::LEFT_SHIFT) or SessionVariables::FILE_PATH.empty()) {
 			save_dialoge();
 		}
 		else {
@@ -329,7 +335,8 @@ void callback_pointer_down(WindowHandler::PointerInfo p) {
 	case UI_HIT::SAVE_BUTTON:
 	{
 		if ((p.type == WindowHandler::POINTER_TYPE::MOUSE  and p.button2pressed)
-		 or (p.type == WindowHandler::POINTER_TYPE::STYLUS and p.button1pressed)) {
+		 or (p.type == WindowHandler::POINTER_TYPE::STYLUS and p.button1pressed)
+		 or  SessionVariables::FILE_PATH.empty()) {
 			save_dialoge();
 		}
 		else {
@@ -428,20 +435,21 @@ void callback_mousewheel(short delta, bool hwheel, Math::Point<int> center) {
 	g_main_window->invalidate_drawing_area();
 }
 
-void load_template_pdfs() {
+std::filesystem::path load_template_pdfs() {
 	auto path = FileHandler::get_appdata_path() / AppVariables::PDF_TEMPLATE_FOLDER_NAME;
+	std::filesystem::path first_file;
 
 	if (std::filesystem::exists(path) == false) {
 		Logger::log("No template folder found. Creating one...");
 		std::filesystem::create_directory(path);
-		return;
+		return first_file;
 	}
 
     for (const auto& entry : std::filesystem::directory_iterator(path)) { 
 		if (entry.is_regular_file() == false or entry.path().extension() != ".pdf") {
 			continue;
 		}
-
+		first_file = entry.path(); 
         // Load the PDF file here
         std::wstring pdf_path = entry.path().wstring();
         // Call the function to load the PDF file
@@ -452,6 +460,8 @@ void load_template_pdfs() {
 
 		g_template_pdfs.push_back(std::move(pdf.value())); 
     }
+
+	return first_file;
 }
 
 void main_window_loop_run(HINSTANCE h, std::filesystem::path p) {
@@ -476,16 +486,23 @@ void main_window_loop_run(HINSTANCE h, std::filesystem::path p) {
 
 	g_mupdfcontext = std::shared_ptr<MuPDFHandler>(new MuPDFHandler); 
 
-	load_template_pdfs();
+	auto alternate_path = load_template_pdfs(); 
 
 	if (p.empty()) {
 	INVALID_PATH:
 		update_caption(L"Choosing .pdf");
 		auto op_path = FileHandler::open_file_dialog(L"PDF\0*.pdf\0\0", *g_main_window); 
-		if (!op_path.has_value()) {
+		if (op_path.has_value()) {
+			p = op_path.value();
+
+			SessionVariables::FILE_PATH = p;
+		}
+		else if (!alternate_path.empty()) {
+			p = alternate_path; 
+		}
+		else {
 			return;
 		}
-		p = op_path.value();
 	}
 
 	Logger::log(L"Trying to open ", p);
@@ -495,7 +512,6 @@ void main_window_loop_run(HINSTANCE h, std::filesystem::path p) {
 	if (!pdf.has_value()) {
 		goto INVALID_PATH;
 	}
-	SessionVariables::FILE_PATH = p; 
 
 	g_pdf = &pdf.value(); 
 	{
