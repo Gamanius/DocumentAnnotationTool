@@ -504,6 +504,9 @@ void main_window_loop_run(HINSTANCE h, std::filesystem::path p) {
 			return;
 		}
 	}
+	else {
+		SessionVariables::FILE_PATH = p;
+	}
 
 	Logger::log(L"Trying to open ", p);
 	update_caption(L"Opening " + p.filename().wstring());
