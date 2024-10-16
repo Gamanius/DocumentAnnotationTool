@@ -256,6 +256,7 @@ namespace Logger {
 			};
 
 		replaceAll(info_string, info_color);
+		replaceAll(success_string, success_color);
 		replaceAll(warning_string, warning_color);
 		replaceAll(error_string, error_color);
 	}
@@ -288,9 +289,24 @@ namespace Logger {
 		}
 	}
 
+	inline void write_to_console(std::wstringstream& s = process_msg_stream) {
+		// Add color
+		auto temp_handle = GetStdHandle(STD_OUTPUT_HANDLE);
+		if (!temp_handle) {
+			return;
+		}
+		std::wstring temp = s.str(); 
+		add_color_to_string(temp); 
+		WriteConsole(temp_handle, temp.c_str(), (DWORD)(temp.size()), NULL, NULL);
+	}
+
 	inline void print_intermediate_stream(std::wstringstream& s) {
 		write_to_handle(false, io_handle, s);
+		write_to_console(s);
+	#ifdef _DEBUG
 		write_to_debug(false, s);
+	#endif // _DEBUG
+
 	}
 
 	template<typename T, typename... Targ>

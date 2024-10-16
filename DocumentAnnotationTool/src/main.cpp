@@ -160,6 +160,9 @@ void init() {
 	// this is used for memory leak detection
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 
+	AttachConsole(ATTACH_PARENT_PROCESS);
+	Logger::unformated_log("---=== Starting Logging ===---");
+
 	SetUnhandledExceptionFilter(Win32ExceptionFilter);
 
 	// load in all settings
@@ -170,7 +173,7 @@ void init() {
 	remove_oldest_log_file();
 
 	Logger::set_handle(create_log_file());
-	Logger::unformated_log("---=== Starting Logging ===---");
+	Logger::write_to_handle();	
 
 	// check for updates
 	check_updates();
@@ -191,5 +194,8 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 	main_window_loop_run(hInstance, p);
 	
 	Logger::log("End of program");
+
+	// free any possible console that might be attached to it
+	auto b = FreeConsole();
 	return 0;
 }

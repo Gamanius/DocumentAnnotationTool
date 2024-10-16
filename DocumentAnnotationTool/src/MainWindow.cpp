@@ -202,6 +202,7 @@ void callback_key_down(WindowHandler::VK key) {
 		}
 		else {
 			g_pdf->save_pdf(SessionVariables::FILE_PATH);
+			Logger::success("Saved PDF to ", SessionVariables::FILE_PATH);
 		}
 		break;
 	}
@@ -248,6 +249,7 @@ void callback_key_down(WindowHandler::VK key) {
 	case VK::F1:
 	{
 		// opens the roaming folder
+		Logger::log("Opening appdata folder");
 		ShellExecute(NULL, L"open", L"explorer.exe", FileHandler::get_appdata_path().c_str(), NULL, SW_SHOWDEFAULT);
 		break;
 	}
