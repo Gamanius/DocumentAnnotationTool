@@ -21,32 +21,32 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{c8f1521f-63a0-4c7c-bcdb-407ef7671c72}</ProjectGuid>
-    <RootNamespace>DocumentAnnotationTool</RootNamespace>
+    <ProjectGuid>{cde48180-cc4e-4d0b-a38f-1fe84d894560}</ProjectGuid>
+    <RootNamespace>DocantoLib</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
+    <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
+    <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
+    <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
+    <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
@@ -71,24 +71,24 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <IntDir>$(SolutionDir)out\$(Configuration)</IntDir>
     <TargetName>$(PlatformShortName)$(ProjectName)</TargetName>
-    <IntDir>$(SolutionDir)int\$(ProjectName)\$(Configuration)\$(Platform)\</IntDir>
-    <OutDir>$(IntDir)executable\</OutDir>
+    <OutDir>$(SolutionDir)out\$(Configuration)</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <IntDir>$(SolutionDir)out\$(Configuration)</IntDir>
+    <OutDir>$(SolutionDir)out\$(Configuration)</OutDir>
     <TargetName>$(PlatformShortName)$(ProjectName)</TargetName>
-    <IntDir>$(SolutionDir)int\$(ProjectName)\$(Configuration)\$(Platform)\</IntDir>
-    <OutDir>$(SolutionDir)release\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <IntDir>$(SolutionDir)out\$(Configuration)</IntDir>
     <TargetName>$(PlatformShortName)$(ProjectName)</TargetName>
-    <IntDir>$(SolutionDir)int\$(ProjectName)\$(Configuration)\$(Platform)\</IntDir>
-    <OutDir>$(IntDir)executable\</OutDir>
+    <OutDir>$(SolutionDir)out\$(Configuration)</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <IntDir>$(SolutionDir)out\$(Configuration)</IntDir>
+    <OutDir>$(SolutionDir)out\$(Configuration)</OutDir>
     <TargetName>$(PlatformShortName)$(ProjectName)</TargetName>
-    <IntDir>$(SolutionDir)int\$(ProjectName)\$(Configuration)\$(Platform)\</IntDir>
-    <OutDir>$(SolutionDir)release\</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -98,16 +98,15 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>$(SolutionDir)mupdf\include;$(ProjectDir)src\dependencies;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ScanSourceForModuleDependencies>true</ScanSourceForModuleDependencies>
     </ClCompile>
     <Link>
-      <SubSystem>Windows</SubSystem>
+      <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d2d1.lib;libmupdf.lib;dwrite.lib;Windowscodecs.lib;Dwmapi.lib;UxTheme.lib;wininet.lib;DbgHelp.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(SolutionDir)mupdf\platform\win32\x64\$(ConfigurationName);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
-    <Manifest>
-      <EnableDpiAwareness>false</EnableDpiAwareness>
-    </Manifest>
+    <Lib>
+      <AdditionalLibraryDirectories>$(SolutionDir)mupdf\platform\win32\x64\$(ConfigurationName);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -119,18 +118,17 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>$(SolutionDir)mupdf\include;$(ProjectDir)src\dependencies;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ScanSourceForModuleDependencies>true</ScanSourceForModuleDependencies>
     </ClCompile>
     <Link>
-      <SubSystem>Windows</SubSystem>
+      <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d2d1.lib;libmupdf.lib;dwrite.lib;Windowscodecs.lib;Dwmapi.lib;UxTheme.lib;wininet.lib;DbgHelp.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(SolutionDir)mupdf\platform\win32\x64\$(ConfigurationName);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
-    <Manifest>
-      <EnableDpiAwareness>false</EnableDpiAwareness>
-    </Manifest>
+    <Lib>
+      <AdditionalLibraryDirectories>$(SolutionDir)mupdf\platform\win32\x64\$(ConfigurationName);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -140,16 +138,15 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>$(SolutionDir)mupdf\include;$(ProjectDir)src\dependencies;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ScanSourceForModuleDependencies>true</ScanSourceForModuleDependencies>
     </ClCompile>
     <Link>
-      <SubSystem>Windows</SubSystem>
+      <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d2d1.lib;libmupdf.lib;dwrite.lib;Windowscodecs.lib;Dwmapi.lib;UxTheme.lib;wininet.lib;DbgHelp.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(SolutionDir)mupdf\platform\win32\x64\$(ConfigurationName);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
-    <Manifest>
-      <EnableDpiAwareness>false</EnableDpiAwareness>
-    </Manifest>
+    <Lib>
+      <AdditionalLibraryDirectories>$(SolutionDir)mupdf\platform\win32\x64\$(ConfigurationName);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -161,91 +158,21 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>$(SolutionDir)mupdf\include;$(ProjectDir)src\dependencies;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ScanSourceForModuleDependencies>true</ScanSourceForModuleDependencies>
     </ClCompile>
     <Link>
-      <SubSystem>Windows</SubSystem>
+      <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d2d1.lib;libmupdf.lib;dwrite.lib;Windowscodecs.lib;Dwmapi.lib;UxTheme.lib;wininet.lib;DbgHelp.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(SolutionDir)mupdf\platform\win32\x64\$(ConfigurationName);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
-    <Manifest>
-      <EnableDpiAwareness>false</EnableDpiAwareness>
-    </Manifest>
+    <Lib>
+      <AdditionalLibraryDirectories>$(SolutionDir)mupdf\platform\win32\x64\$(ConfigurationName);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="src\helper\General\AppVariables.cpp" />
-    <ClCompile Include="src\helper\PDF\PenHandler.cpp" />
-    <ClCompile Include="src\helper\Windows\Direct2D.cpp" />
-    <ClCompile Include="src\helper\General\FileHandler.cpp" />
-    <ClCompile Include="src\helper\PDF\GestureHandler.cpp" />
-    <ClCompile Include="src\helper\PDF\MuPDF.cpp" />
-    <ClCompile Include="src\helper\PDF\PDFRenderHandler.cpp" />
-    <ClCompile Include="src\helper\General\Timer.cpp" />
-    <ClCompile Include="src\helper\Windows\Renderer.cpp" />
-    <ClCompile Include="src\helper\Windows\Window.cpp" />
-    <ClCompile Include="src\helper\PDF\Wrapper.cpp" />
-    <ClCompile Include="src\main.cpp" />
-    <ClCompile Include="src\MainWindow.cpp" />
-    <ClCompile Include="src\helper\PDF\StrokeHandler.cpp" />
-    <ClCompile Include="src\helper\UI\UIHandler.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="src\dependencies\json.hpp" />
-    <ClInclude Include="src\helper\General\AppVariables.h" />
-    <ClInclude Include="src\helper\General\Renderer.h" />
-    <ClInclude Include="src\helper\PDF\PenHandler.h" />
-    <ClInclude Include="rsc\resource.h" />
-    <ClInclude Include="src\dependencies\Macros.h" />
-    <ClInclude Include="src\dependencies\MagicEnum.h" />
-    <ClInclude Include="src\dependencies\magic_enum\magic_enum.hpp" />
-    <ClInclude Include="src\dependencies\magic_enum\magic_enum_all.hpp" />
-    <ClInclude Include="src\dependencies\magic_enum\magic_enum_containers.hpp" />
-    <ClInclude Include="src\dependencies\magic_enum\magic_enum_flags.hpp" />
-    <ClInclude Include="src\dependencies\magic_enum\magic_enum_format.hpp" />
-    <ClInclude Include="src\dependencies\magic_enum\magic_enum_fuse.hpp" />
-    <ClInclude Include="src\dependencies\magic_enum\magic_enum_iostream.hpp" />
-    <ClInclude Include="src\dependencies\magic_enum\magic_enum_switch.hpp" />
-    <ClInclude Include="src\dependencies\magic_enum\magic_enum_utility.hpp" />
-    <ClInclude Include="src\dependencies\ThreadSafeClass.h" />
-    <ClInclude Include="src\helper\General\FileHandler.h" />
-    <ClInclude Include="src\helper\General\General.h" />
-    <ClInclude Include="src\helper\General\Logger.h" />
-    <ClInclude Include="src\helper\General\Math.h" />
-    <ClInclude Include="src\helper\General\Timer.h" />
-    <ClInclude Include="src\helper\include.h" />
-    <ClInclude Include="src\helper\PDF\GestureHandler.h" />
-    <ClInclude Include="src\helper\PDF\MuPDF.h" />
-    <ClInclude Include="src\helper\PDF\PDF.h" />
-    <ClInclude Include="src\helper\PDF\PDFRenderHandler.h" />
-    <ClInclude Include="src\helper\PDF\StrokeHandler.h" />
-    <ClInclude Include="src\helper\UI\UI.h" />
-    <ClInclude Include="src\helper\Windows\Direct2D.h" />
-    <ClInclude Include="src\dependencies\ReadWriteRecursiveMutex.h" />
-    <ClInclude Include="src\helper\Windows\WindowHandler.h" />
-    <ClInclude Include="src\MainWindow.h" />
-    <ClInclude Include="src\helper\UI\UIHandler.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="..\README.md" />
-    <None Include="rsc\pdf_tests\Annotation pdf.pdf" />
-    <None Include="rsc\pdf_tests\ENR6.3-9.slow.rendering.pdf" />
-    <None Include="rsc\pdf_tests\Ghent_PDF_Output_Suite_V50_Testpages\GhentPDFOutputSuite50_ReadMes.pdf" />
-    <None Include="rsc\pdf_tests\Ghent_PDF_Output_Suite_V50_Testpages\Ghent_PDF-Output-Test-V50_ALL_REFERENCE.pdf" />
-    <None Include="rsc\pdf_tests\Ghent_PDF_Output_Suite_V50_Testpages\Ghent_PDF-Output-Test-V50_ALL_X4.pdf" />
-    <None Include="rsc\pdf_tests\Ghent_PDF_Output_Suite_V50_Testpages\PR_Ghent-PDF-Output-Suite-5-Conformance-Certification.pdf" />
-    <None Include="rsc\pdf_tests\Physikpraktikum_1-4.pdf" />
-    <None Include="rsc\pdf_tests\second_measurement_red_sensor_HEAVY.pdf" />
-    <None Include="src\resource.aps" />
-    <None Include="TODO.md" />
-  </ItemGroup>
-  <ItemGroup>
-    <ResourceCompile Include="rsc\resource.rc" />
-  </ItemGroup>
-  <ItemGroup>
-    <Image Include="rsc\icon.ico" />
-    <Image Include="rsc\icon1.ico" />
+    <ClCompile Include="src\general\Logger.cpp" />
+    <ClCompile Include="src\general\Logger.ixx" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

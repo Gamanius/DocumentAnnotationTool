@@ -7,6 +7,13 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DocumentAnnotationTool", "D
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Test", "Test\Test.vcxproj", "{621BDE6E-11F2-40D0-92C1-8E41EA7E63BA}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DocantoLib", "DocantoLib\DocantoLib.vcxproj", "{CDE48180-CC4E-4D0B-A38F-1FE84D894560}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DocantoCLI", "DocantoCLI\DocantoCLI.vcxproj", "{7DA2223F-1071-474F-AF4E-89762F6AAB19}"
+	ProjectSection(ProjectDependencies) = postProject
+		{CDE48180-CC4E-4D0B-A38F-1FE84D894560} = {CDE48180-CC4E-4D0B-A38F-1FE84D894560}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -32,6 +39,22 @@ Global
 		{621BDE6E-11F2-40D0-92C1-8E41EA7E63BA}.Release|x64.Build.0 = Release|x64
 		{621BDE6E-11F2-40D0-92C1-8E41EA7E63BA}.Release|x86.ActiveCfg = Release|Win32
 		{621BDE6E-11F2-40D0-92C1-8E41EA7E63BA}.Release|x86.Build.0 = Release|Win32
+		{CDE48180-CC4E-4D0B-A38F-1FE84D894560}.Debug|x64.ActiveCfg = Debug|x64
+		{CDE48180-CC4E-4D0B-A38F-1FE84D894560}.Debug|x64.Build.0 = Debug|x64
+		{CDE48180-CC4E-4D0B-A38F-1FE84D894560}.Debug|x86.ActiveCfg = Debug|Win32
+		{CDE48180-CC4E-4D0B-A38F-1FE84D894560}.Debug|x86.Build.0 = Debug|Win32
+		{CDE48180-CC4E-4D0B-A38F-1FE84D894560}.Release|x64.ActiveCfg = Release|x64
+		{CDE48180-CC4E-4D0B-A38F-1FE84D894560}.Release|x64.Build.0 = Release|x64
+		{CDE48180-CC4E-4D0B-A38F-1FE84D894560}.Release|x86.ActiveCfg = Release|Win32
+		{CDE48180-CC4E-4D0B-A38F-1FE84D894560}.Release|x86.Build.0 = Release|Win32
+		{7DA2223F-1071-474F-AF4E-89762F6AAB19}.Debug|x64.ActiveCfg = Debug|x64
+		{7DA2223F-1071-474F-AF4E-89762F6AAB19}.Debug|x64.Build.0 = Debug|x64
+		{7DA2223F-1071-474F-AF4E-89762F6AAB19}.Debug|x86.ActiveCfg = Debug|Win32
+		{7DA2223F-1071-474F-AF4E-89762F6AAB19}.Debug|x86.Build.0 = Debug|Win32
+		{7DA2223F-1071-474F-AF4E-89762F6AAB19}.Release|x64.ActiveCfg = Release|x64
+		{7DA2223F-1071-474F-AF4E-89762F6AAB19}.Release|x64.Build.0 = Release|x64
+		{7DA2223F-1071-474F-AF4E-89762F6AAB19}.Release|x86.ActiveCfg = Release|Win32
+		{7DA2223F-1071-474F-AF4E-89762F6AAB19}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
