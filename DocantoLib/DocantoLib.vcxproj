@@ -71,23 +71,23 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <IntDir>$(SolutionDir)out\$(Configuration)</IntDir>
+    <IntDir>$(SolutionDir)out\$(ProjectName)$(Configuration)\</IntDir>
     <TargetName>$(PlatformShortName)$(ProjectName)</TargetName>
-    <OutDir>$(SolutionDir)out\$(Configuration)</OutDir>
+    <OutDir>$(SolutionDir)\out\$(ProjectName)$(Configuration)$(Platform)\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <IntDir>$(SolutionDir)out\$(Configuration)</IntDir>
-    <OutDir>$(SolutionDir)out\$(Configuration)</OutDir>
+    <IntDir>$(SolutionDir)out\$(ProjectName)$(Configuration)\</IntDir>
+    <OutDir>$(SolutionDir)\out\$(ProjectName)$(Configuration)$(Platform)\</OutDir>
     <TargetName>$(PlatformShortName)$(ProjectName)</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IntDir>$(SolutionDir)out\$(Configuration)</IntDir>
+    <IntDir>$(SolutionDir)out\$(ProjectName)$(Configuration)\</IntDir>
     <TargetName>$(PlatformShortName)$(ProjectName)</TargetName>
-    <OutDir>$(SolutionDir)out\$(Configuration)</OutDir>
+    <OutDir>$(SolutionDir)\out\$(ProjectName)$(Configuration)$(Platform)\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IntDir>$(SolutionDir)out\$(Configuration)</IntDir>
-    <OutDir>$(SolutionDir)out\$(Configuration)</OutDir>
+    <IntDir>$(SolutionDir)out\$(ProjectName)$(Configuration)\</IntDir>
+    <OutDir>$(SolutionDir)\out\$(ProjectName)$(Configuration)$(Platform)\</OutDir>
     <TargetName>$(PlatformShortName)$(ProjectName)</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -171,8 +171,11 @@
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\Docanto.ixx" />
     <ClCompile Include="src\general\Logger.cpp" />
     <ClCompile Include="src\general\Logger.ixx" />
+    <ClCompile Include="src\general\Timer.cpp" />
+    <ClCompile Include="src\general\Timer.ixx" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

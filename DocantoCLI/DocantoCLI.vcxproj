@@ -71,23 +71,23 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <OutDir>$(IntDir)executable\</OutDir>
-    <IntDir>$(SolutionDir)int\$(ProjectName)\$(Configuration)\$(Platform)\</IntDir>
+    <OutDir>$(SolutionDir)\out\$(ProjectName)$(Configuration)$(Platform)\</OutDir>
+    <IntDir>$(SolutionDir)int\$(ProjectName)$(Configuration)$(Platform)\</IntDir>
     <TargetName>$(PlatformShortName)$(ProjectName)</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <OutDir>$(IntDir)executable\</OutDir>
-    <IntDir>$(SolutionDir)int\$(ProjectName)\$(Configuration)\$(Platform)\</IntDir>
+    <OutDir>$(SolutionDir)\out\$(ProjectName)$(Configuration)$(Platform)\</OutDir>
+    <IntDir>$(SolutionDir)int\$(ProjectName)$(Configuration)$(Platform)\</IntDir>
     <TargetName>$(PlatformShortName)$(ProjectName)</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <OutDir>$(SolutionDir)release\</OutDir>
-    <IntDir>$(SolutionDir)int\$(ProjectName)\$(Configuration)\$(Platform)\</IntDir>
+    <OutDir>$(SolutionDir)\out\$(ProjectName)$(Configuration)$(Platform)\</OutDir>
+    <IntDir>$(SolutionDir)int\$(ProjectName)$(Configuration)$(Platform)\</IntDir>
     <TargetName>$(PlatformShortName)$(ProjectName)</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <OutDir>$(SolutionDir)release\</OutDir>
-    <IntDir>$(SolutionDir)int\$(ProjectName)\$(Configuration)\$(Platform)\</IntDir>
+    <OutDir>$(SolutionDir)\out\$(ProjectName)$(Configuration)$(Platform)\</OutDir>
+    <IntDir>$(SolutionDir)int\$(ProjectName)$(Configuration)$(Platform)\</IntDir>
     <TargetName>$(PlatformShortName)$(ProjectName)</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
