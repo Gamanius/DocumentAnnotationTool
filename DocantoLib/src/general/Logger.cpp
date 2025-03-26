@@ -2,6 +2,9 @@ module Docanto;
 import :Logger;
 
 namespace Docanto::Logger {
+	void set_out_level(LEVEL lvl) {
+		out_level = lvl;
+	}
 	void set_stream(std::wostream* stream) {
 		out_stream = stream;
 	}
@@ -10,6 +13,8 @@ namespace Docanto::Logger {
 	}
 
 	void start_log(LEVEL lvl) {
+		if (print_started)
+			return;
 		auto& out = get_stream();
 		if (use_color)
 			switch (lvl) {
@@ -53,11 +58,16 @@ namespace Docanto::Logger {
 		out << L"|";
 		get_current_time(out);
 		out << L"]: ";
+		print_started = true;
 	}
 
 	void end_log() {
+		if (print_started == false) {
+			return;
+		}
 		auto& out = get_stream();
 		out << COLOR_RESET << std::endl;
+		print_started = false;
 	}
 
 	void use_colors(bool a) {

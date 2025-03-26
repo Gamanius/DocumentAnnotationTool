@@ -172,6 +172,9 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\Docanto.ixx" />
+    <ClCompile Include="src\general\Common.ixx" />
+    <ClCompile Include="src\general\FileHandler.cpp" />
+    <ClCompile Include="src\general\FileHandler.ixx" />
     <ClCompile Include="src\general\Logger.cpp" />
     <ClCompile Include="src\general\Logger.ixx" />
     <ClCompile Include="src\general\Timer.cpp" />
