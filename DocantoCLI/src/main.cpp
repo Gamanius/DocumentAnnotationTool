@@ -6,9 +6,10 @@ int main() {
 	using namespace Docanto;
 	Logger::init();
 	
-	Timer t;
-
-	Logger::log(t);
+	Geometry::Point<int> p(1, 1);
+	Geometry::Rectangle<int> a(1, 1, 2, 3);
+	Logger::log(p, a);
+	Logger::log(a);
 
 	Logger::print_to_debug();
 }
