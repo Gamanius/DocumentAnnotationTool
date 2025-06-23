@@ -1,4 +1,10 @@
 @echo off
+
+IF EXIST "mupdf\platform\win32\x64" (
+	echo Folder x64 exists... Skipping build
+	EXIT /B 0
+)
+
 echo Upgrading mupdf solution
 devenv "%cd%\mupdf\platform\win32\mupdf.sln" /Upgrade
 
