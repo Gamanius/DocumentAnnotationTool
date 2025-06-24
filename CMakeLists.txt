@@ -10,23 +10,29 @@ message(STATUS "Using: " ${CMAKE_CXX_COMPILER_ID})
 message(STATUS "System: " ${CMAKE_HOST_SYSTEM_NAME})
 
 
+set(MUPDF_INCLUDE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/mupdf/include)
+
 if (CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
-	message(STATUS "Running setup.cmd to compile mupdf")
-	execute_process(
-		COMMAND cmd.exe /c setup.cmd
-		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-		RESULT_VARIABLE _setup_result
-		COMMAND_ECHO STDOUT
-	)
-	if (NOT _setup_result EQUAL 0)
-        message(FATAL_ERROR "setup.cmd failed with exit code ${_setup_result}")
-	endif()
-    set(MUPDF_INCLUDE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/mupdf/include)
-    set(MUPDF_DEBUG_BUILD_PATH ${CMAKE_CURRENT_SOURCE_DIR}/mupdf/platform/win32/x64/Debug)
-    set(MUPDF_RELEASE_BUILD_PATH ${CMAKE_CURRENT_SOURCE_DIR}/mupdf/platform/win32/x64/Debug)
+    if (CMAKE_BUILD_TYPE STREQUAL "Release")
+        set(MUPDF_LIB_PATH ${CMAKE_CURRENT_SOURCE_DIR}/mupdf/platform/win32/x64/Release)
+    else()
+        set(MUPDF_LIB_PATH ${CMAKE_CURRENT_SOURCE_DIR}/mupdf/platform/win32/x64/Debug)
+    endif()
 endif()
 
-message(STATUS MuPDF lib @ ${MUPDF_DEBUG_BUILD_PATH})
+find_library(
+    MUPDF_LIB
+    NAMES mupdf libmupdf
+    PATHS ${MUPDF_LIB_PATH}
+    NO_DEFAULT_PATH
+)
+
+if (MUPDF_LIB)
+    message(STATUS "Found libmupdf at " ${MUPDF_LIB_PATH})
+else()
+    message(FATAL_ERROR "MuPDF library not found!")
+endif()
+
 
 add_subdirectory(DocantoCLI)
 add_subdirectory(DocantoLib)
