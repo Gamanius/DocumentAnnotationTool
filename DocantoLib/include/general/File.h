@@ -10,13 +10,15 @@ namespace Docanto {
 		size_t size = 0;
 
 		File() = default;
+		File(std::unique_ptr<byte> data, size_t size) noexcept : data(std::move(data)), size(size) {}
+
 		File(const File& other) = delete;
 		File& operator=(const File& other) = delete;
 		File(File&& other) noexcept;
 		File& operator=(File&& other) noexcept;
 		~File() = default;
 
-		static std::optional<File> load(std::filesystem::path& p);
+		static std::optional<File> load(const std::filesystem::path& p);
 		
 	};
 }

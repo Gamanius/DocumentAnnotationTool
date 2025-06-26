@@ -18,7 +18,7 @@ Docanto::File& Docanto::File::operator=(File&& other) noexcept {
 	return *this;
 }
 
-std::optional<Docanto::File> Docanto::File::load(std::filesystem::path& p) {
+std::optional<Docanto::File> Docanto::File::load(const std::filesystem::path& p) {
 	if (!std::filesystem::exists(p)) {
 		// Log error: file does not exist
 		Logger::error("File does not exist at path: ", p);

@@ -1,10 +1,11 @@
 #include "Common.h"
 
-namespace Docanto {
+#ifndef _THREADSAFEWRAPPER_H_
+#define _THREADSAFEWRAPPER_H_
 
+namespace Docanto {
 	template<typename T, typename _mutex_type>
 	class ThreadSafeObj;
-
 
 	template<typename T, typename _mutex_type = std::recursive_mutex>
 	class ThreadSafeWrapper {
@@ -73,3 +74,5 @@ template<typename T, typename _mutex_type>
 std::wostream& operator<<(std::wostream& os, const Docanto::ThreadSafeObj<T, _mutex_type>& obj) {
 	return os << *obj;
 }
+
+#endif // !_THREADSAFEWRAPPER_H_

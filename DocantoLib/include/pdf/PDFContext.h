@@ -1,25 +1,24 @@
+#ifndef _PDFCONTEXT_H_
+#define _PDFCONTEXT_H_
+
 #include "../general/Common.h"
+#include "../general/ThreadSafeWrapper.h"
 
 struct fz_context;
 
 namespace Docanto {
+	class PDF;
 
-	class PDFContext {
+	class PDFContext : public Docanto::ThreadSafeWrapper<fz_context*> {
 		PDFContext();
 		~PDFContext();
-
-
-		struct Impl;
-
-		std::unique_ptr<Impl> m_impl;
 
 	public:
 		PDFContext(const PDFContext&) = delete;
 		PDFContext& operator=(const PDFContext&) = delete;
 
 		static PDFContext& get_instance();
-
-		fz_context* get_context() const;
-
 	};
 }
+
+#endif // !_PDFCONTEXT_H_
