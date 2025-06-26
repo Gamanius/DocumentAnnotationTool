@@ -5,3 +5,7 @@ typedef unsigned char byte;
 #include <fstream>
 #include <optional>
 #include <filesystem>
+#include <mutex>
+#include <shared_mutex>
+#include <map>
+#include <condition_variable>

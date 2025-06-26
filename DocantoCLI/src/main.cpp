@@ -2,13 +2,23 @@
 
 #include "DocantoLib.h"
 
+using namespace Docanto;
+ReadWriteThreadSafeMutex<int> a(1);
+
+void test() {
+	auto it = a.get_write();
+	std::cout << *it << std::endl;
+	*it += 1;
+}
+
 int main() {
-	using namespace Docanto;
 	Logger::init();
 	
-	Geometry::Point<int> p(1, 1);
-	Geometry::Rectangle<int> a(1, 1, 2, 3);
-	Logger::log(p, a);
+	std::thread t(test);
+	std::thread t2(test);
+
+	t.join();
+	t2.join();
 
 	Logger::print_to_debug();
 }

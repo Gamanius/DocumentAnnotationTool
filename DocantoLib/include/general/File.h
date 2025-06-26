@@ -1,6 +1,9 @@
 #include "Common.h"
 #include "Logger.h"
 
+#ifndef _FILE_H_
+#define _FILE_H_
+
 namespace Docanto {
 	struct File {
 		std::unique_ptr<byte> data = nullptr;
@@ -17,3 +20,5 @@ namespace Docanto {
 		
 	};
 }
+
+#endif // !_FILE_H_
