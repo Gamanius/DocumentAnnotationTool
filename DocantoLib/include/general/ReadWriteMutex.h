@@ -36,20 +36,8 @@ namespace Docanto {
 		ReadWriteThreadSafeMutex(const ReadWriteThreadSafeMutex& other) = delete;
 		ReadWriteThreadSafeMutex& operator=(const ReadWriteThreadSafeMutex& other) = delete;
 
-		ReadWriteThreadSafeMutex(ReadWriteThreadSafeMutex&& other) noexcept {
-			this->item = std::move(other.item);
-			this->thread_list_mutex = std::move(other.thread_list_mutex);
-			this->thread_list = std::move(other.thread_list);
-		}
-
-		ReadWriteThreadSafeMutex& operator=(ReadWriteThreadSafeMutex&& other) noexcept {
-			if (this != other) {
-				this->item = std::move(other.item);
-				this->thread_list_mutex = std::move(other.thread_list_mutex);
-				this->thread_list = std::move(other.thread_list);
-			}
-			return *this;
-		}
+		ReadWriteThreadSafeMutex(ReadWriteThreadSafeMutex&& other) noexcept = delete;
+		ReadWriteThreadSafeMutex& operator=(ReadWriteThreadSafeMutex&& other) noexcept = delete;
 
 		WriteWrapper<T> get_write() {
 			return std::move(WriteWrapper<T>(&item, this));
@@ -159,7 +147,7 @@ namespace Docanto {
 			if (wrapper->thread_list.find(local_id) != wrapper->thread_list.end()
 				and wrapper->thread_list[local_id].access == wrapper->ACCESS_TYPE::WRITE_ACCESS) {
 
-					wrapper->thread_list[local_id].read_locks += 1;
+					wrapper->thread_list[local_id].write_locks += 1;
 					return;
 			}
 
@@ -167,7 +155,8 @@ namespace Docanto {
 			// this is only the case when the map is empty or has one entry containing this thread ID
 			// check if we can have the access to the variable
 			auto check_access = [&]() -> bool {
-				bool access = wrapper->thread_list.empty() or wrapper->thread_list.find(local_id) != wrapper->thread_list.end();
+				bool access = wrapper->thread_list.empty() or 
+					(wrapper->thread_list.find(local_id) != wrapper->thread_list.end() and wrapper->thread_list.size() == 1);
 				return access;
 				};
 
@@ -178,13 +167,16 @@ namespace Docanto {
 
 			// add to the map
 			if (wrapper->thread_list.find(local_id) != wrapper->thread_list.end()) {
-				wrapper->thread_list[local_id].read_locks += 1;
+				wrapper->thread_list[local_id].write_locks += 1;
 				wrapper->thread_list[local_id].access = wrapper->ACCESS_TYPE::WRITE_ACCESS;
 			}
 			else {
 				wrapper->thread_list.insert({ local_id, {0, 1, wrapper->ACCESS_TYPE::WRITE_ACCESS} });
 			}
 		}
+
+		WriteWrapper(const WriteWrapper& other) = delete;
+		WriteWrapper& operator=(const WriteWrapper& other) = delete;
 
 		WriteWrapper(WriteWrapper&& other) noexcept : obj(other.obj), wrapper(other.wrapper) {
 			other.wrapper = nullptr;
