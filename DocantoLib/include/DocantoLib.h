@@ -5,9 +5,9 @@
 #include "general/File.h"
 #include "general/MathHelper.h"
 #include "general/ReadWriteMutex.h"
+#include "general/ThreadSafeWrapper.h"
 
 #include "general/Common.h"
-
 
 #include "pdf/PDF.h"
 #include "pdf/PDFContext.h"
