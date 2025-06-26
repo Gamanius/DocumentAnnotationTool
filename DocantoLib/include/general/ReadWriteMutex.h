@@ -80,7 +80,6 @@ namespace Docanto {
 			// first check if there are other threads that want to write
 			wrapper->thread_list_conditional.wait(lock, check_access);
 
-			std::cout << local_id << " has read access" << std::endl;
 			// if everything is clear we can add our thread to the list of threads 
 			wrapper->thread_list.insert({ local_id, {1, 0, wrapper->ACCESS_TYPE::READ_ACCESS} });
 		}
@@ -120,7 +119,6 @@ namespace Docanto {
 			// if both read locks and write locks are 0 then we can remove this thread from the watch list
 			if (wrapper->thread_list[local_id].read_locks == 0 and wrapper->thread_list[local_id].write_locks == 0) {
 				wrapper->thread_list.erase(local_id);
-				std::cout << local_id << " has removed access" << std::endl;
 			}
 
 			wrapper->thread_list_conditional.notify_all();
@@ -161,9 +159,6 @@ namespace Docanto {
 				};
 
 			wrapper->thread_list_conditional.wait(lock, check_access);
-
-
-			std::cout << local_id << " has write access" << std::endl;
 
 			// add to the map
 			if (wrapper->thread_list.find(local_id) != wrapper->thread_list.end()) {
@@ -208,14 +203,11 @@ namespace Docanto {
 			// downgrade the access level
 			if (wrapper->thread_list[local_id].write_locks == 0) {
 				wrapper->thread_list[local_id].access = wrapper->ACCESS_TYPE::READ_ACCESS;
-
-				std::cout << local_id << " has removed write access" << std::endl;
 			}
 
 			// if both read locks and write locks are 0 then we can remove this thread from the watch list
 			if (wrapper->thread_list[local_id].read_locks == 0 and wrapper->thread_list[local_id].write_locks == 0) {
 				wrapper->thread_list.erase(local_id);
-				std::cout << local_id << " has removed access" << std::endl;
 			}
 
 			wrapper->thread_list_conditional.notify_all();
@@ -232,5 +224,14 @@ namespace Docanto {
 
 }
 
+template<typename T>
+std::wostream& operator<<(std::wostream& os, const Docanto::ReadWrapper<T>& obj) {
+	return os << *obj;
+}
+
+template<typename T>
+std::wostream& operator<<(std::wostream& os, const Docanto::WriteWrapper<T>& obj) {
+	return os << *obj;
+}
 
 #endif // !_READWRITEMUTEX_H_

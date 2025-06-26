@@ -13,27 +13,50 @@ namespace Docanto {
 
 
 		template <typename T>
-		concept Streamable = (requires(std::wostream & s, T val) {
+		concept Streamable = (requires(std::wostream & s, const T& val) {
 			s << val;
 		} or std::convertible_to<T, std::string>) and !std::is_enum_v<T>;
 
-		inline std::unique_ptr<std::wostream> _msg_buffer;
+		template <class T>
+		concept StreamableOptional = requires(const T& t) {
+			t.value();
+			t.has_value();
+		};
+
+		inline std::wostream* _msg_buffer;
+		inline std::mutex     _msg_mutex;
 
 		void init(std::wostream* buffer = nullptr);
 
 		template<Streamable S>
-		void do_msg(S a) {
+		void do_msg(const S& a) {
 			*_msg_buffer << a;
 		}
 
+		template<StreamableOptional S>
+		void do_msg(const S& a) {
+			if (a.has_value()) {
+				*_msg_buffer << a.value();
+			}
+			else {
+				*_msg_buffer << L"std::nullopt";
+			}
+		}
+
 		template<typename T, typename... Targ>
-		void do_msg(T first, Targ ... args) {
+		void do_msg(const T& first, const Targ& ... args) {
 			do_msg(first);
 			do_msg(args ...);
 		}
 
 		template<typename T, typename... Targ>
-		void _msg(MSG_LEVEL level, T first, Targ... args) {
+		void _msg(MSG_LEVEL level, const T& first, const Targ&... args) {
+			std::scoped_lock<std::mutex> lock(_msg_mutex);
+			auto id = std::this_thread::get_id();
+
+			if (id != MAIN_THREAD_ID) {
+				*_msg_buffer << L"{" << id << L"}";
+			}
 
 			switch (level) {
 			case MSG_LEVEL::INFO:
@@ -55,22 +78,22 @@ namespace Docanto {
 		}
 
 		template<typename T, typename... Targ>
-		void log(T first, Targ... args) {
+		void log(const T& first, const Targ&... args) {
 			_msg(MSG_LEVEL::INFO, first, args...);
 		}
 
 		template<typename T, typename... Targ>
-		void warn(T first, Targ... args) {
+		void warn(const T& first, const Targ&... args) {
 			_msg(MSG_LEVEL::WARNING, first, args...);
 		}
 
 		template<typename T, typename... Targ>
-		void error(T first, Targ... args) {
+		void error(const T& first, const Targ&... args) {
 			_msg(MSG_LEVEL::ERROR, first, args...);
 		}
 
 		template<typename T, typename... Targ>
-		void success(T first, Targ... args) {
+		void success(const T& first, const Targ&... args) {
 			_msg(MSG_LEVEL::SUCCESS, first, args...);
 		}
 

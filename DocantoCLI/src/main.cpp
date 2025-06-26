@@ -7,28 +7,18 @@ ThreadSafeWrapper<int> a(1);
 
 void get() {
 	auto t = a.try_get();
-	auto id = std::this_thread::get_id();
-	std::cout << id << std::endl;
-	if (t.has_value())
-	{
-		std::cout << *t.value() << std::endl;
-	}
+	Logger::log(t);
 }
 
-void try_get() {
-
-}
 
 int main() {
-	Logger::init();
+	Logger::init(&std::wcout);
 
-	std::thread t(get);
-	std::thread t2(get);
-	std::thread t3(get);
+	std::thread a(get);
+	std::thread a2(get);
 
-	t.join();
-	t2.join();
-	t3.join();
-
+	a.join();
+	a2.join();
+	Logger::log("dewa");
 	Logger::print_to_debug();
 }

@@ -56,7 +56,6 @@ namespace Docanto {
 		ThreadSafeObj(ThreadSafeObj&&) = delete;
 		ThreadSafeObj& operator=(ThreadSafeObj&&) = delete;
 
-
 		T* get() const {
 			return &(ref->obj);
 		}
@@ -68,4 +67,9 @@ namespace Docanto {
 		template<typename T, typename _mutex_type>
 		friend class ThreadSafeWrapper;
 	};
+}
+
+template<typename T, typename _mutex_type>
+std::wostream& operator<<(std::wostream& os, const Docanto::ThreadSafeObj<T, _mutex_type>& obj) {
+	return os << *obj;
 }

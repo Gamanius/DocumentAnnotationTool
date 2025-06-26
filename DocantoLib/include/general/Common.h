@@ -1,11 +1,23 @@
-typedef unsigned char byte;
+#ifndef _COMMON_H_
+#define _COMMON_H_
 
 #include <string>
-#include <memory>
-#include <fstream>
+#include <map>
 #include <optional>
+#include <memory>
+
+#include <fstream>
 #include <filesystem>
+
 #include <mutex>
 #include <shared_mutex>
-#include <map>
 #include <condition_variable>
+
+
+typedef unsigned char byte;
+
+namespace Docanto {
+	inline std::thread::id MAIN_THREAD_ID = std::this_thread::get_id();
+}
+
+#endif
