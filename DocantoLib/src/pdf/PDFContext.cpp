@@ -27,7 +27,7 @@ void warning_callback(void* user, const char* message) {
 	Docanto::Logger::warn("MuPDF: \"", message, "\"");
 }
 
-Docanto::PDFContext::PDFContext() : ThreadSafeWrapper(fz_new_context(nullptr, &lock_content, FZ_STORE_UNLIMITED)) {
+Docanto::GlobalPDFContext::GlobalPDFContext() : ThreadSafeWrapper(fz_new_context(nullptr, &lock_content, FZ_STORE_UNLIMITED)) {
 	auto c = get();
 	
 	fz_set_error_callback(*c, error_callback, nullptr);
@@ -35,16 +35,14 @@ Docanto::PDFContext::PDFContext() : ThreadSafeWrapper(fz_new_context(nullptr, &l
 	fz_register_document_handlers(*c);
 }
 
-Docanto::PDFContext::~PDFContext() {
+Docanto::GlobalPDFContext::~GlobalPDFContext() {
 	auto ctx = get();
 	fz_drop_context(*ctx);
-
-
 }
 
 
-Docanto::PDFContext& Docanto::PDFContext::get_instance() {
-	static PDFContext instance;
+Docanto::GlobalPDFContext& Docanto::GlobalPDFContext::get_instance() {
+	static GlobalPDFContext instance;
 	return instance;
 }
 

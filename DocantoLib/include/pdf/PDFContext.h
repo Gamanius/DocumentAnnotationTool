@@ -1,5 +1,5 @@
-#ifndef _PDFCONTEXT_H_
-#define _PDFCONTEXT_H_
+#ifndef _GLOBALPDFCONTEXT_H_
+#define _GLOBALPDFCONTEXT_H_
 
 #include "../general/Common.h"
 #include "../general/ThreadSafeWrapper.h"
@@ -9,15 +9,15 @@ struct fz_context;
 namespace Docanto {
 	class PDF;
 
-	class PDFContext : public Docanto::ThreadSafeWrapper<fz_context*> {
-		PDFContext();
-		~PDFContext();
+	class GlobalPDFContext : public Docanto::ThreadSafeWrapper<fz_context*> {
+		GlobalPDFContext();
+		~GlobalPDFContext();
 
 	public:
-		PDFContext(const PDFContext&) = delete;
-		PDFContext& operator=(const PDFContext&) = delete;
+		GlobalPDFContext(const GlobalPDFContext&) = delete;
+		GlobalPDFContext& operator=(const GlobalPDFContext&) = delete;
 
-		static PDFContext& get_instance();
+		static GlobalPDFContext& get_instance();
 	};
 }
 

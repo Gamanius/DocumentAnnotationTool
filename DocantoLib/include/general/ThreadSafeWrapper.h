@@ -15,6 +15,7 @@ namespace Docanto {
 
 	public:
 		ThreadSafeWrapper(T&& obj) : obj(std::move(obj)) {}
+		ThreadSafeWrapper() = default;
 
 		ThreadSafeObj<T, _mutex_type> get() {
 			return ThreadSafeObj<T, _mutex_type>(this);
@@ -29,7 +30,12 @@ namespace Docanto {
 			return std::nullopt;
 		}
 
-		ThreadSafeWrapper() = delete;
+		void set(T&& other) {
+			std::scoped_lock<_mutex_type> clock(mutex);
+
+			obj = std::move(other);
+		}
+
 		ThreadSafeWrapper(const ThreadSafeWrapper&) = delete;
 		ThreadSafeWrapper(ThreadSafeWrapper&&) noexcept = delete;
 		ThreadSafeWrapper& operator=(const ThreadSafeWrapper&) = delete;

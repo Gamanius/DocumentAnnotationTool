@@ -7,6 +7,7 @@
 namespace Docanto {
 	struct File {
 		std::unique_ptr<byte> data = nullptr;
+		std::filesystem::path path;
 		size_t size = 0;
 
 		File() = default;

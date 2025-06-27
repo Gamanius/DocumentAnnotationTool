@@ -3,16 +3,20 @@
 Docanto::File::File(Docanto::File&& other) noexcept {
 	std::swap(data, other.data);
 	this->size = other.size;
+	this->path = std::move(other.path);
 
 	other.data = nullptr;
+	other.path = std::filesystem::path();
 	other.size = 0;
 }
 
 Docanto::File& Docanto::File::operator=(File&& other) noexcept {
 	std::swap(data, other.data);
 	this->size = other.size;
+	this->path = std::move(other.path);
 
 	other.data = nullptr;
+	other.path = std::filesystem::path();
 	other.size = 0;
 
 	return *this;
@@ -52,6 +56,7 @@ std::optional<Docanto::File> Docanto::File::load(const std::filesystem::path& p)
 	Docanto::File file;
 	file.data = std::move(file_buffer);
 	file.size = size;
+	file.path = p;
 
 
 	return std::move(file);
