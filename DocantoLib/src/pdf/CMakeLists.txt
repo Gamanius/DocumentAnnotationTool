@@ -1,6 +1,6 @@
 add_library(DocantoPDFLib STATIC
     PDF.cpp
- "PDFContext.cpp")
+ "PDFContext.cpp" "PDFRenderer.cpp")
 
 target_include_directories(DocantoPDFLib PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../include/pdf> 
