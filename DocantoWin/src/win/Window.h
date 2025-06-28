@@ -5,6 +5,8 @@ class Window {
 	HWND m_hwnd = NULL;
 	HDC m_hdc = NULL;
 
+	bool m_closeRequest = false;
+
 public:
 	enum WINDOW_STATE {
 		HIDDEN,
@@ -26,6 +28,7 @@ public:
 	static void get_window_messages(bool blocking);
 
 	Window(HINSTANCE h);
+	~Window();
 
 
 	// Returns the DPI of the window
@@ -40,6 +43,9 @@ public:
 
 	bool is_window_maximized() const;
 
+	bool get_close_request() const;
 
 	void set_state(WINDOW_STATE state);
+	// Sets a new windowsize
+	void set_window_size(Docanto::Geometry::Rectangle<long> r);
 };

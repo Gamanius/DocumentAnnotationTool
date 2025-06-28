@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.31)
 
 project(Docanto)
 
@@ -13,6 +13,8 @@ message(STATUS "System: " ${CMAKE_HOST_SYSTEM_NAME})
 set(MUPDF_INCLUDE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/mupdf/include)
 
 if (CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
+    add_link_options($<$<CONFIG:Debug>:/INCREMENTAL>)
+    add_compile_options($<$<CONFIG:Debug>:/ZI>)
     if (CMAKE_BUILD_TYPE STREQUAL "Release")
         set(MUPDF_LIB_PATH ${CMAKE_CURRENT_SOURCE_DIR}/mupdf/platform/win32/x64/Release)
     else()
