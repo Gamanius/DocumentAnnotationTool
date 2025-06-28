@@ -34,5 +34,8 @@ else()
 endif()
 
 
-add_subdirectory(DocantoCLI)
 add_subdirectory(DocantoLib)
+add_subdirectory(DocantoCLI)
+if (CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
+    add_subdirectory(DocantoWin)
+endif()

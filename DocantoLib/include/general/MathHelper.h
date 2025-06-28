@@ -12,10 +12,13 @@ namespace Docanto {
 
 		template <typename T>
 		struct Rectangle {
-			T x;
-			T y;
-			T width;
-			T height;
+			T x      = 0;
+			T y      = 0;
+			T width  = 0;
+			T height = 0;
+
+			Rectangle();
+			Rectangle(T x, T y, T width, T height) : x(x), y(y), width(width), height(height) {}
 
 			template <typename W>
 			operator Rectangle<W>() const {
