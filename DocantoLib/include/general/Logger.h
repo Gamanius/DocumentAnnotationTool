@@ -23,6 +23,7 @@ namespace Docanto {
 			t.has_value();
 		};
 
+		inline std::shared_ptr<std::wostream> _internal_buffer;
 		inline std::wostream* _msg_buffer;
 		inline std::mutex     _msg_mutex;
 
