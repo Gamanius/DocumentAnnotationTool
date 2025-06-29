@@ -14,12 +14,6 @@ LRESULT Window::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam, LPARA
 			auto window = reinterpret_cast<CREATESTRUCT*>(lParam)->lpCreateParams;
 			m_allWindowInstances->operator[](hWnd) = reinterpret_cast<Window*>(window);
 
-			MARGINS margins = { 0, 100, 0, 0 };
-			HRESULT hr = S_OK;
-
-			// Extend the frame across the entire window.
-			hr = DwmExtendFrameIntoClientArea(hWnd, &margins);
-
 			// notify that the frame has changed
 			SetWindowPos(hWnd, nullptr, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE);
 			return 0;
@@ -33,11 +27,6 @@ LRESULT Window::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam, LPARA
 	{
 		currentInstance->m_closeRequest = true;
 		return NULL;
-	}
-	case WM_ACTIVATE:
-	{
-		InvalidateRect(hWnd, nullptr, FALSE);
-		return DefWindowProc(hWnd, uMsg, wParam, lParam);
 	}
 	case WM_NCCALCSIZE:
 	{
@@ -64,35 +53,8 @@ LRESULT Window::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam, LPARA
 	}
 	case WM_PAINT:
 	{
-		PAINTSTRUCT ps;
-		HDC hdc = BeginPaint(hWnd, &ps);
-
-		// Fill background with gray
-		HBRUSH grayBrush = CreateSolidBrush(RGB(200, 200, 200));
-		FillRect(hdc, &ps.rcPaint, grayBrush);
-		DeleteObject(grayBrush);
-
-		// Set up red pen
-		HPEN redPen = CreatePen(PS_SOLID, 2, RGB(255, 0, 0));
-		HPEN oldPen = (HPEN)SelectObject(hdc, redPen);
-
-		// Draw rectangle (fixed size for example)
-		Rectangle(hdc, 50, 50, 200, 150);
-
-		// Cleanup
-		SelectObject(hdc, oldPen);
-		DeleteObject(redPen);
-
-		EndPaint(hWnd, &ps);
+		ValidateRect(hWnd, nullptr);
 		return 0;
-		break;
-	}
-	case WM_ERASEBKGND:
-		return 1;
-	case WM_SETFOCUS:
-	case WM_KILLFOCUS:
-	{
-		InvalidateRect(hWnd, nullptr, false);
 	}
 	default:
 		return DefWindowProc(hWnd, uMsg, wParam, lParam);
@@ -138,8 +100,7 @@ Window::Window(HINSTANCE h) {
 	if (!m_hdc) {
 		Docanto::Logger::error("Could not retrieve device m_context");
 	}
-	COLORREF red = RGB(255, 0, 0);
-	DwmSetWindowAttribute(m_hwnd, DWMWA_BORDER_COLOR, &red, sizeof(red));
+	
 	bool temp = EnableMouseInPointer(true);
 	if (!temp) {
 		Docanto::Logger::error("Couldn't add Mouse input into Pointer Input Stack API");
