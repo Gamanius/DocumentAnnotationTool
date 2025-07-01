@@ -17,8 +17,20 @@ namespace Docanto {
 			T width  = 0;
 			T height = 0;
 
-			Rectangle();
+			Rectangle() = default;
 			Rectangle(T x, T y, T width, T height) : x(x), y(y), width(width), height(height) {}
+			Rectangle(Point<T> p1, Point<T> p2) : x(p1.x), y(p1.y), width(p2.x - p1.x), height(p2.y - p1.y) {}
+
+
+			Rectangle(const Rectangle& r) : x(r.x), y(r.y), width(r.width), height(r.height) {}
+			Rectangle& operator=(const Rectangle& r) {
+				x = r.x;
+				y = r.y;
+				width = r.width;
+				height = r.height;
+
+				return *this;
+			}
 
 			template <typename W>
 			operator Rectangle<W>() const {

@@ -1,4 +1,4 @@
-#include "include.h"
+#include "../include.h"
 
 class Direct2DRender;
 
@@ -26,8 +26,8 @@ public:
 		TOUCH
 	};
 
-	static LRESULT parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-	static std::map<HWND, Window*>& get_instances();
+	static LRESULT wndproc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+	LRESULT parse_message(UINT uMsg, WPARAM wParam, LPARAM lParam);
 
 	// Retrieves window messages for _all_ windows
 	static void get_window_messages(bool blocking);
@@ -52,6 +52,65 @@ public:
 	Docanto::Geometry::Point<long> get_window_position() const;
 
 	bool is_window_maximized() const;
+
+
+	/// <summary>
+	/// Converts the given pixel to DIPs (device independent pixels)
+	/// </summary>
+	/// <param name="px">The pixels</param>
+	/// <returns>DIP</returns>
+	template <typename T>
+	T PxToDp(T px) const {
+		return px / (get_dpi() / 96.0f);
+	}
+
+	/// <summary>
+	/// Converts the DIP to on screen pixels
+	/// </summary>
+	/// <param name="dip">the dip</param>
+	/// <returns>Pixels in screen coordinates</returns>
+	template <typename T>
+	T DptoPx(T dip) const {
+		return dip * (get_dpi() / 96.0f);
+	}
+
+
+	template<typename T>
+	Docanto::Geometry::Point<T> PxToDp(const Docanto::Geometry::Point<T>& pxPoint) const {
+		Docanto::Geometry::Point<T> dpPoint;
+		dpPoint.x = pxPoint.x / (get_dpi() / 96.0f);
+		dpPoint.y = pxPoint.y / (get_dpi() / 96.0f);
+		return dpPoint;
+	}
+
+	template<typename T>
+	Docanto::Geometry::Point<T> DpToPx(const Docanto::Geometry::Point<T>& dpPoint) const {
+		Docanto::Geometry::Point<T> pxPoint;
+		pxPoint.x = dpPoint.x * (get_dpi() / 96.0f);
+		pxPoint.y = dpPoint.y * (get_dpi() / 96.0f);
+		return pxPoint;
+	}
+
+	template<typename T>
+	Docanto::Geometry::Rectangle<T> PxToDp(const Docanto::Geometry::Rectangle<T>& pxRect) const {
+		Docanto::Geometry::Rectangle<T> dpRect;
+		dpRect.x = pxRect.x / (get_dpi() / 96.0f);
+		dpRect.y = pxRect.y / (get_dpi() / 96.0f);
+		dpRect.width = pxRect.width / (get_dpi() / 96.0f);
+		dpRect.height = pxRect.height / (get_dpi() / 96.0f);
+		return dpRect;
+	}
+
+	template<typename T>
+	Docanto::Geometry::Rectangle<T> DpToPx(const Docanto::Geometry::Rectangle<T>& dpRect) const {
+		Docanto::Geometry::Rectangle<T> pxRect;
+		pxRect.x = dpRect.x * (get_dpi() / 96.0f);
+		pxRect.y = dpRect.y * (get_dpi() / 96.0f);
+		pxRect.width = dpRect.width * (get_dpi() / 96.0f);
+		pxRect.height = dpRect.height * (get_dpi() / 96.0f);
+		return pxRect;
+	}
+
 
 	bool get_close_request() const;
 

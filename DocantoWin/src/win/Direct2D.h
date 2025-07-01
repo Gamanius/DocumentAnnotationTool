@@ -1,4 +1,4 @@
-#include "include.h"
+#include "../include.h"
 #include "Window.h"
 
 inline void SafeRelease(IUnknown* ptr) {
@@ -63,6 +63,7 @@ public:
 	typedef RenderObject<ID2D1StrokeStyle> StrokeStyle;
 	typedef RenderObject<ID2D1Bitmap> BitmapObject;
 	typedef RenderObject<IDWriteTextFormat> TextFormatObject;
+	typedef RenderObject<IDWriteTextLayout> TextLayoutObject;
 	typedef RenderObject<ID2D1PathGeometry> PathObject;
 
 	Direct2DRender(std::shared_ptr<Window> w);
@@ -71,10 +72,23 @@ public:
 	void begin_draw();
 	void end_draw();
 
-	void draw_rect(Docanto::Geometry::Rectangle<float> r, Docanto::Color c);
+	void draw_text(const std::wstring& text, Docanto::Geometry::Point<float> pos, TextFormatObject& format, BrushObject& brush);
+	void draw_text(const std::wstring& text, Docanto::Geometry::Point<float> pos, Docanto::Color c, float size);
 
+	void draw_rect(Docanto::Geometry::Rectangle<float> r, Docanto::Color c, float thick = 1);
+	void draw_rect(Docanto::Geometry::Rectangle<float> r, Docanto::Color c);
+	void draw_rect(Docanto::Geometry::Rectangle<float> r, BrushObject& brush, float thick = 1);
+
+	void draw_line(Docanto::Geometry::Point<float> p1, Docanto::Geometry::Point<float> p2, BrushObject& brush, float thick);
+	void draw_line(Docanto::Geometry::Point<float> p1, Docanto::Geometry::Point<float> p2, Docanto::Color c, float thick);
+
+	void draw_rect_filled(Docanto::Geometry::Rectangle<float> r, BrushObject& brush);
+
+	std::shared_ptr<Window> get_attached_window() const;
 
 	void resize(Docanto::Geometry::Dimension<long> r);
 
 	BrushObject create_brush(Docanto::Color c);
+	TextFormatObject create_text_format(std::wstring font, float size);
+	TextLayoutObject create_text_layout(const std::wstring& text, TextFormatObject& format);
 };

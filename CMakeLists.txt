@@ -14,7 +14,7 @@ set(MUPDF_INCLUDE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/mupdf/include)
 
 if (CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
     add_link_options($<$<CONFIG:Debug>:/INCREMENTAL>)
-    add_compile_options($<$<CONFIG:Debug>:/ZI>)
+    add_compile_options($<$<CONFIG:Debug>:/Zi>)
     if (CMAKE_BUILD_TYPE STREQUAL "Release")
         set(MUPDF_LIB_PATH ${CMAKE_CURRENT_SOURCE_DIR}/mupdf/platform/win32/x64/Release)
     else()

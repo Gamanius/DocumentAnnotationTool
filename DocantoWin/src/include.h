@@ -27,8 +27,13 @@ inline Docanto::Geometry::Dimension<long> RectToDimension(const RECT& r) {
 inline D2D1_SIZE_U DimensionToD2D1(const Docanto::Geometry::Dimension<long>& dim) {
 	return { static_cast<UINT32>(dim.width), static_cast<UINT32>(dim.height) };
 }
+
 inline D2D1_RECT_F RectToD2D1(const Docanto::Geometry::Rectangle<float>& r) {
 	return { r.x, r.y, r.x + r.width, r.y + r.height };
+}
+
+inline D2D1_POINT_2F PointToD2D1(const Docanto::Geometry::Point<float>& r) {
+	return { r.x, r.y };
 }
 
 inline D2D1_COLOR_F ColorToD2D1(const Docanto::Color& c) {

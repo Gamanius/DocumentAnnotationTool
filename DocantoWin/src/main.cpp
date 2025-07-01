@@ -1,4 +1,4 @@
-#include "win/Direct2D.h"
+#include "ui/Caption.h"
 
 #define _CRTDBG_MAP_ALLOC
 #include <crtdbg.h>
@@ -6,11 +6,14 @@
 
 std::shared_ptr<Window> g_window = nullptr;
 std::shared_ptr<Direct2DRender> g_render = nullptr;
+std::shared_ptr<Caption> g_caption = nullptr;
 
 void paint_callback() {
+	g_caption->draw();
 }
 
 void size_callback(Docanto::Geometry::Dimension<long> dims) {
+	g_render->resize(dims);
 }
 
 int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nCmdShow) {
@@ -23,15 +26,14 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 	g_window->set_window_size({ 50, 50, 500, 500 });
 	g_window->set_callback_paint(paint_callback);
 	g_window->set_callback_size(size_callback);
-
+	
 	g_render = std::make_shared<Direct2DRender>(g_window);
+	g_caption = std::make_shared<Caption>(g_render);
 
 	while (!g_window->get_close_request()) {
 		Window::get_window_messages(true);
 		Docanto::Logger::print_to_debug();
 	}
-
-	g_window = nullptr;
 
 	Docanto::Logger::print_to_debug();
 
