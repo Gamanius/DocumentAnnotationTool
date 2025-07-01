@@ -2,17 +2,15 @@
 #include <dwmapi.h>
 #pragma comment(lib, "dwmapi.lib")
 
-std::unique_ptr<std::map<HWND, Window*>> Window::m_allWindowInstances;
-
 LRESULT Window::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 	// Example message handling
-	Window* currentInstance = m_allWindowInstances->operator[](hWnd);
+	Window* currentInstance = Window::get_instances()[hWnd];
 	// The WM_CREATE msg must be translated before anything else
 	if (currentInstance == nullptr) {
 		if (uMsg == WM_CREATE) {
 			// add this windows to the window stack
 			auto window = reinterpret_cast<CREATESTRUCT*>(lParam)->lpCreateParams;
-			m_allWindowInstances->operator[](hWnd) = reinterpret_cast<Window*>(window);
+			Window::get_instances()[hWnd] = reinterpret_cast<Window*>(window);
 
 			// notify that the frame has changed
 			SetWindowPos(hWnd, nullptr, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE);
@@ -51,8 +49,17 @@ LRESULT Window::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam, LPARA
 	
 		return 1;
 	}
+	case WM_SIZE:
+	case WM_SIZING:
+	{
+		if (currentInstance->m_callback_size) {
+			currentInstance->m_callback_size(currentInstance->get_window_size());
+		}
+		return DefWindowProc(hWnd, uMsg, wParam, lParam);
+	}
 	case WM_PAINT:
 	{
+		currentInstance->m_callback_paint();
 		ValidateRect(hWnd, nullptr);
 		return 0;
 	}
@@ -62,12 +69,14 @@ LRESULT Window::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam, LPARA
 	return true;
 }
 
+std::map<HWND, Window*>& Window::get_instances() {
+	static std::map<HWND, Window*> instances;
+	return instances;
+}
+
 Window::Window(HINSTANCE h) {
-	if (Window::m_allWindowInstances == nullptr) {
-		Window::m_allWindowInstances = std::make_unique<std::map<HWND, Window*>>();
-		if (!SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2))
-			Docanto::Logger::error("Could not set DPI awereness");
-	}
+	if (!SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2))
+		Docanto::Logger::warn("Could not set DPI awareness");
 
 
 	WNDCLASS wc = {};
@@ -94,21 +103,24 @@ Window::Window(HINSTANCE h) {
 
 	if (!m_hwnd) {
 		Docanto::Logger::error("Window creation was not succefull");
+		return;
 	}
 
 	m_hdc = GetDC(m_hwnd);
 	if (!m_hdc) {
 		Docanto::Logger::error("Could not retrieve device m_context");
+		return;
 	}
 	
 	bool temp = EnableMouseInPointer(true);
 	if (!temp) {
 		Docanto::Logger::error("Couldn't add Mouse input into Pointer Input Stack API");
+		return;
 	}
 }
 
 Window::~Window() {
-	m_allWindowInstances->erase(m_hwnd);
+	get_instances().erase(m_hwnd);
 	if (!DestroyWindow(m_hwnd))
 		Docanto::Logger::error("Error when destroying window");
 }
@@ -122,21 +134,22 @@ void Window::set_window_title(const std::wstring& s) {
 	SetWindowText(m_hwnd, s.c_str());
 }
 
-Docanto::Geometry::Rectangle<long> Window::get_client_size() const {
+Docanto::Geometry::Dimension<long> Window::get_client_size() const {
 	RECT r;
 	GetClientRect(m_hwnd, &r);
-	return Docanto::Geometry::Rectangle<long>(0, 0, r.right, r.bottom);
+	return Docanto::Geometry::Dimension<long>(r.right, r.bottom);
 }
 
-Docanto::Geometry::Rectangle<long> Window::get_window_size() const {
+Docanto::Geometry::Dimension<long> Window::get_window_size() const {
 	RECT r;
 	DwmGetWindowAttribute(m_hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, &r, sizeof(RECT));
-	return RectToRectangle(r);
+	return RectToDimension(r);
 }
 
 Docanto::Geometry::Point<long> Window::get_window_position() const {
-	auto r = get_window_size();
-	return Docanto::Geometry::Point<long>(r.x, r.y);
+	RECT r;
+	DwmGetWindowAttribute(m_hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, &r, sizeof(RECT));
+	return Docanto::Geometry::Point<long>(r.left, r.top);
 }
 
 bool Window::is_window_maximized() const {
@@ -178,4 +191,14 @@ void Window::get_window_messages(bool blocking) {
 		//now just peek messages
 		result = PeekMessage(&msg, 0, 0, 0, PM_REMOVE);
 	}
+}
+
+
+void Window::set_callback_paint(std::function<void()> callback) {
+	m_callback_paint = callback;
+}
+
+
+void Window::set_callback_size(std::function<void(Docanto::Geometry::Dimension<long>)> callback) {
+	m_callback_size = callback;
 }

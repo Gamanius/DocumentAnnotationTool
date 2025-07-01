@@ -1,3 +1,3 @@
-add_executable(DocantoWin WIN32 src/main.cpp "src/win/include.h" "src/win/Window.h" "src/win/Window.cpp")
+add_executable(DocantoWin WIN32 src/main.cpp "src/win/include.h" "src/win/Window.h" "src/win/Window.cpp" "src/win/Direct2D.cpp" "src/win/Direct2D.h")
 
 target_link_libraries(DocantoWin PUBLIC DocantoLib)

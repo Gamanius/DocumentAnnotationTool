@@ -5,6 +5,7 @@
 #include "general/File.h"
 #include "general/MathHelper.h"
 #include "general/ReadWriteMutex.h"
+#include "general/BasicRender.h"
 #include "general/ThreadSafeWrapper.h"
 
 #include "general/Common.h"
