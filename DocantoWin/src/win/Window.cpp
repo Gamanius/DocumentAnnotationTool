@@ -2,77 +2,80 @@
 #include <dwmapi.h>
 #pragma comment(lib, "dwmapi.lib")
 
-LRESULT Window::parse_window_messages(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-	// Example message handling
-	Window* currentInstance = Window::get_instances()[hWnd];
-	// The WM_CREATE msg must be translated before anything else
-	if (currentInstance == nullptr) {
-		if (uMsg == WM_CREATE) {
-			// add this windows to the window stack
-			auto window = reinterpret_cast<CREATESTRUCT*>(lParam)->lpCreateParams;
-			Window::get_instances()[hWnd] = reinterpret_cast<Window*>(window);
-
-			// notify that the frame has changed
-			SetWindowPos(hWnd, nullptr, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE);
-			return 0;
-		}
-		return DefWindowProc(hWnd, uMsg, wParam, lParam);
+LRESULT Window::wndproc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+	Window* me = nullptr;
+	if (uMsg == WM_CREATE) {
+		auto cs = reinterpret_cast<CREATESTRUCT*>(lParam);
+		me = reinterpret_cast<Window*>(cs->lpCreateParams);
+		SetWindowLongPtr(hWnd, GWLP_USERDATA, (LONG_PTR)me);
+	}
+	else {
+		me = reinterpret_cast<Window*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
 	}
 
+	if (me) {
+		return me->parse_message(uMsg, wParam, lParam);
+	}
+	else {
+		return DefWindowProc(hWnd, uMsg, wParam, lParam);
+	}
+}
+
+LRESULT Window::parse_message(UINT uMsg, WPARAM wParam, LPARAM lParam) {
 	switch (uMsg) {
+	case WM_CREATE:
+	{
+		SetWindowPos(m_hwnd, nullptr, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE);
+		return DefWindowProc(m_hwnd, uMsg, wParam, lParam);
+	}
 	case WM_ENDSESSION:
 	case WM_CLOSE:
 	{
-		currentInstance->m_closeRequest = true;
+		m_closeRequest = true;
 		return NULL;
 	}
 	case WM_NCCALCSIZE:
 	{
-		if (!wParam) return DefWindowProc(hWnd, uMsg, wParam, lParam);
-		UINT dpi = GetDpiForWindow(hWnd);
-	
+		if (!wParam) return DefWindowProc(m_hwnd, uMsg, wParam, lParam);
+		UINT dpi = GetDpiForWindow(m_hwnd);
+
 		int frame_x = GetSystemMetricsForDpi(SM_CXFRAME, dpi);
 		int frame_y = GetSystemMetricsForDpi(SM_CYFRAME, dpi);
 		int padding = GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi);
-	
+
 		NCCALCSIZE_PARAMS* params = (NCCALCSIZE_PARAMS*)lParam;
 		RECT* requested_client_rect = params->rgrc;
-	
+
 		requested_client_rect->right -= frame_x + padding;
 		requested_client_rect->left += frame_x + padding;
 		requested_client_rect->bottom -= frame_y + padding;
-	
+
 		// we only need to add the padding if the window is maximized
-		if (currentInstance->is_window_maximized()) {
+		if (is_window_maximized()) {
 			requested_client_rect->top += padding;
 		}
-	
+
 		return 1;
 	}
 	case WM_SIZE:
 	case WM_SIZING:
 	{
-		if (currentInstance->m_callback_size) {
-			currentInstance->m_callback_size(currentInstance->get_window_size());
+		if (m_callback_size) {
+			m_callback_size(get_window_size());
 		}
-		return DefWindowProc(hWnd, uMsg, wParam, lParam);
+		return DefWindowProc(m_hwnd, uMsg, wParam, lParam);
 	}
 	case WM_PAINT:
 	{
-		currentInstance->m_callback_paint();
-		ValidateRect(hWnd, nullptr);
+		m_callback_paint();
+		ValidateRect(m_hwnd, nullptr);
 		return 0;
 	}
 	default:
-		return DefWindowProc(hWnd, uMsg, wParam, lParam);
+		return DefWindowProc(m_hwnd, uMsg, wParam, lParam);
 	}
-	return true;
 }
 
-std::map<HWND, Window*>& Window::get_instances() {
-	static std::map<HWND, Window*> instances;
-	return instances;
-}
 
 Window::Window(HINSTANCE h) {
 	if (!SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2))
@@ -81,7 +84,7 @@ Window::Window(HINSTANCE h) {
 
 	WNDCLASS wc = {};
 	wc.style = CS_HREDRAW | CS_VREDRAW;
-	wc.lpfnWndProc = reinterpret_cast<WNDPROC>(this->parse_window_messages);
+	wc.lpfnWndProc = wndproc;
 	wc.hInstance = h;
 	wc.hCursor = LoadCursor(NULL, IDC_ARROW);
 	wc.hbrBackground = CreateSolidBrush(3289650);
@@ -120,7 +123,6 @@ Window::Window(HINSTANCE h) {
 }
 
 Window::~Window() {
-	get_instances().erase(m_hwnd);
 	if (!DestroyWindow(m_hwnd))
 		Docanto::Logger::error("Error when destroying window");
 }
