@@ -95,7 +95,7 @@ void Direct2DRender::draw_text(const std::wstring& text, Docanto::Geometry::Poin
 	begin_draw();
 
 	m_renderTarget->DrawTextLayout(
-		PointToD2D1(pos),
+		m_window->PxToDp(pos),
 		layout.m_object,
 		brush.m_object,
 		D2D1_DRAW_TEXT_OPTIONS_NONE);
@@ -119,15 +119,15 @@ void Direct2DRender::draw_rect(Docanto::Geometry::Rectangle<float> r, Docanto::C
 }
 
 void Direct2DRender::draw_rect(Docanto::Geometry::Rectangle<float> r, BrushObject& brush, float thic) {
-	m_renderTarget->DrawRectangle(RectToD2D1(r), brush.m_object, thic);
+	m_renderTarget->DrawRectangle(m_window->PxToDp(r), brush.m_object, thic);
 }
 void Direct2DRender::draw_rect_filled(Docanto::Geometry::Rectangle<float> r, BrushObject& brush) {
-	m_renderTarget->FillRectangle(RectToD2D1(r), brush.m_object);
+	m_renderTarget->FillRectangle(m_window->PxToDp(r), brush.m_object);
 }
 
 void Direct2DRender::draw_line(Docanto::Geometry::Point<float> p1, Docanto::Geometry::Point<float> p2, BrushObject& brush, float thick) {
 	begin_draw();
-	m_renderTarget->DrawLine(PointToD2D1(p1), PointToD2D1(p2), brush.m_object, thick);
+	m_renderTarget->DrawLine(m_window->PxToDp(p1), m_window->PxToDp(p2), brush.m_object, thick);
 	end_draw();
 }
 

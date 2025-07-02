@@ -1,4 +1,4 @@
-#include "../include.h"
+#include "../helper/Geometry.h"
 #include "Window.h"
 
 inline void SafeRelease(IUnknown* ptr) {

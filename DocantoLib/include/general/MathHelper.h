@@ -32,9 +32,28 @@ namespace Docanto {
 				return *this;
 			}
 
+			T right() const { return x + width; }
+			T bottom() const { return y + height; }
+			Point<T> upperleft() const { return { x, y }; }
+			Point<T> upperright() const { return { right(), y }; }
+			Point<T> lowerleft() const { return { x, bottom() }; }
+			Point<T> lowerright() const { return { right(), bottom() }; }
+
 			template <typename W>
 			operator Rectangle<W>() const {
 				return Rectangle<W>((W)x, (W)y, (W)width, (W)height);
+			}
+
+			bool intersects(const Rectangle<T>& other) const {
+				return (x < other.x + other.width &&
+					x + width > other.x &&
+					y < other.y + other.height &&
+					y + height > other.y);
+			}
+
+			bool intersects(const Point<T>& p) const {
+				// NEVER CHANGE it to < or >. Keep it at >= and <= or else EVERYTHING will break!!
+				return (x <= p.x && x + width >= p.x && y <= p.y && y + height >= p.y);
 			}
 
 		};

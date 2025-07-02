@@ -1,4 +1,5 @@
 #include "../include.h"
+#include "../helper/Geometry.h"
 
 class Direct2DRender;
 
@@ -76,24 +77,24 @@ public:
 
 
 	template<typename T>
-	Docanto::Geometry::Point<T> PxToDp(const Docanto::Geometry::Point<T>& pxPoint) const {
-		Docanto::Geometry::Point<T> dpPoint;
+	ExtendedPoint<T> PxToDp(const Docanto::Geometry::Point<T>& pxPoint) const {
+		ExtendedPoint<T> dpPoint;
 		dpPoint.x = pxPoint.x / (get_dpi() / 96.0f);
 		dpPoint.y = pxPoint.y / (get_dpi() / 96.0f);
 		return dpPoint;
 	}
 
 	template<typename T>
-	Docanto::Geometry::Point<T> DpToPx(const Docanto::Geometry::Point<T>& dpPoint) const {
-		Docanto::Geometry::Point<T> pxPoint;
+	ExtendedPoint<T> DpToPx(const Docanto::Geometry::Point<T>& dpPoint) const {
+		ExtendedPoint<T> pxPoint;
 		pxPoint.x = dpPoint.x * (get_dpi() / 96.0f);
 		pxPoint.y = dpPoint.y * (get_dpi() / 96.0f);
 		return pxPoint;
 	}
 
 	template<typename T>
-	Docanto::Geometry::Rectangle<T> PxToDp(const Docanto::Geometry::Rectangle<T>& pxRect) const {
-		Docanto::Geometry::Rectangle<T> dpRect;
+	ExtendedRectangle<T> PxToDp(const Docanto::Geometry::Rectangle<T>& pxRect) const {
+		ExtendedRectangle<T> dpRect;
 		dpRect.x = pxRect.x / (get_dpi() / 96.0f);
 		dpRect.y = pxRect.y / (get_dpi() / 96.0f);
 		dpRect.width = pxRect.width / (get_dpi() / 96.0f);
@@ -102,8 +103,8 @@ public:
 	}
 
 	template<typename T>
-	Docanto::Geometry::Rectangle<T> DpToPx(const Docanto::Geometry::Rectangle<T>& dpRect) const {
-		Docanto::Geometry::Rectangle<T> pxRect;
+	ExtendedRectangle<T> DpToPx(const Docanto::Geometry::Rectangle<T>& dpRect) const {
+		ExtendedRectangle<T> pxRect;
 		pxRect.x = dpRect.x * (get_dpi() / 96.0f);
 		pxRect.y = dpRect.y * (get_dpi() / 96.0f);
 		pxRect.width = dpRect.width * (get_dpi() / 96.0f);

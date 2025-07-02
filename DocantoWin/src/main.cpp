@@ -23,7 +23,6 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 
 	g_window = std::make_shared<Window>(hInstance);
 	g_window->set_state(Window::WINDOW_STATE::NORMAL);
-	g_window->set_window_size({ 50, 50, 500, 500 });
 	g_window->set_callback_paint(paint_callback);
 	g_window->set_callback_size(size_callback);
 	

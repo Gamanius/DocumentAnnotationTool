@@ -61,7 +61,7 @@ LRESULT Window::parse_message(UINT uMsg, WPARAM wParam, LPARAM lParam) {
 	case WM_SIZING:
 	{
 		if (m_callback_size) {
-			m_callback_size(get_window_size());
+			m_callback_size(get_client_size());
 		}
 		return DefWindowProc(m_hwnd, uMsg, wParam, lParam);
 	}

@@ -15,4 +15,6 @@ public:
 
 
 	void draw();
+
+	int hittest() const;
 };
