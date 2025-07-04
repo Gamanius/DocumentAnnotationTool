@@ -4,10 +4,11 @@
 
 LRESULT Window::wndproc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 	Window* me = nullptr;
-	if (uMsg == WM_CREATE) {
+	if (uMsg == WM_NCCREATE) {
 		auto cs = reinterpret_cast<CREATESTRUCT*>(lParam);
 		me = reinterpret_cast<Window*>(cs->lpCreateParams);
 		SetWindowLongPtr(hWnd, GWLP_USERDATA, (LONG_PTR)me);
+		me->m_hwnd = hWnd;
 	}
 	else {
 		me = reinterpret_cast<Window*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
