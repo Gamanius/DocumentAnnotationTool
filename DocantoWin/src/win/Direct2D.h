@@ -19,6 +19,8 @@ namespace DocantoWin {
 
 		std::atomic<UINT32> m_isRenderinProgress = 0;
 		std::mutex draw_lock;
+
+
 	public:
 		template <typename T>
 		struct RenderObject {
@@ -58,6 +60,10 @@ namespace DocantoWin {
 			operator T* () const {
 				return m_object;
 			}
+
+			T* operator->() const {
+				return m_object;
+			}
 		};
 
 		typedef RenderObject<ID2D1SolidColorBrush> BrushObject;
@@ -66,6 +72,11 @@ namespace DocantoWin {
 		typedef RenderObject<IDWriteTextFormat> TextFormatObject;
 		typedef RenderObject<IDWriteTextLayout> TextLayoutObject;
 		typedef RenderObject<ID2D1PathGeometry> PathObject;
+	private:
+		// GPU resources
+		BrushObject m_solid_brush;
+
+	public:
 
 		Direct2DRender(std::shared_ptr<Window> w);
 		~Direct2DRender();
@@ -78,14 +89,15 @@ namespace DocantoWin {
 		void draw_text(const std::wstring& text, Docanto::Geometry::Point<float> pos, TextFormatObject& format, BrushObject& brush);
 		void draw_text(const std::wstring& text, Docanto::Geometry::Point<float> pos, Docanto::Color c, float size);
 
-		void draw_rect(Docanto::Geometry::Rectangle<float> r, Docanto::Color c, float thick = 1);
 		void draw_rect(Docanto::Geometry::Rectangle<float> r, Docanto::Color c);
+		void draw_rect(Docanto::Geometry::Rectangle<float> r, Docanto::Color c, float thick = 1);
 		void draw_rect(Docanto::Geometry::Rectangle<float> r, BrushObject& brush, float thick = 1);
 
-		void draw_line(Docanto::Geometry::Point<float> p1, Docanto::Geometry::Point<float> p2, BrushObject& brush, float thick);
-		void draw_line(Docanto::Geometry::Point<float> p1, Docanto::Geometry::Point<float> p2, Docanto::Color c, float thick);
+		void draw_line(Docanto::Geometry::Point<float> p1, Docanto::Geometry::Point<float> p2, BrushObject& brush, float thick = 1);
+		void draw_line(Docanto::Geometry::Point<float> p1, Docanto::Geometry::Point<float> p2, Docanto::Color c, float thick = 1);
 
 		void draw_rect_filled(Docanto::Geometry::Rectangle<float> r, BrushObject& brush);
+		void draw_rect_filled(Docanto::Geometry::Rectangle<float> r, Docanto::Color c);
 
 		std::shared_ptr<Window> get_attached_window() const;
 

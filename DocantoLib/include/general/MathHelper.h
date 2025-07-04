@@ -8,6 +8,52 @@ namespace Docanto {
 		struct Point {
 			T x;
 			T y;
+
+			template <typename W>
+			operator Point<W>() const {
+				return Point<W>((W)x, (W)y);
+			}
+
+
+			Point<T> operator +(const Point<T>& p) const {
+				return Point<T>(x + p.x, y + p.y);
+			}
+
+			Point<T> operator -(const Point<T>& p) const {
+				return Point<T>(x - p.x, y - p.y);
+			}
+
+			Point<T> operator / (const T& f) const {
+				return Point<T>(x / f, y / f);
+			}
+
+			Point<T> operator *(const T& f) const {
+				return Point<T>(x * f, y * f);
+			}
+
+
+			template <typename F>
+			Point<T> operator / (const F& f) const {
+				return Point<T>(x / static_cast<T>(f), y / static_cast<T>(f));
+			}
+
+			template <typename F>
+			Point<T> operator *(const F& f) const {
+				return Point<T>(x * static_cast<T>(f), y * static_cast<T>(f));
+			}
+
+
+			Point<T>& operator /= (const T& f) {
+				x /= f;
+				y /= f;
+				return *this;
+			}
+			Point<T>& operator +=(const Point<T>& p) {
+				x += p.x;
+				y += p.y;
+
+				return *this;
+			}
 		};
 
 		template <typename T>

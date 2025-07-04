@@ -54,6 +54,12 @@ DocantoWin::Direct2DRender::Direct2DRender(std::shared_ptr<Window> w) : m_window
 	if (result != S_OK) {
 		Docanto::Logger::error("Could not initilaize HWND rendering");
 	}	
+
+	// create gpu rsc
+	m_solid_brush = create_brush({});
+
+	// set dpi and size of the target
+	resize(m_window->get_client_size());
 }
 
 DocantoWin::Direct2DRender::~Direct2DRender() {
@@ -111,36 +117,41 @@ void DocantoWin::Direct2DRender::draw_text(const std::wstring& text, Docanto::Ge
 
 void DocantoWin::Direct2DRender::draw_text(const std::wstring& text, Docanto::Geometry::Point<float> pos, Docanto::Color c, float size) {
 	auto format = create_text_format(L"Consolas", size);
-	auto brush = create_brush(c);
-	draw_text(text, pos, format, brush);
+	m_solid_brush->SetColor(ColorToD2D1(c));
+	draw_text(text, pos, format, m_solid_brush);
 }
 
 void DocantoWin::Direct2DRender::draw_rect(Docanto::Geometry::Rectangle<float> r, Docanto::Color c, float thic) {
-	auto brush = create_brush(c);
-	draw_rect(r, brush, thic);
+	m_solid_brush->SetColor(ColorToD2D1(c));
+	draw_rect(r, m_solid_brush, thic);
 }
 void DocantoWin::Direct2DRender::draw_rect(Docanto::Geometry::Rectangle<float> r, Docanto::Color c) {
-	auto brush = create_brush(c);
-	draw_rect(r, brush);
+	m_solid_brush->SetColor(ColorToD2D1(c));
+	draw_rect(r, m_solid_brush);
 }
 
 void DocantoWin::Direct2DRender::draw_rect(Docanto::Geometry::Rectangle<float> r, BrushObject& brush, float thic) {
-	m_renderTarget->DrawRectangle(m_window->PxToDp(r), brush.m_object, thic);
+	m_renderTarget->DrawRectangle(m_window->PxToDp(r), brush.m_object, m_window->PxToDp(thic));
 }
 void DocantoWin::Direct2DRender::draw_rect_filled(Docanto::Geometry::Rectangle<float> r, BrushObject& brush) {
 	m_renderTarget->FillRectangle(m_window->PxToDp(r), brush.m_object);
 }
 
+void DocantoWin::Direct2DRender::draw_rect_filled(Docanto::Geometry::Rectangle<float> r, Docanto::Color c) {
+	m_solid_brush->SetColor(ColorToD2D1(c));
+	m_renderTarget->FillRectangle(m_window->PxToDp(r), m_solid_brush);
+}
+
 void DocantoWin::Direct2DRender::draw_line(Docanto::Geometry::Point<float> p1, Docanto::Geometry::Point<float> p2, BrushObject& brush, float thick) {
 	begin_draw();
-	m_renderTarget->DrawLine(m_window->PxToDp(p1), m_window->PxToDp(p2), brush.m_object, thick);
+	m_renderTarget->DrawLine(m_window->PxToDp(p1), m_window->PxToDp(p2), brush.m_object, m_window->PxToDp(thick));
 	end_draw();
 }
 
 void DocantoWin::Direct2DRender::draw_line(Docanto::Geometry::Point<float> p1, Docanto::Geometry::Point<float> p2, Docanto::Color c, float thick) {
 	begin_draw();
-	auto brush = create_brush(c);
-	draw_line(p1, p2, brush, thick);
+	m_solid_brush->SetColor(ColorToD2D1(c));
+	draw_line(p1, p2, m_solid_brush, thick);
 	end_draw();
 }
 

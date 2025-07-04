@@ -13,6 +13,7 @@ namespace DocantoWin {
 
 		std::function<void()> m_callback_paint;
 		std::function<void(Docanto::Geometry::Dimension<long>)> m_callback_size;
+		std::function<int(Docanto::Geometry::Point<long>)> m_callback_nchittest;
 
 	public:
 		enum WINDOW_STATE {
@@ -53,6 +54,7 @@ namespace DocantoWin {
 		Docanto::Geometry::Dimension<long> get_client_size() const;
 		Docanto::Geometry::Dimension<long> get_window_size() const;
 		Docanto::Geometry::Point<long> get_window_position() const;
+		Docanto::Geometry::Point<long> get_mouse_pos()       const;
 
 		bool is_window_maximized() const;
 
@@ -123,6 +125,7 @@ namespace DocantoWin {
 
 		void set_callback_paint(std::function<void()> callback);
 		void set_callback_size(std::function<void(Docanto::Geometry::Dimension<long>)> callback);
+		void set_callback_nchittest(std::function<int(Docanto::Geometry::Point<long>)> callback);
 
 		friend class Direct2DRender;
 	};

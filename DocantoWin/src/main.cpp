@@ -37,6 +37,10 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 	g_render = std::make_shared<Direct2DRender>(g_window);
 	g_caption = std::make_shared<Caption>(g_render);
 
+	g_window->set_callback_nchittest([&](Docanto::Geometry::Point<long> p) -> int {
+		return g_caption->hittest(p);
+		});
+
 	while (!g_window->get_close_request()) {
 		Window::get_window_messages(true);
 	}

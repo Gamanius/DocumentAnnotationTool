@@ -1,5 +1,6 @@
 #include "Window.h"
 #include <dwmapi.h>
+#include <windowsx.h>
 #pragma comment(lib, "dwmapi.lib")
 
 LRESULT DocantoWin::Window::wndproc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
@@ -58,6 +59,65 @@ LRESULT DocantoWin::Window::parse_message(UINT uMsg, WPARAM wParam, LPARAM lPara
 
 		return 1;
 	}
+	case WM_NCHITTEST:
+	{
+		LRESULT hit = DefWindowProc(m_hwnd, uMsg, wParam, lParam);
+		switch (hit)
+		{
+		case HTNOWHERE:
+		case HTRIGHT:
+		case HTLEFT:
+		case HTTOPLEFT:
+		case HTTOP:
+		case HTTOPRIGHT:
+		case HTBOTTOMRIGHT:
+		case HTBOTTOM:
+		case HTBOTTOMLEFT:
+			return hit;
+		}
+
+		if (m_callback_nchittest) {
+
+			auto xPos = GET_X_LPARAM(lParam);
+			auto yPos = GET_Y_LPARAM(lParam);
+			Docanto::Geometry::Point<long> mousepos = { xPos, yPos };
+			mousepos = mousepos - get_window_position();
+
+			auto hit = m_callback_nchittest(mousepos);
+			
+			if (hit != 0) {
+				InvalidateRect(m_hwnd, nullptr, false);
+				return hit;
+			}
+		}
+
+		break;
+	}
+	case WM_NCLBUTTONDOWN:
+	{
+		switch (wParam) {
+		case HTMINBUTTON:
+		case HTMAXBUTTON:
+		case HTCLOSE:
+			return 0;
+		}
+		break;
+	}
+	case WM_NCLBUTTONUP:
+	{
+		switch (wParam) {
+		case HTMINBUTTON:
+			ShowWindow(m_hwnd, SW_MINIMIZE);
+			return 0;
+		case HTMAXBUTTON:
+			ShowWindow(m_hwnd, is_window_maximized() ? SW_RESTORE : SW_MAXIMIZE);
+			return 0;
+		case HTCLOSE:
+			SendMessage(m_hwnd, WM_CLOSE, 0, 0);
+			return 0;
+		}
+		break;
+	}
 	case WM_SIZE:
 	case WM_SIZING:
 	{
@@ -72,9 +132,8 @@ LRESULT DocantoWin::Window::parse_message(UINT uMsg, WPARAM wParam, LPARAM lPara
 		ValidateRect(m_hwnd, nullptr);
 		return 0;
 	}
-	default:
-		return DefWindowProc(m_hwnd, uMsg, wParam, lParam);
 	}
+	return DefWindowProc(m_hwnd, uMsg, wParam, lParam);
 }
 
 
@@ -157,6 +216,21 @@ Docanto::Geometry::Point<long> DocantoWin::Window::get_window_position() const {
 	return Docanto::Geometry::Point<long>(r.left, r.top);
 }
 
+Docanto::Geometry::Point<long> DocantoWin::Window::get_mouse_pos() const {
+	POINT pt;
+	if (!GetCursorPos(&pt)) {
+		Docanto::Logger::error("Could not retrieve mouse position");
+		return { -1, -1 };
+	}
+
+	if (!ScreenToClient(m_hwnd, &pt)) {
+		Docanto::Logger::error("Could not retrieve mouse position");
+		return { -1, -1 };
+	}
+
+	return { pt.x, pt.y };
+}
+
 bool DocantoWin::Window::is_window_maximized() const {
 	return IsZoomed(m_hwnd) != 0;
 }
@@ -206,4 +280,8 @@ void DocantoWin::Window::set_callback_paint(std::function<void()> callback) {
 
 void DocantoWin::Window::set_callback_size(std::function<void(Docanto::Geometry::Dimension<long>)> callback) {
 	m_callback_size = callback;
+}
+
+void DocantoWin::Window::set_callback_nchittest(std::function<int(Docanto::Geometry::Point<long>)> callback) {
+	m_callback_nchittest = callback;
 }
