@@ -4,6 +4,8 @@
 #include <crtdbg.h>
 #include <cstdlib>
 
+using namespace DocantoWin;
+
 std::shared_ptr<Window> g_window = nullptr;
 std::shared_ptr<Direct2DRender> g_render = nullptr;
 std::shared_ptr<Caption> g_caption = nullptr;

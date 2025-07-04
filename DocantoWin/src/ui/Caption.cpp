@@ -1,12 +1,12 @@
 #include "Caption.h"
 
-Caption::Caption(std::shared_ptr<Direct2DRender> render) : m_render(render) {
+DocantoWin::Caption::Caption(std::shared_ptr<Direct2DRender> render) : m_render(render) {
 	m_caption_text_format = std::move(m_render->create_text_format(L"Consolas", m_render->get_attached_window()->PxToDp(m_caption_height)));
 	m_text_color = std::move(m_render->create_brush({255, 255, 255, 255}));
 	m_caption_color = std::move(m_render->create_brush({50, 50, 255, 255}));
 }
 
-void Caption::draw() {
+void DocantoWin::Caption::draw() {
 	auto window = m_render->get_attached_window();
 
 	auto dims = window->get_window_size();
@@ -47,6 +47,6 @@ void Caption::draw() {
 	m_render->end_draw();
 }
 
-int Caption::hittest() const {
+int DocantoWin::Caption::hittest() const {
 	return 0;
 }

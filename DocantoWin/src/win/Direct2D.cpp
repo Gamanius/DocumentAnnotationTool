@@ -5,10 +5,10 @@
 #pragma comment(lib, "d2d1.lib")
 #pragma comment(lib, "dwrite.lib")
 
-ID2D1Factory* Direct2DRender::m_factory = nullptr;
-IDWriteFactory3* Direct2DRender::m_writeFactory = nullptr;
+ID2D1Factory* DocantoWin::Direct2DRender::m_factory = nullptr;
+IDWriteFactory3* DocantoWin::Direct2DRender::m_writeFactory = nullptr;
 
-Direct2DRender::Direct2DRender(std::shared_ptr<Window> w) : m_window(w) {
+DocantoWin::Direct2DRender::Direct2DRender(std::shared_ptr<Window> w) : m_window(w) {
 	D2D1_FACTORY_OPTIONS option{};
 
 #ifdef _DEBUG
@@ -56,37 +56,37 @@ Direct2DRender::Direct2DRender(std::shared_ptr<Window> w) : m_window(w) {
 	}	
 }
 
-Direct2DRender::~Direct2DRender() {
+DocantoWin::Direct2DRender::~Direct2DRender() {
 	SafeRelease(m_factory);
 	SafeRelease(m_renderTarget);
 	SafeRelease(m_writeFactory);
 }
 
-void Direct2DRender::begin_draw() {
+void DocantoWin::Direct2DRender::begin_draw() {
 	std::lock_guard lock(draw_lock);
 	if (m_isRenderinProgress == 0)
 		m_renderTarget->BeginDraw();
 	m_isRenderinProgress++;
 }
 
-void Direct2DRender::end_draw() {
+void DocantoWin::Direct2DRender::end_draw() {
 	std::lock_guard lock(draw_lock);
 	m_isRenderinProgress--;
 	if (m_isRenderinProgress == 0)
 		m_renderTarget->EndDraw();
 }
 
-void Direct2DRender::clear(Docanto::Color c) {
+void DocantoWin::Direct2DRender::clear(Docanto::Color c) {
 	begin_draw();
 	m_renderTarget->Clear(ColorToD2D1(c));
 	end_draw();
 }
 
-std::shared_ptr<Window> Direct2DRender::get_attached_window() const {
+std::shared_ptr<DocantoWin::Window> DocantoWin::Direct2DRender::get_attached_window() const {
 	return m_window;
 }
 
-void Direct2DRender::resize(Docanto::Geometry::Dimension<long> r) {
+void DocantoWin::Direct2DRender::resize(Docanto::Geometry::Dimension<long> r) {
 	m_renderTarget->Resize(DimensionToD2D1(r));
 
 	// we should also check if the dpi changed
@@ -95,7 +95,7 @@ void Direct2DRender::resize(Docanto::Geometry::Dimension<long> r) {
 	m_renderTarget->SetDpi(static_cast<float>(dpiX), static_cast<float>(dpiY));
 }
 
-void Direct2DRender::draw_text(const std::wstring& text, Docanto::Geometry::Point<float> pos, TextFormatObject& format, BrushObject& brush) {
+void DocantoWin::Direct2DRender::draw_text(const std::wstring& text, Docanto::Geometry::Point<float> pos, TextFormatObject& format, BrushObject& brush) {
 	auto layout = create_text_layout(text, format);
 
 	begin_draw();
@@ -109,42 +109,42 @@ void Direct2DRender::draw_text(const std::wstring& text, Docanto::Geometry::Poin
 	end_draw();
 }
 
-void Direct2DRender::draw_text(const std::wstring& text, Docanto::Geometry::Point<float> pos, Docanto::Color c, float size) {
+void DocantoWin::Direct2DRender::draw_text(const std::wstring& text, Docanto::Geometry::Point<float> pos, Docanto::Color c, float size) {
 	auto format = create_text_format(L"Consolas", size);
 	auto brush = create_brush(c);
 	draw_text(text, pos, format, brush);
 }
 
-void Direct2DRender::draw_rect(Docanto::Geometry::Rectangle<float> r, Docanto::Color c, float thic) {
+void DocantoWin::Direct2DRender::draw_rect(Docanto::Geometry::Rectangle<float> r, Docanto::Color c, float thic) {
 	auto brush = create_brush(c);
 	draw_rect(r, brush, thic);
 }
-void Direct2DRender::draw_rect(Docanto::Geometry::Rectangle<float> r, Docanto::Color c) {
+void DocantoWin::Direct2DRender::draw_rect(Docanto::Geometry::Rectangle<float> r, Docanto::Color c) {
 	auto brush = create_brush(c);
 	draw_rect(r, brush);
 }
 
-void Direct2DRender::draw_rect(Docanto::Geometry::Rectangle<float> r, BrushObject& brush, float thic) {
+void DocantoWin::Direct2DRender::draw_rect(Docanto::Geometry::Rectangle<float> r, BrushObject& brush, float thic) {
 	m_renderTarget->DrawRectangle(m_window->PxToDp(r), brush.m_object, thic);
 }
-void Direct2DRender::draw_rect_filled(Docanto::Geometry::Rectangle<float> r, BrushObject& brush) {
+void DocantoWin::Direct2DRender::draw_rect_filled(Docanto::Geometry::Rectangle<float> r, BrushObject& brush) {
 	m_renderTarget->FillRectangle(m_window->PxToDp(r), brush.m_object);
 }
 
-void Direct2DRender::draw_line(Docanto::Geometry::Point<float> p1, Docanto::Geometry::Point<float> p2, BrushObject& brush, float thick) {
+void DocantoWin::Direct2DRender::draw_line(Docanto::Geometry::Point<float> p1, Docanto::Geometry::Point<float> p2, BrushObject& brush, float thick) {
 	begin_draw();
 	m_renderTarget->DrawLine(m_window->PxToDp(p1), m_window->PxToDp(p2), brush.m_object, thick);
 	end_draw();
 }
 
-void Direct2DRender::draw_line(Docanto::Geometry::Point<float> p1, Docanto::Geometry::Point<float> p2, Docanto::Color c, float thick) {
+void DocantoWin::Direct2DRender::draw_line(Docanto::Geometry::Point<float> p1, Docanto::Geometry::Point<float> p2, Docanto::Color c, float thick) {
 	begin_draw();
 	auto brush = create_brush(c);
 	draw_line(p1, p2, brush, thick);
 	end_draw();
 }
 
-Direct2DRender::TextFormatObject Direct2DRender::create_text_format(std::wstring font, float size) {
+DocantoWin::Direct2DRender::TextFormatObject DocantoWin::Direct2DRender::create_text_format(std::wstring font, float size) {
 	TextFormatObject text;
 	IDWriteTextFormat* textformat = nullptr;
 
@@ -168,7 +168,7 @@ Direct2DRender::TextFormatObject Direct2DRender::create_text_format(std::wstring
 	return std::move(text);
 }
 
-Direct2DRender::TextLayoutObject Direct2DRender::create_text_layout(const std::wstring &text, TextFormatObject& format) {
+DocantoWin::Direct2DRender::TextLayoutObject DocantoWin::Direct2DRender::create_text_layout(const std::wstring &text, TextFormatObject& format) {
 	TextLayoutObject obj;
 	IDWriteTextLayout* textLayout;
 	auto result = m_writeFactory->CreateTextLayout(
@@ -188,7 +188,7 @@ Direct2DRender::TextLayoutObject Direct2DRender::create_text_layout(const std::w
 	return std::move(obj);
 }
 
-Direct2DRender::BrushObject Direct2DRender::create_brush(Docanto::Color c) {
+DocantoWin::Direct2DRender::BrushObject DocantoWin::Direct2DRender::create_brush(Docanto::Color c) {
 	BrushObject obj;
 	ID2D1SolidColorBrush* brush = nullptr;
 	auto result = m_renderTarget->CreateSolidColorBrush(ColorToD2D1(c), &brush);

@@ -2,7 +2,7 @@
 #include <dwmapi.h>
 #pragma comment(lib, "dwmapi.lib")
 
-LRESULT Window::wndproc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+LRESULT DocantoWin::Window::wndproc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 	Window* me = nullptr;
 	if (uMsg == WM_NCCREATE) {
 		auto cs = reinterpret_cast<CREATESTRUCT*>(lParam);
@@ -22,7 +22,7 @@ LRESULT Window::wndproc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 	}
 }
 
-LRESULT Window::parse_message(UINT uMsg, WPARAM wParam, LPARAM lParam) {
+LRESULT DocantoWin::Window::parse_message(UINT uMsg, WPARAM wParam, LPARAM lParam) {
 	switch (uMsg) {
 	case WM_CREATE:
 	{
@@ -78,7 +78,7 @@ LRESULT Window::parse_message(UINT uMsg, WPARAM wParam, LPARAM lParam) {
 }
 
 
-Window::Window(HINSTANCE h) {
+DocantoWin::Window::Window(HINSTANCE h) {
 	if (!SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2))
 		Docanto::Logger::warn("Could not set DPI awareness");
 
@@ -125,47 +125,47 @@ Window::Window(HINSTANCE h) {
 	Docanto::Logger::success("Initialized window!");
 }
 
-Window::~Window() {
+DocantoWin::Window::~Window() {
 	if (!DestroyWindow(m_hwnd))
 		Docanto::Logger::error("Error when destroying window");
 }
 
 
-UINT Window::get_dpi() const {
+UINT DocantoWin::Window::get_dpi() const {
 	return GetDpiForWindow(m_hwnd);
 }
 
-void Window::set_window_title(const std::wstring& s) {
+void DocantoWin::Window::set_window_title(const std::wstring& s) {
 	SetWindowText(m_hwnd, s.c_str());
 }
 
-Docanto::Geometry::Dimension<long> Window::get_client_size() const {
+Docanto::Geometry::Dimension<long> DocantoWin::Window::get_client_size() const {
 	RECT r;
 	GetClientRect(m_hwnd, &r);
 	return Docanto::Geometry::Dimension<long>(r.right, r.bottom);
 }
 
-Docanto::Geometry::Dimension<long> Window::get_window_size() const {
+Docanto::Geometry::Dimension<long> DocantoWin::Window::get_window_size() const {
 	RECT r;
 	DwmGetWindowAttribute(m_hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, &r, sizeof(RECT));
 	return RectToDimension(r);
 }
 
-Docanto::Geometry::Point<long> Window::get_window_position() const {
+Docanto::Geometry::Point<long> DocantoWin::Window::get_window_position() const {
 	RECT r;
 	DwmGetWindowAttribute(m_hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, &r, sizeof(RECT));
 	return Docanto::Geometry::Point<long>(r.left, r.top);
 }
 
-bool Window::is_window_maximized() const {
+bool DocantoWin::Window::is_window_maximized() const {
 	return IsZoomed(m_hwnd) != 0;
 }
 
-bool Window::get_close_request() const {
+bool DocantoWin::Window::get_close_request() const {
 	return m_closeRequest;
 }
 
-void Window::set_state(WINDOW_STATE state) {
+void DocantoWin::Window::set_state(WINDOW_STATE state) {
 	int nCmdShow = 0;
 	switch (state) {
 	case WINDOW_STATE::HIDDEN:    nCmdShow = SW_HIDE;     break;
@@ -176,11 +176,11 @@ void Window::set_state(WINDOW_STATE state) {
 	ShowWindow(m_hwnd, nCmdShow);
 }
 
-void Window::set_window_size(Docanto::Geometry::Rectangle<long> r) {
+void DocantoWin::Window::set_window_size(Docanto::Geometry::Rectangle<long> r) {
 	SetWindowPos(m_hwnd, HWND_TOP, r.x, r.y, r.width, r.height, SWP_NOZORDER);
 }
 
-void Window::get_window_messages(bool blocking) {
+void DocantoWin::Window::get_window_messages(bool blocking) {
 	MSG msg;
 	BOOL result;
 
@@ -199,11 +199,11 @@ void Window::get_window_messages(bool blocking) {
 }
 
 
-void Window::set_callback_paint(std::function<void()> callback) {
+void DocantoWin::Window::set_callback_paint(std::function<void()> callback) {
 	m_callback_paint = callback;
 }
 
 
-void Window::set_callback_size(std::function<void(Docanto::Geometry::Dimension<long>)> callback) {
+void DocantoWin::Window::set_callback_size(std::function<void(Docanto::Geometry::Dimension<long>)> callback) {
 	m_callback_size = callback;
 }
