@@ -76,6 +76,12 @@ void Direct2DRender::end_draw() {
 		m_renderTarget->EndDraw();
 }
 
+void Direct2DRender::clear(Docanto::Color c) {
+	begin_draw();
+	m_renderTarget->Clear(ColorToD2D1(c));
+	end_draw();
+}
+
 std::shared_ptr<Window> Direct2DRender::get_attached_window() const {
 	return m_window;
 }

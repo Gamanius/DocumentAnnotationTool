@@ -72,6 +72,8 @@ public:
 	void begin_draw();
 	void end_draw();
 
+	void clear(Docanto::Color c);
+
 	void draw_text(const std::wstring& text, Docanto::Geometry::Point<float> pos, TextFormatObject& format, BrushObject& brush);
 	void draw_text(const std::wstring& text, Docanto::Geometry::Point<float> pos, Docanto::Color c, float size);
 

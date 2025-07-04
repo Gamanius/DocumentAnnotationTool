@@ -121,6 +121,8 @@ Window::Window(HINSTANCE h) {
 		Docanto::Logger::error("Couldn't add Mouse input into Pointer Input Stack API");
 		return;
 	}
+
+	Docanto::Logger::success("Initialized window!");
 }
 
 Window::~Window() {

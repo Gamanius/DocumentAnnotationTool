@@ -9,6 +9,7 @@ std::shared_ptr<Direct2DRender> g_render = nullptr;
 std::shared_ptr<Caption> g_caption = nullptr;
 
 void paint_callback() {
+	g_render->clear({ 50, 50, 50 });
 	g_caption->draw();
 }
 
@@ -16,9 +17,14 @@ void size_callback(Docanto::Geometry::Dimension<long> dims) {
 	g_render->resize(dims);
 }
 
+void exit_func() {
+	Docanto::Logger::print_to_debug();
+}
+
 int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nCmdShow) {
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 	Docanto::Logger::init();
+	std::atexit(exit_func);
 
 
 	g_window = std::make_shared<Window>(hInstance);
@@ -31,7 +37,6 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 
 	while (!g_window->get_close_request()) {
 		Window::get_window_messages(true);
-		Docanto::Logger::print_to_debug();
 	}
 
 	Docanto::Logger::print_to_debug();
