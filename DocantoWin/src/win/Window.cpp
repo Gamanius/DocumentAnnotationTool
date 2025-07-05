@@ -59,6 +59,7 @@ LRESULT DocantoWin::Window::parse_message(UINT uMsg, WPARAM wParam, LPARAM lPara
 
 		return 1;
 	}
+
 	case WM_NCHITTEST:
 	{
 		LRESULT hit = DefWindowProc(m_hwnd, uMsg, wParam, lParam);
@@ -86,7 +87,7 @@ LRESULT DocantoWin::Window::parse_message(UINT uMsg, WPARAM wParam, LPARAM lPara
 			auto hit = m_callback_nchittest(mousepos);
 			
 			if (hit != 0) {
-				InvalidateRect(m_hwnd, nullptr, false);
+				PostMessage(m_hwnd, WM_PAINT, 0, 0);
 				return hit;
 			}
 		}
@@ -128,7 +129,9 @@ LRESULT DocantoWin::Window::parse_message(UINT uMsg, WPARAM wParam, LPARAM lPara
 	}
 	case WM_PAINT:
 	{
-		m_callback_paint();
+		if (m_callback_paint) {
+			m_callback_paint();
+		}
 		ValidateRect(m_hwnd, nullptr);
 		return 0;
 	}

@@ -1,6 +1,9 @@
 #include "../include.h"
 #include "helper/Geometry.h"
 
+#ifndef _DOCANTOWIN_WINDOW_H_
+#define _DOCANTOWIN_WINDOW_H_
+
 
 namespace DocantoWin {
 	class Direct2DRender;
@@ -130,3 +133,5 @@ namespace DocantoWin {
 		friend class Direct2DRender;
 	};
 }
+
+#endif // !_DOCANTOWIN_WINDOW_H_

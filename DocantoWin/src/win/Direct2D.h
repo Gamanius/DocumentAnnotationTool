@@ -1,6 +1,10 @@
 #include "helper/Geometry.h"
 #include "Window.h"
 
+#ifndef _DOCANTOWIN_DIRECT2D_H_
+#define _DOCANTOWIN_DIRECT2D_H_
+
+
 namespace DocantoWin {
 	inline void SafeRelease(IUnknown* ptr) {
 		if (ptr) {
@@ -109,3 +113,4 @@ namespace DocantoWin {
 	};
 
 }
+#endif // !_DOCANTOWIN_DIRECT2D_H_

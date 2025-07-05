@@ -1,24 +1,20 @@
 #include "Caption.h"
 
-Docanto::Geometry::Rectangle<float> DocantoWin::Caption::get_close_btn_rect() const {
-	auto caption_width = m_render->get_attached_window()->get_window_size().width;
+std::tuple<Docanto::Geometry::Rectangle<float>, Docanto::Geometry::Rectangle<float>, Docanto::Geometry::Rectangle<float>, Docanto::Geometry::Rectangle<float>> DocantoWin::Caption::get_caption_rects() const {
+	auto window = m_render->get_attached_window();
 
-	return Docanto::Geometry::Rectangle<float>(caption_width - m_caption_height, 0, m_caption_height, m_caption_height);
-}
+	auto caption_width = window->get_window_size().width;
+	auto is_maximized = window->is_window_maximized();
 
-Docanto::Geometry::Rectangle<float> DocantoWin::Caption::get_max_btn_rect() const {
-	auto caption_width = m_render->get_attached_window()->get_window_size().width;
-	return Docanto::Geometry::Rectangle<float>(caption_width - m_caption_height * 2, 0, m_caption_height, m_caption_height);
-}
+	float padding = static_cast<float>(GetSystemMetricsForDpi(SM_CXPADDEDBORDER, window->get_dpi()) * is_maximized);
 
-Docanto::Geometry::Rectangle<float> DocantoWin::Caption::get_min_btn_rect() const {
-	auto caption_width = m_render->get_attached_window()->get_window_size().width;
-	return Docanto::Geometry::Rectangle<float>(caption_width - m_caption_height * 3, 0, m_caption_height, m_caption_height);
-}
+	return {
+		{ 0, padding, (float)caption_width, m_caption_height },								// Caption bar
+		{ caption_width - m_caption_height, padding, m_caption_height, m_caption_height },		// close btn
+		{ caption_width - m_caption_height * 2, padding, m_caption_height, m_caption_height },	// maxi  btn
+		{ caption_width - m_caption_height * 3, padding, m_caption_height, m_caption_height },	// mini  btn
 
-Docanto::Geometry::Rectangle<float> DocantoWin::Caption::get_caption_rect() const {
-	auto caption_width = m_render->get_attached_window()->get_window_size().width;
-	return Docanto::Geometry::Rectangle<float>({ 0, 0, (float)caption_width, m_caption_height });
+	};
 }
 
 DocantoWin::Caption::Caption(std::shared_ptr<Direct2DRender> render) : m_render(render) {
@@ -35,8 +31,16 @@ void DocantoWin::Caption::draw() {
 	auto dims = window->get_window_size();
 	m_render->begin_draw();
 
+
+	auto [
+		caption_rec,
+		close_btn_rec,
+		max_btn_rec,
+		min_btn_rec
+	] = get_caption_rects();
+
 	// draw the caption bar
-	m_render->draw_rect_filled(get_caption_rect(), m_caption_color);
+	m_render->draw_rect_filled(caption_rec, m_caption_color);
 
 	// then draw the title
 	m_render->draw_text(L"Docanto", {0, 0}, m_caption_title_text_format, m_title_text_color);
@@ -44,61 +48,72 @@ void DocantoWin::Caption::draw() {
 	auto hit = hittest(window->get_mouse_pos());
 
 	// close button
-	auto close_btn_rec = get_close_btn_rect();
 	if (hit == HTCLOSE) {
 		m_render->draw_rect_filled(close_btn_rec, { 255, 0, 0 });
 	}
 	m_render->draw_line(
-		{ close_btn_rec.x + close_btn_rec.height / 4, close_btn_rec.height / 4 },
-		{ close_btn_rec.x + close_btn_rec.height * 3 / 4, close_btn_rec.height * 3 / 4 },
+		{ close_btn_rec.x + close_btn_rec.height / 4, close_btn_rec.height / 4 + close_btn_rec.y },
+		{ close_btn_rec.x + close_btn_rec.height * 3 / 4, close_btn_rec.height * 3 / 4 + close_btn_rec.y},
 		m_caption_button_line_color, button_thickness);
 	m_render->draw_line(
-		{ close_btn_rec.x + close_btn_rec.height * 3 / 4, close_btn_rec.height / 4 },
-		{ close_btn_rec.x + close_btn_rec.height / 4, close_btn_rec.height * 3 / 4 },
+		{ close_btn_rec.x + close_btn_rec.height * 3 / 4, close_btn_rec.height / 4 + close_btn_rec.y },
+		{ close_btn_rec.x + close_btn_rec.height / 4, close_btn_rec.height * 3 / 4 + close_btn_rec.y },
 		m_caption_button_line_color, button_thickness);
 
 	// Maximize button
-	auto max_btn_rec = get_max_btn_rect();
+	if (hit == HTMAXBUTTON) {
+		m_render->draw_rect_filled(max_btn_rec, { 100, 100, 255 });
+	}
 	m_render->draw_rect(
-		Docanto::Geometry::Rectangle<float>({ max_btn_rec.x + max_btn_rec.height / 4, max_btn_rec.height / 4 },
-		  { max_btn_rec.x + max_btn_rec.height * 3 / 4, max_btn_rec.height * 3 / 4}),
+		Docanto::Geometry::Rectangle<float>({ std::ceil(max_btn_rec.x + max_btn_rec.height / 4) + 0.5f, std::ceil(max_btn_rec.height / 4 + max_btn_rec.y) + 0.5f},
+		  { std::ceil(max_btn_rec.x + max_btn_rec.height * 3 / 4) + 0.5f, std::ceil(max_btn_rec.height * 3 / 4 + max_btn_rec.y) + 0.5f}),
 		m_caption_button_line_color, button_thickness);
 
 	// Minimize
-	auto min_btn_rec = get_min_btn_rect();
+	if (hit == HTMINBUTTON) {
+		m_render->draw_rect_filled(min_btn_rec, { 100, 100, 255 });
+	}
 	m_render->draw_line(
-		{ min_btn_rec.x + min_btn_rec.height / 4, min_btn_rec.height / 2 },
-		{ min_btn_rec.x + min_btn_rec.height * 3 / 4, min_btn_rec.height / 2 },
+		{ std::ceil(min_btn_rec.x + min_btn_rec.height / 4) + 0.5f, std::ceil(min_btn_rec.height / 2 + min_btn_rec.y) + 0.5f },
+		{ std::ceil(min_btn_rec.x + min_btn_rec.height * 3 / 4) + 0.5f, std::ceil(min_btn_rec.height / 2 + min_btn_rec.y) + 0.5f},
 		m_caption_button_line_color, button_thickness);
 
 	m_render->end_draw();
 }
 
 int DocantoWin::Caption::hittest(Docanto::Geometry::Point<long> mousepos) const {
-	auto dpi = m_render->get_attached_window()->get_dpi();
-	auto caption_width = m_render->get_attached_window()->get_window_size().width;
+	auto window = m_render->get_attached_window();
+	auto dpi = window->get_dpi();
+	auto caption_width = window->get_window_size().width;
 
 
 	int frame_y = GetSystemMetricsForDpi(SM_CYFRAME, dpi);
 	int padding = GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi);
 
+	auto [
+		caption_rec,
+		close_btn_rec,
+		max_btn_rec,
+		min_btn_rec
+	] = get_caption_rects();
+
 	Docanto::Geometry::Rectangle<int> top_frame(0, 0, caption_width, frame_y + padding);
-	if (top_frame.intersects(mousepos)) {
+	if (!window->is_window_maximized() and top_frame.intersects(mousepos)) {
 		return HTTOP;
 	}
 
-	if (get_close_btn_rect().intersects(mousepos)) {
+	if (close_btn_rec.intersects(mousepos)) {
 		return HTCLOSE;
 	}
-	if (get_max_btn_rect().intersects(mousepos)) {
+	if (max_btn_rec.intersects(mousepos)) {
 		return HTMAXBUTTON;
 	}
 
-	if (get_min_btn_rect().intersects(mousepos)) {
+	if (min_btn_rec.intersects(mousepos)) {
 		return HTMINBUTTON;
 	}
 
-	if (get_caption_rect().intersects(mousepos)) {
+	if (caption_rec.intersects(mousepos)) {
 		return HTCAPTION;
 	}
 

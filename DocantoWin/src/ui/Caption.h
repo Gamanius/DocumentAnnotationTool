@@ -8,14 +8,15 @@ namespace DocantoWin {
 		Direct2DRender::BrushObject m_caption_color;
 		Direct2DRender::BrushObject m_caption_button_line_color;
 
-		float m_caption_height = 40.0f;
+		float m_caption_height = 24.0f;
 
 		std::shared_ptr<Direct2DRender> m_render;
 
-		Docanto::Geometry::Rectangle<float> get_close_btn_rect() const;
-		Docanto::Geometry::Rectangle<float> get_max_btn_rect() const;
-		Docanto::Geometry::Rectangle<float> get_min_btn_rect() const;
-		Docanto::Geometry::Rectangle<float> get_caption_rect() const;
+		std::tuple<
+			Docanto::Geometry::Rectangle<float>,
+			Docanto::Geometry::Rectangle<float>,
+			Docanto::Geometry::Rectangle<float>,
+			Docanto::Geometry::Rectangle<float>> get_caption_rects() const;
 
 	public:
 
