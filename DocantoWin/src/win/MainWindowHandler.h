@@ -18,6 +18,7 @@ namespace DocantoWin {
 
 		void paint();
 		void size(Docanto::Geometry::Dimension<long> d);
+		void key(Window::VK key, bool pressed);
 	public:
 		MainWindowHandler(HINSTANCE instance);
 

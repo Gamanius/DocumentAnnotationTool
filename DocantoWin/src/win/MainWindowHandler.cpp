@@ -16,6 +16,68 @@ void DocantoWin::MainWindowHandler::size(Docanto::Geometry::Dimension<long> d) {
 	m_render->resize(d);
 }
 
+void DocantoWin::MainWindowHandler::key(Window::VK key, bool pressed) {
+	if (pressed == false) {
+		return;
+	}
+
+	using enum Window::VK;
+
+	switch (key) {
+	case F4:
+	{
+		if (m_mainwindow->is_key_pressed(ALT)) {
+			m_mainwindow->send_close_request();
+		}
+		break;
+	}
+	case O:
+	{
+
+		m_pdfhandler = std::make_shared<PDFHandler>(L"C:/repos/Docanto/pdf_tests/Annotation pdf.pdf", m_render);
+		m_pdfhandler->render();
+		m_mainwindow->send_paint_request();
+		break;
+	}
+	case DOWNARROW:
+	{
+		m_render->add_transform_matrix({ 0, -100 });
+		m_mainwindow->send_paint_request();
+		break;
+	}
+	case UPARROW:
+	{
+		m_render->add_transform_matrix({ 0, 100 });
+		m_mainwindow->send_paint_request();
+		break;
+	}
+	case LEFTARROW:
+	{
+		m_render->add_transform_matrix({ 100, 0 });
+		m_mainwindow->send_paint_request();
+		break;
+	}
+	case RIGHTARROW:
+	{
+		m_render->add_transform_matrix({ -100, 0 });
+		m_mainwindow->send_paint_request();
+		break;
+	}
+	case OEM_PLUS:
+	{
+		m_render->add_scale_matrix(1.05, m_mainwindow->get_mouse_pos());
+		m_mainwindow->send_paint_request();
+		break;
+	}
+	case OEM_MINUS:
+	{
+		m_render->add_scale_matrix(0.95, m_mainwindow->get_mouse_pos());
+		m_mainwindow->send_paint_request();
+		break;
+	}
+	}
+}
+
 DocantoWin::MainWindowHandler::MainWindowHandler(HINSTANCE instance) {
 	m_mainwindow = std::make_shared<Window>(instance);
 	m_render = std::make_shared<Direct2DRender>(m_mainwindow);
@@ -31,6 +93,10 @@ DocantoWin::MainWindowHandler::MainWindowHandler(HINSTANCE instance) {
 
 	m_mainwindow->set_callback_size([&](Docanto::Geometry::Dimension<long> d) {
 		this->size(d);
+	});
+
+	m_mainwindow->set_callback_key([&](Window::VK key, bool presed) {
+		this->key(key, presed);
 	});
 
 

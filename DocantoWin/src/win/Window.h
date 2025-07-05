@@ -14,10 +14,6 @@ namespace DocantoWin {
 
 		bool m_closeRequest = false;
 
-		std::function<void()> m_callback_paint;
-		std::function<void(Docanto::Geometry::Dimension<long>)> m_callback_size;
-		std::function<int(Docanto::Geometry::Point<long>)> m_callback_nchittest;
-
 	public:
 		enum WINDOW_STATE {
 			HIDDEN,
@@ -32,6 +28,158 @@ namespace DocantoWin {
 			STYLUS,
 			TOUCH
 		};
+
+		enum VK {
+			LEFT_MB,
+			RIGHT_MB,
+			CANCEL,
+			MIDDLE_MB,
+			X1_MB,
+			X2_MB,
+			LEFT_SHIFT,
+			RIGHT_SHIFT,
+			LEFT_CONTROL,
+			RIGHT_CONTROL,
+			BACKSPACE,
+			TAB,
+			ENTER,
+			ALT,
+			PAUSE,
+			CAPSLOCK,
+			ESCAPE,
+			SPACE,
+			PAGE_UP,
+			PAGE_DOWN,
+			END,
+			HOME,
+			LEFTARROW,
+			UPARROW,
+			RIGHTARROW,
+			DOWNARROW,
+			SELECT,
+			PRINT,
+			EXECUTE,
+			PRINT_SCREEN,
+			INSERT,
+			DEL,
+			HELP,
+			KEY_0,
+			KEY_1,
+			KEY_2,
+			KEY_3,
+			KEY_4,
+			KEY_5,
+			KEY_6,
+			KEY_7,
+			KEY_8,
+			KEY_9,
+			A,
+			B,
+			C,
+			D,
+			E,
+			F,
+			G,
+			H,
+			I,
+			J,
+			K,
+			L,
+			M,
+			N,
+			O,
+			P,
+			Q,
+			R,
+			S,
+			T,
+			U,
+			V,
+			W,
+			X,
+			Y,
+			Z,
+			LEFT_WINDOWS,
+			RIGHT_WINDOWS,
+			APPLICATION,
+			SLEEP,
+			SCROLL_LOCK,
+			LEFT_MENU,
+			RIGHT_MENU,
+			VOLUME_MUTE,
+			VOLUME_DOWN,
+			VOLUME_UP,
+			MEDIA_NEXT,
+			MEDIA_LAST,
+			MEDIA_STOP,
+			MEDIA_PLAY_PAUSE,
+			OEM_1,
+			OEM_2,
+			OEM_3,
+			OEM_4,
+			OEM_5,
+			OEM_6,
+			OEM_7,
+			OEM_8,
+			OEM_102,
+			OEM_CLEAR,
+			OEM_PLUS,
+			OEM_COMMA,
+			OEM_MINUS,
+			OEM_PERIOD,
+			NUMPAD_0,
+			NUMPAD_1,
+			NUMPAD_2,
+			NUMPAD_3,
+			NUMPAD_4,
+			NUMPAD_5,
+			NUMPAD_6,
+			NUMPAD_7,
+			NUMPAD_8,
+			NUMPAD_9,
+			NUMPAD_MULTIPLY,
+			NUMPAD_ADD,
+			NUMPAD_SEPERATOR,
+			NUMPAD_SUBTRACT,
+			NUMPAD_COMMA,
+			NUMPAD_DIVIDE,
+			NUMPAD_LOCK,
+			F1,
+			F2,
+			F3,
+			F4,
+			F5,
+			F6,
+			F7,
+			F8,
+			F9,
+			F10,
+			F11,
+			F12,
+			F13,
+			F14,
+			F15,
+			F16,
+			F17,
+			F18,
+			F19,
+			F20,
+			F21,
+			F22,
+			F23,
+			F24,
+			PLAY,
+			ZOOM,
+			UNKWON
+		};
+
+
+	private:
+			std::function<void()> m_callback_paint;
+			std::function<void(Docanto::Geometry::Dimension<long>)> m_callback_size;
+			std::function<int(Docanto::Geometry::Point<long>)> m_callback_nchittest;
+			std::function<void(VK, bool)>  m_callback_key;
+	public:
 
 		static LRESULT wndproc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 		LRESULT parse_message(UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -121,6 +269,11 @@ namespace DocantoWin {
 
 
 		bool get_close_request() const;
+		void send_close_request();
+		void send_paint_request();
+
+		static bool is_key_pressed(VK key);
+
 
 		void set_state(WINDOW_STATE state);
 		// Sets a new windowsize
@@ -129,6 +282,7 @@ namespace DocantoWin {
 		void set_callback_paint(std::function<void()> callback);
 		void set_callback_size(std::function<void(Docanto::Geometry::Dimension<long>)> callback);
 		void set_callback_nchittest(std::function<int(Docanto::Geometry::Point<long>)> callback);
+		void set_callback_key(std::function<void(VK, bool)> callback);
 
 		friend class Direct2DRender;
 	};
