@@ -7,10 +7,10 @@
 
 namespace Docanto {
 	struct Image : public File {
-		Geometry::Dimension<size_t> dims;
-		size_t stride;
-		size_t components;
-		size_t  dpi;
+		Geometry::Dimension<size_t> dims = {};
+		size_t stride = 0;
+		size_t components = 0;
+		size_t  dpi = 0;
 
 		Image() = default;
 		Image(std::unique_ptr<byte> data, size_t size, size_t width);

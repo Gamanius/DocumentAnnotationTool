@@ -21,6 +21,8 @@ namespace DocantoWin {
 
 		ID2D1HwndRenderTarget* m_renderTarget = nullptr;
 
+		D2D1::Matrix3x2F m_transformPosMatrix = D2D1::Matrix3x2F::Identity(), m_transformScaleMatrix = D2D1::Matrix3x2F::Identity();
+
 		std::atomic<UINT32> m_isRenderinProgress = 0;
 		std::mutex draw_lock;
 
@@ -103,6 +105,23 @@ namespace DocantoWin {
 		void draw_rect_filled(Docanto::Geometry::Rectangle<float> r, BrushObject& brush);
 		void draw_rect_filled(Docanto::Geometry::Rectangle<float> r, Docanto::Color c);
 
+		void draw_bitmap(Docanto::Geometry::Point<float> where, BitmapObject& obj);
+
+		void set_current_transform_active();
+		void set_identity_transform_active();
+
+		void set_transform_matrix(Docanto::Geometry::Point<float> p);
+		void set_transform_matrix(D2D1::Matrix3x2F m);
+		void add_transform_matrix(Docanto::Geometry::Point<float> p);
+		void set_scale_matrix(float scale, Docanto::Geometry::Point<float> center);
+		void set_scale_matrix(D2D1::Matrix3x2F m);
+		void add_scale_matrix(float scale, Docanto::Geometry::Point<float> center);
+
+		float get_transform_scale() const;
+		D2D1::Matrix3x2F get_scale_matrix() const;
+		Docanto::Geometry::Point<float> get_zoom_center() const;
+		Docanto::Geometry::Point<float> get_transform_pos() const;
+
 		std::shared_ptr<Window> get_attached_window() const;
 
 		void resize(Docanto::Geometry::Dimension<long> r);
@@ -110,6 +129,7 @@ namespace DocantoWin {
 		BrushObject create_brush(Docanto::Color c);
 		TextFormatObject create_text_format(std::wstring font, float size);
 		TextLayoutObject create_text_layout(const std::wstring& text, TextFormatObject& format);
+		BitmapObject create_bitmap(const Docanto::Image& i);
 	};
 
 }

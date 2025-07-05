@@ -20,9 +20,8 @@ DocantoWin::Direct2DRender::Direct2DRender(std::shared_ptr<Window> w) : m_window
 	HRESULT result = S_OK;
 	if (m_factory == nullptr) {
 		result = D2D1CreateFactory(D2D1_FACTORY_TYPE_MULTI_THREADED, option, &m_factory);
-
-		if (result != S_OK) {
-			Docanto::Logger::error("Could not initialize Direct2D");
+		
+		if (!WIN_ASSERT_OK(result, "Could not initialize Direct2D")) {
 			return;
 		}
 	}
@@ -142,6 +141,13 @@ void DocantoWin::Direct2DRender::draw_rect_filled(Docanto::Geometry::Rectangle<f
 	m_renderTarget->FillRectangle(m_window->PxToDp(r), m_solid_brush);
 }
 
+void DocantoWin::Direct2DRender::draw_bitmap(Docanto::Geometry::Point<float> where, BitmapObject& obj) {
+	begin_draw();
+	auto size = obj.m_object->GetSize();
+	m_renderTarget->DrawBitmap(obj.m_object, D2D1::RectF(where.x, where.y, size.width + where.x , size.height + where.y));
+	end_draw();
+}
+
 void DocantoWin::Direct2DRender::draw_line(Docanto::Geometry::Point<float> p1, Docanto::Geometry::Point<float> p2, BrushObject& brush, float thick) {
 	begin_draw();
 	m_renderTarget->DrawLine(m_window->PxToDp(p1), m_window->PxToDp(p2), brush.m_object, m_window->PxToDp(thick));
@@ -154,6 +160,65 @@ void DocantoWin::Direct2DRender::draw_line(Docanto::Geometry::Point<float> p1, D
 	draw_line(p1, p2, m_solid_brush, thick);
 	end_draw();
 }
+
+
+void DocantoWin::Direct2DRender::set_current_transform_active() {
+	m_renderTarget->SetTransform(m_transformPosMatrix * m_transformScaleMatrix);
+}
+
+void DocantoWin::Direct2DRender::set_identity_transform_active() {
+	m_renderTarget->SetTransform(D2D1::Matrix3x2F::Identity());
+}
+
+void DocantoWin::Direct2DRender::set_transform_matrix(Docanto::Geometry::Point<float> p) {
+	m_transformPosMatrix = D2D1::Matrix3x2F::Translation(p.x, p.y);
+}
+
+void DocantoWin::Direct2DRender::set_transform_matrix(D2D1::Matrix3x2F m) {
+	m_transformPosMatrix = m;
+}
+
+void DocantoWin::Direct2DRender::add_transform_matrix(Docanto::Geometry::Point<float> p) {
+	m_transformPosMatrix = D2D1::Matrix3x2F::Translation(p.x, p.y) * m_transformPosMatrix;
+}
+
+void DocantoWin::Direct2DRender::set_scale_matrix(float scale, Docanto::Geometry::Point<float> center) {
+	m_transformScaleMatrix = D2D1::Matrix3x2F::Scale({ scale, scale }, PointToD2D1(center));
+}
+
+void DocantoWin::Direct2DRender::set_scale_matrix(D2D1::Matrix3x2F m) {
+	m_transformScaleMatrix = m;
+}
+
+void DocantoWin::Direct2DRender::add_scale_matrix(float scale, Docanto::Geometry::Point<float> center) {
+	// calc the new scale matrix
+	// boi i wish i would know how this works again...
+	auto mat = D2D1::Matrix3x2F(m_transformScaleMatrix);
+	mat.Invert();
+	mat = D2D1::Matrix3x2F::Scale({ scale, scale }, mat.TransformPoint(PointToD2D1(center)));
+	m_transformScaleMatrix = mat * m_transformScaleMatrix;
+}
+
+float DocantoWin::Direct2DRender::get_transform_scale() const {
+	return m_transformScaleMatrix._11;
+}
+
+D2D1::Matrix3x2F DocantoWin::Direct2DRender::get_scale_matrix() const {
+	return m_transformScaleMatrix;
+}
+
+Docanto::Geometry::Point<float> DocantoWin::Direct2DRender::get_zoom_center() const {
+	if (FLOAT_EQUAL(m_transformScaleMatrix._11, 1)) {
+		return { m_transformScaleMatrix._31, m_transformScaleMatrix._32 };
+	}
+	return { m_transformScaleMatrix._31 / (1 - m_transformScaleMatrix._11),
+		m_transformScaleMatrix._32 / (1 - m_transformScaleMatrix._11), };
+}
+
+Docanto::Geometry::Point<float> DocantoWin::Direct2DRender::get_transform_pos() const {
+	return { m_transformPosMatrix._31, m_transformPosMatrix._32 };
+}
+
 
 DocantoWin::Direct2DRender::TextFormatObject DocantoWin::Direct2DRender::create_text_format(std::wstring font, float size) {
 	TextFormatObject text;
@@ -195,6 +260,25 @@ DocantoWin::Direct2DRender::TextLayoutObject DocantoWin::Direct2DRender::create_
 		Docanto::Logger::error("Could not create D2D1 text layout");
 	}
 	obj.m_object = textLayout;
+
+	return std::move(obj);
+}
+
+DocantoWin::Direct2DRender::BitmapObject DocantoWin::Direct2DRender::create_bitmap(const Docanto::Image& i) {
+	ID2D1Bitmap* pBitmap = nullptr;
+	D2D1_BITMAP_PROPERTIES prop;
+
+	prop.dpiX = static_cast<float>(i.dpi);
+	prop.dpiY = static_cast<float>(i.dpi);
+	prop.pixelFormat.alphaMode = D2D1_ALPHA_MODE_PREMULTIPLIED;
+	prop.pixelFormat.format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	HRESULT res = m_renderTarget->CreateBitmap(DimensionToD2D1(i.dims), i.data.get(), i.stride, prop, &pBitmap);
+	if (res != S_OK) {
+		Docanto::Logger::error("Could not create bitmap");
+	}
+
+	BitmapObject obj;
+	obj.m_object = pBitmap;
 
 	return std::move(obj);
 }

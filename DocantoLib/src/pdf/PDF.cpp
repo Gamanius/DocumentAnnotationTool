@@ -31,6 +31,8 @@ Docanto::PDF::PDF(const std::filesystem::path& p) {
 	for (size_t i = 0; i < page_count; i++) {
 		m_pages.emplace_back(std::make_unique<PageWrapper>(fz_load_page(*ctx, doc, static_cast<int>(i))));
 	}
+
+	Logger::success("Loaded in PDF at path ", path);
 }
 
 Docanto::PDF::~PDF() {
