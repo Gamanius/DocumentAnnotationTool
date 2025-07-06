@@ -3,10 +3,11 @@
 std::tuple<Docanto::Geometry::Rectangle<float>, Docanto::Geometry::Rectangle<float>, Docanto::Geometry::Rectangle<float>, Docanto::Geometry::Rectangle<float>> DocantoWin::Caption::get_caption_rects() const {
 	auto window = m_render->get_attached_window();
 
-	auto caption_width = window->get_window_size().width;
+	auto caption_width = window->PxToDp(window->get_window_size().width);
 	auto is_maximized = window->is_window_maximized();
 
 	float padding = static_cast<float>(GetSystemMetricsForDpi(SM_CXPADDEDBORDER, window->get_dpi()) * is_maximized);
+	padding = 0; // this needs to be checked since it doesnt work sometimes
 
 	return {
 		{ 0, padding, (float)caption_width, m_caption_height },								// Caption bar
@@ -18,7 +19,7 @@ std::tuple<Docanto::Geometry::Rectangle<float>, Docanto::Geometry::Rectangle<flo
 }
 
 DocantoWin::Caption::Caption(std::shared_ptr<Direct2DRender> render) : m_render(render) {
-	m_caption_title_text_format = std::move(m_render->create_text_format(L"Consolas", m_render->get_attached_window()->PxToDp(m_caption_height)));
+	m_caption_title_text_format = std::move(m_render->create_text_format(L"Consolas", m_caption_height));
 	m_title_text_color = std::move(m_render->create_brush({255, 255, 255, 255}));
 	m_caption_color = std::move(m_render->create_brush({50, 50, 255, 255}));
 	m_caption_button_line_color = std::move(m_render->create_brush({255, 255, 255, 255}));
@@ -86,7 +87,6 @@ int DocantoWin::Caption::hittest(Docanto::Geometry::Point<long> mousepos) const 
 	auto dpi = window->get_dpi();
 	auto caption_width = window->get_window_size().width;
 
-
 	int frame_y = GetSystemMetricsForDpi(SM_CYFRAME, dpi);
 	int padding = GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi);
 
@@ -97,7 +97,8 @@ int DocantoWin::Caption::hittest(Docanto::Geometry::Point<long> mousepos) const 
 		min_btn_rec
 	] = get_caption_rects();
 
-	Docanto::Geometry::Rectangle<int> top_frame(0, 0, caption_width, frame_y + padding);
+
+	Docanto::Geometry::Rectangle<int> top_frame(0, 0, caption_width, frame_y);
 	if (!window->is_window_maximized() and top_frame.intersects(mousepos)) {
 		return HTTOP;
 	}

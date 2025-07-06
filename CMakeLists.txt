@@ -30,7 +30,7 @@ find_library(
 )
 
 if (MUPDF_LIB)
-    message(STATUS "Found libmupdf at " ${MUPDF_LIB_PATH})
+    message(STATUS "Found libmupdf at " ${MUPDF_LIB})
 else()
     message(FATAL_ERROR "MuPDF library not found!")
 endif()
