@@ -1,4 +1,5 @@
 #include "Window.h"
+
 #include <dwmapi.h>
 #include <windowsx.h>
 #pragma comment(lib, "dwmapi.lib")
@@ -125,6 +126,15 @@ LRESULT DocantoWin::Window::parse_message(UINT uMsg, WPARAM wParam, LPARAM lPara
 		}
 		break;
 	}
+	case WM_POINTERDOWN:
+	{
+		break;
+	}
+	case DM_POINTERHITTEST:
+	{
+		break;
+	}
+
 	case WM_SYSKEYDOWN:
 	case WM_KEYDOWN:
 	{
@@ -202,11 +212,13 @@ DocantoWin::Window::Window(HINSTANCE h) {
 		return;
 	}
 	
-	bool temp = EnableMouseInPointer(true);
+	/*bool temp = EnableMouseInPointer(true);
 	if (!temp) {
 		Docanto::Logger::error("Couldn't add Mouse input into Pointer Input Stack API");
 		return;
-	}
+	}*/
+
+	m_manager = std::make_shared<DirectManipulationHandler>(m_hwnd);
 
 	Docanto::Logger::success("Initialized window!");
 }
