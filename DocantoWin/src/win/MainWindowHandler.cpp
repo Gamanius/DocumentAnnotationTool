@@ -103,10 +103,25 @@ void DocantoWin::MainWindowHandler::key(Window::VK key, bool pressed) {
 }
 
 void DocantoWin::MainWindowHandler::pointer_down(Window::PointerInfo p) {
+	if (p.type == Window::POINTER_TYPE::TOUCH or p.type == Window::POINTER_TYPE::TOUCHPAD) {
+		m_gesture->start_gesture(p);
+	}
+
+	m_mainwindow->send_paint_request();
 }
 
 void DocantoWin::MainWindowHandler::pointer_update(Window::PointerInfo p) {
+	if (p.type == Window::POINTER_TYPE::TOUCH or p.type == Window::POINTER_TYPE::TOUCHPAD) {
+		m_gesture->update_gesture(p);
+	}
+	m_mainwindow->send_paint_request();
+}
 
+void DocantoWin::MainWindowHandler::pointer_up(Window::PointerInfo p) {
+	if (p.type == Window::POINTER_TYPE::TOUCH or p.type == Window::POINTER_TYPE::TOUCHPAD) {
+		m_gesture->end_gesture(p);
+	}
+	m_mainwindow->send_paint_request();
 }
 
 DocantoWin::MainWindowHandler::MainWindowHandler(HINSTANCE instance) {
@@ -137,17 +152,23 @@ DocantoWin::MainWindowHandler::MainWindowHandler(HINSTANCE instance) {
 		this->pointer_update(d);
 	});
 
+	m_mainwindow->set_callback_pointer_up([&](Window::PointerInfo d) {
+		this->pointer_up(d);
+	});
+
 
 	m_render->add_transform_matrix({ 100, 100 });
 	auto path = open_file_dialog(L"PDF\0 * .pdf\0\0", m_mainwindow->get_hwnd());
 	Docanto::Logger::log("Got path ", path);
 	if (path.has_value()) {
 		m_pdfhandler = std::make_shared<PDFHandler>(path.value(), m_render);
-		m_pdfhandler->render();
 	}
 	else {
 		exit(0);
 	}
+
+	m_pdfhandler->render();
+	m_gesture = std::make_shared<GestureHandler>(m_render, m_pdfhandler);
 
 }
 

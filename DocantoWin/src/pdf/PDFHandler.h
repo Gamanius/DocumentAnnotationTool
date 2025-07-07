@@ -18,6 +18,8 @@ namespace DocantoWin {
 
 		void render();
 		void draw();
+
+		std::shared_ptr<Docanto::PDF> get_pdf() const;
 	};
 }
 

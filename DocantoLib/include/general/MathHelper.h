@@ -6,8 +6,16 @@ namespace Docanto {
 	namespace Geometry {
 		template <typename T>
 		struct Point {
-			T x;
-			T y;
+			T x = 0;
+			T y = 0;
+
+
+			Point() = default;
+			Point(T x, T y) : x(x), y(y) {}
+
+			T distance() const {
+				return std::sqrt(x * x + y * y);
+			}
 
 			template <typename W>
 			operator Point<W>() const {
@@ -61,6 +69,16 @@ namespace Docanto {
 				return *this;
 			}
 		};
+
+		template <typename T, typename W>
+		Point<T> operator*(Point<T> p, W f) {
+			return { p.x * static_cast<T>(f), p.y * static_cast<T>(f) };
+		}
+
+		template <typename T, typename W>
+		Point<T> operator*(W f, Point<T> p) {
+			return { p.x * static_cast<T>(f), p.y * static_cast<T>(f) };
+		}
 
 		template <typename T>
 		struct Rectangle {

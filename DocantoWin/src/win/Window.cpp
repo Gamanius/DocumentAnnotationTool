@@ -311,9 +311,11 @@ LRESULT DocantoWin::Window::parse_message(UINT uMsg, WPARAM wParam, LPARAM lPara
 		if (!touch.has_value()) {
 			break;
 		}
-		if (touch.value().size() <= 1) {
+		if (touch.value().size() <= 1) { 
+			Docanto::Logger::log("smaller than 1");
 			break;
 		}
+		Docanto::Logger::log("larger");
 		for (auto& [id, p] : touch.value()) {
 			// generate a pointerupdate struct using this
 			Window::PointerInfo info;

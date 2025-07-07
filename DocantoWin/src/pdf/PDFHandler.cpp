@@ -14,6 +14,10 @@ void DocantoWin::PDFHandler::draw() {
 	}
 }
 
+std::shared_ptr<Docanto::PDF> DocantoWin::PDFHandler::get_pdf() const {
+	return m_pdf;
+}
+
 void DocantoWin::PDFHandler::render() {
 	auto i = m_pdfrender->get_image(0);
 	m_bitmaps.emplace_back(std::make_unique<Direct2DRender::BitmapObject>(m_render->create_bitmap(i)));

@@ -5,6 +5,7 @@
 #include "Direct2D.h"
 
 #include "ui/Caption.h"
+#include "ui/Gesture.h"
 
 #include "pdf/PDFHandler.h"
 
@@ -14,6 +15,8 @@ namespace DocantoWin {
 		std::shared_ptr<Direct2DRender> m_render;
 		std::shared_ptr<Caption> m_uicaption;
 
+		std::shared_ptr<GestureHandler> m_gesture;
+
 		std::shared_ptr<PDFHandler> m_pdfhandler;
 
 		void paint();
@@ -21,6 +24,7 @@ namespace DocantoWin {
 		void key(Window::VK key, bool pressed);
 		void pointer_down(Window::PointerInfo p);
 		void pointer_update(Window::PointerInfo p);
+		void pointer_up(Window::PointerInfo p);
 	public:
 		MainWindowHandler(HINSTANCE instance);
 
