@@ -218,7 +218,7 @@ LRESULT DocantoWin::Window::parse_message(UINT uMsg, WPARAM wParam, LPARAM lPara
 			Docanto::Geometry::Point<long> mousepos = { xPos, yPos };
 			mousepos = mousepos - get_window_position();
 
-			auto hit = m_callback_nchittest(mousepos);
+			auto hit = m_callback_nchittest(PxToDp(mousepos));
 			
 			if (hit != 0) {
 				return hit;
@@ -406,7 +406,7 @@ Docanto::Geometry::Point<long> DocantoWin::Window::get_mouse_pos() const {
 		return { -1, -1 };
 	}
 
-	return { pt.x, pt.y };
+	return PxToDp(Docanto::Geometry::Point<long>(pt.x, pt.y));
 }
 
 bool DocantoWin::Window::is_window_maximized() const {

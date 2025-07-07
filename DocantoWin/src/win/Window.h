@@ -1,6 +1,5 @@
 #include "../include.h"
 #include "helper/Geometry.h"
-#include "DirectManipulationHandler.h"
 
 #ifndef _DOCANTOWIN_WINDOW_H_
 #define _DOCANTOWIN_WINDOW_H_
@@ -12,8 +11,6 @@ namespace DocantoWin {
 	class Window {
 		HWND m_hwnd = NULL;
 		HDC m_hdc = NULL;
-
-		std::shared_ptr<DirectManipulationHandler> m_manager;
 
 		bool m_closeRequest = false;
 

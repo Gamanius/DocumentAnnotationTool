@@ -6,7 +6,6 @@ void DocantoWin::MainWindowHandler::paint() {
 	m_render->clear({ 50, 50, 50 });
 
 	m_render->set_current_transform_active();
-	m_pdfhandler->draw();
 
 	m_render->set_identity_transform_active();
 	m_uicaption->draw();
@@ -100,8 +99,6 @@ DocantoWin::MainWindowHandler::MainWindowHandler(HINSTANCE instance) {
 	});
 
 
-	m_pdfhandler = std::make_shared<PDFHandler>(L"C:/repos/Docanto/pdf_tests/1.pdf", m_render);
-	m_pdfhandler->render();
 	m_render->add_transform_matrix({ 100, 100 });
 	
 }
