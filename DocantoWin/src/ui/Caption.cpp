@@ -7,8 +7,8 @@ std::tuple<Docanto::Geometry::Rectangle<float>, Docanto::Geometry::Rectangle<flo
 	auto is_maximized = window->is_window_maximized();
 
 	float padding = static_cast<float>(GetSystemMetricsForDpi(SM_CYSIZEFRAME, window->get_dpi()) * is_maximized);
-	padding = window->PxToDp(padding); 
-
+	padding = window->PxToDp(padding);
+  
 	return {
 		{ 0, padding, (float)caption_width, m_caption_height },								// Caption bar
 		{ caption_width - m_caption_height, padding, m_caption_height, m_caption_height },		// close btn
