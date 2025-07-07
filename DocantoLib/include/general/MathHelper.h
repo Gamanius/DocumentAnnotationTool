@@ -54,6 +54,12 @@ namespace Docanto {
 
 				return *this;
 			}
+			Point<T>& operator -=(const Point<T>& p) {
+				x -= p.x;
+				y -= p.y;
+
+				return *this;
+			}
 		};
 
 		template <typename T>

@@ -1,11 +1,36 @@
 #include "MainWindowHandler.h"
 
 
+static std::optional<std::wstring> open_file_dialog(const wchar_t* filter, HWND windowhandle = nullptr) {
+	OPENFILENAME ofn;
+	WCHAR szFile[MAX_PATH] = { 0 };
+
+	ZeroMemory(&ofn, sizeof(ofn));
+	ofn.lStructSize = sizeof(ofn);
+	ofn.hwndOwner = windowhandle; // If you have a window handle, specify it here.
+	ofn.lpstrFile = szFile;
+	ofn.nMaxFile = MAX_PATH;
+	ofn.lpstrFilter = filter;
+	ofn.nFilterIndex = 1;
+	ofn.lpstrFileTitle = NULL;
+	ofn.nMaxFileTitle = 0;
+	ofn.lpstrInitialDir = NULL;
+	ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_ENABLESIZING;
+
+	if (GetOpenFileName(&ofn)) {
+		return std::wstring(ofn.lpstrFile);
+	}
+	auto error = CommDlgExtendedError();
+	WIN_ASSERT_OK(error, "Unknown file dialog error with comm error ", error);
+	return std::nullopt;
+}
+
 void DocantoWin::MainWindowHandler::paint() {
 	m_render->begin_draw();
 	m_render->clear({ 50, 50, 50 });
 
 	m_render->set_current_transform_active();
+	m_pdfhandler->draw();
 
 	m_render->set_identity_transform_active();
 	m_uicaption->draw();
@@ -77,6 +102,13 @@ void DocantoWin::MainWindowHandler::key(Window::VK key, bool pressed) {
 	}
 }
 
+void DocantoWin::MainWindowHandler::pointer_down(Window::PointerInfo p) {
+}
+
+void DocantoWin::MainWindowHandler::pointer_update(Window::PointerInfo p) {
+
+}
+
 DocantoWin::MainWindowHandler::MainWindowHandler(HINSTANCE instance) {
 	m_mainwindow = std::make_shared<Window>(instance);
 	m_render = std::make_shared<Direct2DRender>(m_mainwindow);
@@ -98,9 +130,25 @@ DocantoWin::MainWindowHandler::MainWindowHandler(HINSTANCE instance) {
 		this->key(key, presed);
 	});
 
+	m_mainwindow->set_callback_pointer_down([&](Window::PointerInfo d) {
+		this->pointer_down(d);
+	});
+	m_mainwindow->set_callback_pointer_update([&](Window::PointerInfo d) {
+		this->pointer_update(d);
+	});
+
 
 	m_render->add_transform_matrix({ 100, 100 });
-	
+	auto path = open_file_dialog(L"PDF\0 * .pdf\0\0", m_mainwindow->get_hwnd());
+	Docanto::Logger::log("Got path ", path);
+	if (path.has_value()) {
+		m_pdfhandler = std::make_shared<PDFHandler>(path.value(), m_render);
+		m_pdfhandler->render();
+	}
+	else {
+		exit(0);
+	}
+
 }
 
 void DocantoWin::MainWindowHandler::run() {

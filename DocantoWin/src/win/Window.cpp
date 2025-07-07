@@ -9,6 +9,8 @@
 #include <hidsdi.h>
 #pragma comment(lib, "hid.lib")
 
+#define CHECK_BIT(var,pos) ((var) & (1<<(pos)))
+
 DocantoWin::Window::VK winkey_to_vk(int windowsKey);
 
 LRESULT DocantoWin::Window::wndproc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
@@ -152,6 +154,57 @@ static std::optional<std::map<ULONG, Docanto::Geometry::Point<ULONG>>> get_touch
 	return touches;
 }
 
+
+static DocantoWin::Window::PointerInfo parse_pointer_info(WPARAM wParam, LPARAM lParam, const DocantoWin::Window& w) {
+	DocantoWin::Window::PointerInfo info;
+
+	info.id = GET_POINTERID_WPARAM(wParam);
+	POINTER_INPUT_TYPE pointerType = PT_POINTER;
+	GetPointerType(info.id, &pointerType);
+
+	tagPOINTER_INFO pointerinfo;
+	switch (pointerType) {
+	case PT_TOUCH:
+		POINTER_TOUCH_INFO touchinfo;
+		info.type = DocantoWin::Window::POINTER_TYPE::TOUCH;
+		if (!GetPointerTouchInfo(info.id, &touchinfo)) {
+			return info;
+		}
+		pointerinfo = touchinfo.pointerInfo;
+		break;
+	case PT_PEN:
+		POINTER_PEN_INFO peninfo;
+		info.type = DocantoWin::Window::POINTER_TYPE::STYLUS;
+		if (!GetPointerPenInfo(info.id, &peninfo)) {
+			return info;
+		}
+		info.pressure = peninfo.pressure;
+		info.button1pressed = CHECK_BIT(peninfo.penFlags, 0) != 0;
+		info.button2pressed = CHECK_BIT(peninfo.penFlags, 1) != 0 || CHECK_BIT(peninfo.penFlags, 2) != 0;
+		pointerinfo = peninfo.pointerInfo;
+		break;
+	default:
+		info.type = DocantoWin::Window::POINTER_TYPE::MOUSE;
+		if (!GetPointerInfo(info.id, &pointerinfo)) {
+			return info;
+		}
+		info.button1pressed = CHECK_BIT(pointerinfo.pointerFlags, 4) != 0;
+		info.button2pressed = CHECK_BIT(pointerinfo.pointerFlags, 5) != 0;
+		info.button3pressed = CHECK_BIT(pointerinfo.pointerFlags, 6) != 0;
+		info.button4pressed = CHECK_BIT(pointerinfo.pointerFlags, 7) != 0;
+		info.button5pressed = CHECK_BIT(pointerinfo.pointerFlags, 8) != 0;
+		break;
+	}
+	info.pos.x = pointerinfo.ptPixelLocation.x;
+	info.pos.y = pointerinfo.ptPixelLocation.y;
+
+	info.pos -= w.get_window_position();
+	info.pos = w.PxToDp(info.pos);
+
+	return info;
+}
+
+
 LRESULT DocantoWin::Window::parse_message(UINT uMsg, WPARAM wParam, LPARAM lParam) {
 	switch (uMsg) {
 	case WM_CREATE:
@@ -255,13 +308,61 @@ LRESULT DocantoWin::Window::parse_message(UINT uMsg, WPARAM wParam, LPARAM lPara
 	case WM_INPUT:
 	{
 		auto touch = get_touchpadinfo(lParam);
-		Docanto::Logger::log(touch);
+		if (!touch.has_value()) {
+			break;
+		}
+		if (touch.value().size() <= 1) {
+			break;
+		}
+		for (auto& [id, p] : touch.value()) {
+			// generate a pointerupdate struct using this
+			Window::PointerInfo info;
+			info.pos = p;
+			info.id = id;
+			info.type = Window::POINTER_TYPE::TOUCHPAD;
+			m_callback_pointer_update(info);
+		}
 		break;
 	}
 	case WM_POINTERDOWN:
 	{
-		Docanto::Logger::log("Pointer");
-		break;
+		if (m_callback_pointer_down) {
+			m_callback_pointer_down(parse_pointer_info(wParam, lParam, *this));
+		}
+		return 0;
+	}
+	case WM_POINTERUPDATE:
+	{
+		if (m_callback_pointer_update)
+			m_callback_pointer_update(parse_pointer_info(wParam, lParam, *this));
+		return 0;
+	}
+	case WM_POINTERUP:
+	{
+		if (m_callback_pointer_up)
+			m_callback_pointer_up(parse_pointer_info(wParam, lParam, *this));
+
+		return 0;
+	}
+	case WM_POINTERHWHEEL:
+	{
+		if (!m_callback_mousewheel)
+			break;
+		POINT ppp = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
+		ScreenToClient(m_hwnd, &ppp);
+		auto p = Docanto::Geometry::Point<float>(ppp.x, ppp.y);
+		m_callback_mousewheel(-GET_WHEEL_DELTA_WPARAM(wParam), true);
+		return 0;
+	}
+	case WM_POINTERWHEEL:
+	{
+		if (!m_callback_mousewheel)
+			break;
+		POINT ppp = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
+		ScreenToClient(m_hwnd, &ppp);
+		auto p = Docanto::Geometry::Point<float>(ppp.x, ppp.y);
+		m_callback_mousewheel(-GET_WHEEL_DELTA_WPARAM(wParam), GetKeyState(VK_SHIFT) & 0x8000);
+		return 0;
 	}
 
 	case WM_SYSKEYDOWN:
@@ -372,6 +473,10 @@ UINT DocantoWin::Window::get_dpi() const {
 	return GetDpiForWindow(m_hwnd);
 }
 
+HWND DocantoWin::Window::get_hwnd() const {
+	return m_hwnd;
+}
+
 void DocantoWin::Window::set_window_title(const std::wstring& s) {
 	SetWindowText(m_hwnd, s.c_str());
 }
@@ -474,6 +579,22 @@ void DocantoWin::Window::set_callback_nchittest(std::function<int(Docanto::Geome
 
 void DocantoWin::Window::set_callback_key(std::function<void(VK, bool)> callback) {
 	m_callback_key = callback;
+}
+
+void DocantoWin::Window::set_callback_pointer_down(std::function<void(PointerInfo)> callback) {
+	m_callback_pointer_down = callback;
+}
+
+void DocantoWin::Window::set_callback_pointer_up(std::function<void(PointerInfo)> callback) {
+	m_callback_pointer_up = callback;
+}
+
+void DocantoWin::Window::set_callback_pointer_update(std::function<void(PointerInfo)> callback) {
+	m_callback_pointer_update = callback;
+}
+
+void DocantoWin::Window::set_callback_pointer_wheel(std::function<void(short, bool)> callback) {
+	m_callback_mousewheel = callback;
 }
 
 DocantoWin::Window::VK winkey_to_vk(int windowsKey) {

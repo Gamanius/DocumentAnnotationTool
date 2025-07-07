@@ -28,7 +28,7 @@ namespace Docanto {
 			{
 				arr.size()
 			} -> std::same_as<size_t>;
-		};
+		} and !std::convertible_to<T, std::wstring> and !std::convertible_to<T, std::string>;
 
 		/// <summary>
 		/// https://stackoverflow.com/questions/68443804/c20-concept-to-check-tuple-like-types

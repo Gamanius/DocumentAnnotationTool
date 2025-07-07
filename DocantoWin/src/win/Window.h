@@ -26,7 +26,8 @@ namespace DocantoWin {
 			UNKNOWN,
 			MOUSE,
 			STYLUS,
-			TOUCH
+			TOUCH,
+			TOUCHPAD
 		};
 
 		enum VK {
@@ -173,12 +174,29 @@ namespace DocantoWin {
 			UNKWON
 		};
 
+		struct PointerInfo {
+			UINT id = 0;
+			POINTER_TYPE type = POINTER_TYPE::UNKNOWN;
+			Docanto::Geometry::Point<float> pos = { 0, 0 };
+			UINT32 pressure = 0;
+			bool button1pressed = false; /* Left mouse button or barrel button */
+			bool button2pressed = false; /* Right mouse button eareser button */
+			bool button3pressed = false; /* Middle mouse button */
+			bool button4pressed = false; /* X1 Button */
+			bool button5pressed = false; /* X2 Button */
+		};
 
 	private:
 			std::function<void()> m_callback_paint;
 			std::function<void(Docanto::Geometry::Dimension<long>)> m_callback_size;
 			std::function<int(Docanto::Geometry::Point<long>)> m_callback_nchittest;
 			std::function<void(VK, bool)>  m_callback_key;
+
+
+			std::function<void(PointerInfo)> m_callback_pointer_down;
+			std::function<void(PointerInfo)> m_callback_pointer_up;
+			std::function<void(PointerInfo)> m_callback_pointer_update;
+			std::function<void(short, bool)> m_callback_mousewheel;
 	public:
 
 		static LRESULT wndproc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -198,6 +216,7 @@ namespace DocantoWin {
 
 		// Returns the DPI of the window
 		UINT get_dpi() const;
+		HWND get_hwnd() const;
 
 		void set_window_title(const std::wstring& s);
 
@@ -283,6 +302,11 @@ namespace DocantoWin {
 		void set_callback_size(std::function<void(Docanto::Geometry::Dimension<long>)> callback);
 		void set_callback_nchittest(std::function<int(Docanto::Geometry::Point<long>)> callback);
 		void set_callback_key(std::function<void(VK, bool)> callback);
+
+		void set_callback_pointer_down(std::function<void(PointerInfo)> m_callback_pointer_down	);
+		void set_callback_pointer_up(std::function<void(PointerInfo)> m_callback_pointer_up);
+		void set_callback_pointer_update(std::function<void(PointerInfo)> m_callback_pointer_update);
+		void set_callback_pointer_wheel(std::function<void(short, bool)> m_callback_mousewheel);
 
 		friend class Direct2DRender;
 	};
