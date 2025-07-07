@@ -67,7 +67,7 @@ namespace Docanto {
 		}
 
 		template <StreamableTuple T>
-		void do_msg(T msg) {
+		void do_msg(const T& msg) {
 			size_t size = std::tuple_size<T>{};
 			*_msg_buffer << "{";
 			std::apply([&](auto&&... args) {
@@ -78,7 +78,7 @@ namespace Docanto {
 		}
 
 		template <StreamableContainer T>
-		void do_msg(T arr) {
+		void do_msg(const T& arr) {
 			size_t size = arr.size();
 			*_msg_buffer << "[";
 			for (const auto& i : arr) {
@@ -91,7 +91,7 @@ namespace Docanto {
 		template<StreamableOptional S>
 		void do_msg(const S& a) {
 			if (a.has_value()) {
-				*_msg_buffer << a.value();
+				do_msg(a.value());
 			}
 			else {
 				*_msg_buffer << L"std::nullopt";
