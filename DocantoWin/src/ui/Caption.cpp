@@ -19,7 +19,7 @@ std::tuple<Docanto::Geometry::Rectangle<float>, Docanto::Geometry::Rectangle<flo
 }
 
 DocantoWin::Caption::Caption(std::shared_ptr<Direct2DRender> render) : m_render(render) {
-	m_caption_title_text_format = std::move(m_render->create_text_format(L"Consolas", m_caption_height));
+	m_caption_title_text_format = std::move(m_render->create_text_format(L"Consolas", m_render->get_attached_window()->PxToDp(m_caption_height)));
 	m_title_text_color = std::move(m_render->create_brush({255, 255, 255, 255}));
 	m_caption_color = std::move(m_render->create_brush({50, 50, 255, 255}));
 	m_caption_button_line_color = std::move(m_render->create_brush({255, 255, 255, 255}));
@@ -96,8 +96,7 @@ int DocantoWin::Caption::hittest(Docanto::Geometry::Point<long> mousepos) const 
 		min_btn_rec
 	] = get_caption_rects();
 
-
-	Docanto::Geometry::Rectangle<int> top_frame(0, 0, caption_width, frame_y);
+	Docanto::Geometry::Rectangle<int> top_frame(0, 0, caption_width, frame_y + padding);
 	if (!window->is_window_maximized() and top_frame.intersects(mousepos)) {
 		return HTTOP;
 	}
