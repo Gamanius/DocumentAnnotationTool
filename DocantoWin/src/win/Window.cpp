@@ -1,7 +1,13 @@
 #include "Window.h"
+
 #include <dwmapi.h>
-#include <windowsx.h>
 #pragma comment(lib, "dwmapi.lib")
+
+#include <windowsx.h>
+
+#include <hidusage.h>
+#include <hidsdi.h>
+#pragma comment(lib, "hid.lib")
 
 DocantoWin::Window::VK winkey_to_vk(int windowsKey);
 
@@ -125,6 +131,132 @@ LRESULT DocantoWin::Window::parse_message(UINT uMsg, WPARAM wParam, LPARAM lPara
 		}
 		break;
 	}
+	case WM_INPUT:
+	{
+		// First, get the size of the raw input data
+		UINT dwSize = 0;
+		GetRawInputData((HRAWINPUT)lParam, RID_INPUT, NULL, &dwSize,
+			sizeof(RAWINPUTHEADER));
+
+		if (dwSize == 0) {
+			Docanto::Logger::error("WM_INPUT: Failed to get raw input data size.");
+			break;
+		}
+
+		// Allocate a buffer for the raw input data
+		std::vector<BYTE> rawInputBuffer(dwSize);
+
+		// Now, get the raw input data into the buffer
+		if (GetRawInputData((HRAWINPUT)lParam, RID_INPUT, rawInputBuffer.data(), &dwSize,
+			sizeof(RAWINPUTHEADER)) != dwSize) {
+			Docanto::Logger::error("WM_INPUT: GetRawInputData failed or returned incorrect size.");
+			break;
+		}
+
+		// Cast the buffer to a RAWINPUT structure
+		RAWINPUT* raw = reinterpret_cast<RAWINPUT*>(rawInputBuffer.data());
+		
+
+		// get the devie name 
+		UINT buffersize = 0;
+
+		GetRawInputDeviceInfo(raw->header.hDevice, RIDI_PREPARSEDDATA, nullptr, &buffersize);
+		if (buffersize == 0) {
+			Docanto::Logger::error("WM_INPUT: GetRawInputDeviceInfo failed or returned incorrect size.");
+			break;
+		}
+		std::vector<BYTE> preparsedDatabuffer(buffersize);
+
+		if (GetRawInputDeviceInfo(raw->header.hDevice, RIDI_PREPARSEDDATA, preparsedDatabuffer.data(), &buffersize) != buffersize) {
+			Docanto::Logger::error("WM_INPUT: GetRawInputDeviceInfo failed to retrieve data.");
+		}
+
+		PHIDP_PREPARSED_DATA preparseddata = (PHIDP_PREPARSED_DATA)preparsedDatabuffer.data();
+		HIDP_CAPS caps;
+
+		if (HidP_GetCaps(preparseddata, &caps) != HIDP_STATUS_SUCCESS) {
+			Docanto::Logger::error("WM_INPUT: HidP_GetCaps failed.");
+		}
+
+		std::vector<HIDP_VALUE_CAPS> value_caps(caps.NumberInputValueCaps);
+
+		if (HidP_GetValueCaps(HIDP_REPORT_TYPE::HidP_Input, value_caps.data(), &caps.NumberInputValueCaps, preparseddata) != HIDP_STATUS_SUCCESS) {
+			Docanto::Logger::error("WM_INPUT: HidP_GetValueCaps failed.");
+		}
+
+		UINT scanTime = 0;
+		UINT contactCount = 0;
+
+		std::map<ULONG, Docanto::Geometry::Point<ULONG>> touches;
+
+		std::sort(value_caps.begin(), value_caps.end(), [](const HIDP_VALUE_CAPS& a, const HIDP_VALUE_CAPS& b) {
+			return a.LinkCollection < b.LinkCollection;
+			});
+
+		std::optional<ULONG> curr_id = std::nullopt;
+		std::optional<ULONG> x = std::nullopt;
+		std::optional<ULONG> y = std::nullopt;
+
+		ULONG touch_points = 0;
+
+		for (size_t i = 0; i < value_caps.size(); i++) {
+			auto& valueCap = value_caps[i];
+			ULONG value;
+			if (HidP_GetUsageValue(
+				HIDP_REPORT_TYPE::HidP_Input,
+				valueCap.UsagePage,
+				valueCap.LinkCollection,
+				valueCap.NotRange.Usage,
+				&value,
+				preparseddata,
+				(PCHAR)raw->data.hid.bRawData,
+				raw->data.hid.dwCount * raw->data.hid.dwSizeHid) != HIDP_STATUS_SUCCESS) {
+				continue;
+			}
+
+			// Usage Page and ID in Windows Precision Touchpad input reports
+			// https://learn.microsoft.com/en-us/windows-hardware/design/component-guidelines/touchpad-windows-precision-touchpad-collection
+			auto page = valueCap.UsagePage;
+			auto usage = valueCap.NotRange.Usage;
+
+			if (valueCap.LinkCollection == 0 and page == 0x0D and usage == 0x54) {
+				touch_points = value;
+			}
+
+			if (page == 0x0D and usage == 0x51) {
+				Docanto::Logger::log("ID ", value);
+				curr_id = value;
+			}
+			else if (page == 0x01 and usage == 0x30) {
+				x = value;
+
+			}
+			else if (page == 0x01 and usage == 0x31) {
+				y = value;
+			}
+
+			if (x.has_value() and y.has_value() and curr_id.has_value() ) {
+				touches[curr_id.value()] = { x.value(), y.value() };
+
+				curr_id = std::nullopt;
+				x = std::nullopt;
+				y = std::nullopt;
+
+				if (touches.size() >= touch_points) {
+					break;
+				}
+			}
+		}
+
+		Docanto::Logger::log(touches);
+
+		break;
+	}
+	case WM_POINTERDOWN:
+	{
+		Docanto::Logger::log("Pointer");
+		break;
+	}
 	case WM_SYSKEYDOWN:
 	case WM_KEYDOWN:
 	{
@@ -202,10 +334,22 @@ DocantoWin::Window::Window(HINSTANCE h) {
 		return;
 	}
 	
-	bool temp = EnableMouseInPointer(true);
-	if (!temp) {
+	auto hr = EnableMouseInPointer(true);
+	if (!hr) {
 		Docanto::Logger::error("Couldn't add Mouse input into Pointer Input Stack API");
-		return;
+	}
+
+	RAWINPUTDEVICE Rid[1];
+	
+	
+	Rid[0].usUsagePage = HID_USAGE_PAGE_DIGITIZER;
+	Rid[0].usUsage = HID_USAGE_DIGITIZER_TOUCH_PAD;
+	Rid[0].dwFlags = 0;
+	Rid[0].hwndTarget = m_hwnd;
+
+	hr = RegisterRawInputDevices(Rid, 1, sizeof(Rid[0]));
+	if (!hr) {
+		Docanto::Logger::error("Could not do RegisterRawInputDevices");
 	}
 
 	Docanto::Logger::success("Initialized window!");

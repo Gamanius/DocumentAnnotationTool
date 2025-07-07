@@ -17,6 +17,38 @@ namespace Docanto {
 			s << val;
 		} or std::convertible_to<T, std::string>) and !std::is_enum_v<T>;
 
+		template <typename T>
+		concept StreamableContainer = requires(T arr) {
+			{
+				arr.begin()
+			} -> std::same_as<typename T::iterator>;
+			{
+				arr.end()
+			} -> std::same_as<typename T::iterator>;
+			{
+				arr.size()
+			} -> std::same_as<size_t>;
+		};
+
+		/// <summary>
+		/// https://stackoverflow.com/questions/68443804/c20-concept-to-check-tuple-like-types
+		/// </summary>
+		template<class T, std::size_t N>
+		concept has_tuple_element = requires(T t) {
+			typename std::tuple_element_t<N, std::remove_const_t<T>>;
+			std::get<N>(t);
+
+		};
+
+		template<class T>
+		concept StreamableTuple = !std::is_reference_v<T> and requires(T t) {
+			typename std::tuple_size<T>::type;
+			requires std::derived_from<std::tuple_size<T>, std::integral_constant<std::size_t, std::tuple_size_v<T>>>;
+		} and
+			[]<std::size_t... N>(std::index_sequence<N...>) {
+			return (has_tuple_element<T, N> and ...);
+		} (std::make_index_sequence<std::tuple_size_v<T>>());
+
 		template <class T>
 		concept StreamableOptional = requires(const T& t) {
 			t.value();
@@ -32,6 +64,28 @@ namespace Docanto {
 		template<Streamable S>
 		void do_msg(const S& a) {
 			*_msg_buffer << a;
+		}
+
+		template <StreamableTuple T>
+		void do_msg(T msg) {
+			size_t size = std::tuple_size<T>{};
+			*_msg_buffer << "{";
+			std::apply([&](auto&&... args) {
+				size_t index = 0;
+				((do_msg(args), *_msg_buffer << (++index < size ? ", " : "")), ...);
+				}, msg);
+			*_msg_buffer << "}";
+		}
+
+		template <StreamableContainer T>
+		void do_msg(T arr) {
+			size_t size = arr.size();
+			*_msg_buffer << "[";
+			for (const auto& i : arr) {
+				do_msg(i);
+				*_msg_buffer << (--size > 0 ? ", " : "");
+			}
+			*_msg_buffer << "]";
 		}
 
 		template<StreamableOptional S>
