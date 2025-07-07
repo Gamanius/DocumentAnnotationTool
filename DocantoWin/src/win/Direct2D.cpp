@@ -130,15 +130,15 @@ void DocantoWin::Direct2DRender::draw_rect(Docanto::Geometry::Rectangle<float> r
 }
 
 void DocantoWin::Direct2DRender::draw_rect(Docanto::Geometry::Rectangle<float> r, BrushObject& brush, float thic) {
-	m_renderTarget->DrawRectangle(RectToD2D1(r), brush.m_object, thic);
+	m_renderTarget->DrawRectangle(m_window->PxToDp(r), brush.m_object, m_window->PxToDp(thic));
 }
 void DocantoWin::Direct2DRender::draw_rect_filled(Docanto::Geometry::Rectangle<float> r, BrushObject& brush) {
-	m_renderTarget->FillRectangle(RectToD2D1(r), brush.m_object);
+	m_renderTarget->FillRectangle(m_window->PxToDp(r), brush.m_object);
 }
 
 void DocantoWin::Direct2DRender::draw_rect_filled(Docanto::Geometry::Rectangle<float> r, Docanto::Color c) {
 	m_solid_brush->SetColor(ColorToD2D1(c));
-	m_renderTarget->FillRectangle(RectToD2D1(r), m_solid_brush);
+	m_renderTarget->FillRectangle(m_window->PxToDp(r), m_solid_brush);
 }
 
 void DocantoWin::Direct2DRender::draw_bitmap(Docanto::Geometry::Point<float> where, BitmapObject& obj) {
@@ -150,7 +150,7 @@ void DocantoWin::Direct2DRender::draw_bitmap(Docanto::Geometry::Point<float> whe
 
 void DocantoWin::Direct2DRender::draw_line(Docanto::Geometry::Point<float> p1, Docanto::Geometry::Point<float> p2, BrushObject& brush, float thick) {
 	begin_draw();
-	m_renderTarget->DrawLine(PointToD2D1(p1), PointToD2D1(p2), brush.m_object, thick);
+	m_renderTarget->DrawLine(m_window->PxToDp(p1), m_window->PxToDp(p2), brush.m_object, m_window->PxToDp(thick));
 	end_draw();
 }
 
