@@ -14,6 +14,8 @@ namespace DocantoWin {
 
 		bool m_closeRequest = false;
 
+		static bool g_touchpadGestureInProgress;
+
 	public:
 		enum WINDOW_STATE {
 			HIDDEN,
@@ -191,7 +193,6 @@ namespace DocantoWin {
 			std::function<void(Docanto::Geometry::Dimension<long>)> m_callback_size;
 			std::function<int(Docanto::Geometry::Point<long>)> m_callback_nchittest;
 			std::function<void(VK, bool)>  m_callback_key;
-
 
 			std::function<void(PointerInfo)> m_callback_pointer_down;
 			std::function<void(PointerInfo)> m_callback_pointer_up;

@@ -103,6 +103,7 @@ void DocantoWin::MainWindowHandler::key(Window::VK key, bool pressed) {
 }
 
 void DocantoWin::MainWindowHandler::pointer_down(Window::PointerInfo p) {
+	// there will never be a touchpad pointer down event since we cant track them
 	if (p.type == Window::POINTER_TYPE::TOUCH or p.type == Window::POINTER_TYPE::TOUCHPAD) {
 		m_gesture->start_gesture(p);
 	}

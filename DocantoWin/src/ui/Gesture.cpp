@@ -51,7 +51,7 @@ void DocantoWin::GestureHandler::start_gesture(const Window::PointerInfo& p) {
 	switch (amount_finger) {
 	case 1:
 	{
-		m_initial_offset = m_render->get_transform_pos();// - m_renderer->inv_transform_point({ 0, 0 });
+		m_initial_offset = m_render->get_transform_pos();
 		return;
 	};
 	case 2:
@@ -75,6 +75,11 @@ void DocantoWin::GestureHandler::start_gesture(const Window::PointerInfo& p) {
 }
 
 void DocantoWin::GestureHandler::update_gesture(const Window::PointerInfo& p) {
+	// we need to do a check if the update comes from a touchpda
+	if (p.type == Window::POINTER_TYPE::TOUCHPAD) {
+		// the ids should be sorted
+	}
+	
 	// check which finger gets updated
 	for (size_t i = 0; i < m_gesturefinger.size(); i++) {
 		if (m_gesturefinger.at(i).id == p.id) {
