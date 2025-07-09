@@ -55,6 +55,23 @@ void DocantoWin::MainWindowHandler::key(Window::VK key, bool pressed) {
 		}
 		break;
 	}
+	case O:
+	{
+		auto path = open_file_dialog(L"PDF\0 * .pdf\0\0", m_mainwindow->get_hwnd());
+		Docanto::Logger::log("Got path ", path);
+		if (path.has_value()) {
+			Docanto::Timer t;
+			m_pdfhandler = std::make_shared<PDFHandler>(path.value(), m_render);
+			Docanto::Logger::log("Loaded PDF in ", t);
+		}
+		else {
+			exit(0);
+		}
+
+		m_pdfhandler->render();
+		m_gesture = std::make_shared<GestureHandler>(m_render, m_pdfhandler);
+		break;
+	}
 	case DOWNARROW:
 	{
 		m_render->add_transform_matrix({ 0, -100 });
@@ -95,6 +112,9 @@ void DocantoWin::MainWindowHandler::key(Window::VK key, bool pressed) {
 }
 
 void DocantoWin::MainWindowHandler::pointer_down(Window::PointerInfo p) {
+	if (!m_gesture) {
+		return;
+	}
 	// there will never be a touchpad pointer down event since we cant track them
 	if (p.type == Window::POINTER_TYPE::TOUCH or p.type == Window::POINTER_TYPE::TOUCHPAD) {
 		m_gesture->start_gesture(p);
@@ -104,6 +124,10 @@ void DocantoWin::MainWindowHandler::pointer_down(Window::PointerInfo p) {
 }
 
 void DocantoWin::MainWindowHandler::pointer_update(Window::PointerInfo p) {
+	if (!m_gesture) {
+		return;
+	}
+
 	if (p.type == Window::POINTER_TYPE::TOUCH or p.type == Window::POINTER_TYPE::TOUCHPAD) {
 		m_gesture->update_gesture(p);
 	}
@@ -111,6 +135,10 @@ void DocantoWin::MainWindowHandler::pointer_update(Window::PointerInfo p) {
 }
 
 void DocantoWin::MainWindowHandler::pointer_up(Window::PointerInfo p) {
+	if (!m_gesture) {
+		return;
+	}
+
 	if (p.type == Window::POINTER_TYPE::TOUCH or p.type == Window::POINTER_TYPE::TOUCHPAD) {
 		m_gesture->end_gesture(p);
 	}

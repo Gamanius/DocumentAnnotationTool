@@ -111,6 +111,10 @@ void DocantoWin::GestureHandler::update_gesture(const Window::PointerInfo& p) {
 		auto last_center = (firstfinger.last_position + secondfinger.last_position) / 2.0f;
 		auto init_center = (firstfinger.initial_position+ secondfinger.initial_position) / 2.0f;
 
+		if ((init_center - last_center).distance() < AppVariables::TOUCHPAD_JITTER_DISTANCE) {
+			return;
+		}
+
 		if ((init_center - last_center).distance() > AppVariables::TOUCHPAD_MIN_TRAVEL_DISTANCE and m_touchpadWasOneFingerActive) {
 			m_touchpadMovedFar = true;
 		}

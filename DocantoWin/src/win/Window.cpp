@@ -335,6 +335,30 @@ LRESULT DocantoWin::Window::parse_message(UINT uMsg, WPARAM wParam, LPARAM lPara
 	}
 	case WM_INPUT:
 	{
+		// we also get wm_input even if the mouse is not over the window
+		POINT cursorPos;
+		if (!GetCursorPos(&cursorPos)) {
+			Docanto::Logger::warn("Couldnt get mouse positions");
+			break;
+		}
+
+		if (!ScreenToClient(m_hwnd, &cursorPos)) {
+			Docanto::Logger::warn("Couldn't translate mouse positions");
+			break;
+		}
+
+		RECT clientRect;
+		if (!GetClientRect(m_hwnd, &clientRect)) {
+			Docanto::Logger::warn("Couldn't get Client rect");
+			break;
+		}
+
+		// Check if cursor is within client area
+		if (PtInRect(&clientRect, cursorPos) == false) {
+			break;
+		}
+
+
 		auto touch = get_touchpadinfo(lParam);
 		if (!touch.has_value()) {
 			break;
