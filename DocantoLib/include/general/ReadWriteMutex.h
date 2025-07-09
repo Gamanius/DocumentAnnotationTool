@@ -224,6 +224,9 @@ namespace Docanto {
 
 }
 
+template <typename T>
+using ThreadSafeVector = Docanto::ReadWriteThreadSafeMutex<std::vector<T>>;
+
 template<typename T>
 std::wostream& operator<<(std::wostream& os, const Docanto::ReadWrapper<T>& obj) {
 	return os << *obj;

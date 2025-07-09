@@ -3,9 +3,42 @@
 #include "mupdf/fitz.h"
 #include "mupdf/pdf.h"
 
-Docanto::PDFRenderer::PDFRenderer(std::shared_ptr<PDF> pdf_obj) {
+#include "../../include/general/Timer.h"
+#include "../../include/general/ReadWriteMutex.h"
+
+typedef struct {
+	unsigned int cmd : 5;
+	unsigned int size : 9;
+	unsigned int rect : 1;
+	unsigned int path : 1;
+	unsigned int cs : 3;
+	unsigned int color : 1;
+	unsigned int alpha : 2;
+	unsigned int ctm : 3;
+	unsigned int stroke : 1;
+	unsigned int flags : 6;
+} fz_display_node;
+
+struct fz_display_list {
+	fz_storable storable;
+	fz_display_node* list;
+	fz_rect mediabox;
+	size_t max;
+	size_t len;
+};
+
+struct Docanto::PDFRenderer::impl {
+
+	impl() = default;
+	~impl() = default;
+};
+
+Docanto::PDFRenderer::PDFRenderer(std::shared_ptr<PDF> pdf_obj) : pimpl(std::make_unique<impl>()) {
 	this->pdf_obj = pdf_obj;
+	update();
 }
+
+Docanto::PDFRenderer::~PDFRenderer() = default;
 
 Docanto::Image Docanto::PDFRenderer::get_image(size_t page, float dpi) {
 	fz_matrix ctm;
@@ -43,4 +76,70 @@ Docanto::Image Docanto::PDFRenderer::get_image(size_t page, float dpi) {
 	}
 
 	return std::move(obj);
+}
+
+
+void Docanto::PDFRenderer::update() {
+	// clear the list and copy all again
+	Logger::log(L"Start creating Display List");
+	Docanto::Timer time;
+	// for each rec create a display list
+	fz_display_list* list_annot = nullptr;
+	fz_display_list* list_widget = nullptr;
+	fz_display_list* list_content = nullptr;
+	fz_device* dev_annot = nullptr;
+	fz_device* dev_widget = nullptr;
+	fz_device* dev_content = nullptr;
+
+	auto ctx = GlobalPDFContext::get_instance().get();
+
+	size_t amount_of_pages = pdf_obj->get_page_count();
+	//m_display_list_amount_processed_total = amount_of_pages;
+
+	for (size_t i = 0; i < amount_of_pages; i++) {
+		// get the page that will be rendered
+		auto doc = pdf_obj->get();
+		// we have to do a fz call since we want to use the ctx.
+		// we can't use any other calls (like m_pdf->get_page()) since we would need to create a ctx
+		// wrapper which would be overkill for this scenario.
+		auto p = fz_load_page(*ctx, *doc, static_cast<int>(i));
+		fz_try(*ctx) {
+			// create a display list with all the draw calls and so on
+			list_annot = fz_new_display_list(*ctx, fz_bound_page(*ctx, p));
+			list_widget = fz_new_display_list(*ctx, fz_bound_page(*ctx, p));
+			list_content = fz_new_display_list(*ctx, fz_bound_page(*ctx, p));
+
+			dev_annot = fz_new_list_device(*ctx, list_annot);
+			dev_widget = fz_new_list_device(*ctx, list_widget);
+			dev_content = fz_new_list_device(*ctx, list_content);
+
+			// run all three devices
+			Timer time2;
+			fz_run_page_annots(*ctx, p, dev_annot, fz_identity, nullptr);
+			Logger::log("Page ", i + 1, " Annots Rendered in ", time2);
+
+			time2 = Timer();
+			fz_run_page_widgets(*ctx, p, dev_widget, fz_identity, nullptr);
+			Logger::log("Page ", i + 1, " Widgets Rendered in ", time2);
+
+			time2 = Timer();
+			fz_run_page_contents(*ctx, p, dev_content, fz_identity, nullptr);
+			Logger::log("Page ", i + 1, " Content Rendered in ", time2);
+
+		} fz_always(*ctx) {
+			// flush the device
+			fz_close_device(*ctx, dev_annot);
+			fz_close_device(*ctx, dev_widget);
+			fz_close_device(*ctx, dev_content);
+			fz_drop_device(*ctx, dev_annot);
+			fz_drop_device(*ctx, dev_widget);
+			fz_drop_device(*ctx, dev_content);
+		} fz_catch(*ctx) {
+			Docanto::Logger::error("Could not preprocess the PDF page");
+		}
+		// always drop page at the end
+		fz_drop_page(*ctx, p);
+	}
+
+	Logger::log(L"Finished Displaylist in ", time);
 }

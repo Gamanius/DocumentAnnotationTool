@@ -12,8 +12,15 @@ namespace Docanto {
 		std::shared_ptr<PDF> pdf_obj;
 	public:
 		PDFRenderer(std::shared_ptr<PDF> pdf_obj);
+		~PDFRenderer();
 
 		Image get_image(size_t page, float dpi = MUPDF_DEFAULT_DPI);
+
+		void update();
+	private:
+		struct impl;
+
+		std::unique_ptr<impl> pimpl;
 	};
 }
 
