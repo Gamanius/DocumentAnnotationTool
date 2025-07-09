@@ -177,7 +177,6 @@ DocantoWin::MainWindowHandler::MainWindowHandler(HINSTANCE instance) {
 		this->pointer_up(d);
 	});
 
-
 	m_render->add_transform_matrix({ 100, 100 });
 	auto path = open_file_dialog(L"PDF\0 * .pdf\0\0", m_mainwindow->get_hwnd());
 	Docanto::Logger::log("Got path ", path);

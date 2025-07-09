@@ -600,6 +600,23 @@ bool DocantoWin::Window::is_window_maximized() const {
 	return IsZoomed(m_hwnd) != 0;
 }
 
+Docanto::Color DocantoWin::Window::get_accent_color() {
+	DWORD color = 0;
+	BOOL opaque = FALSE;
+
+	HRESULT hr = DwmGetColorizationColor(&color, &opaque);
+	if (!WIN_ASSERT_OK(hr, "Could not retrieve accent color")) {
+		return Docanto::Color();
+	}
+
+	BYTE a = (color >> 24) & 0xFF;
+	BYTE r = (color >> 16) & 0xFF;
+	BYTE g = (color >> 8) & 0xFF;
+	BYTE b = color & 0xFF;
+
+	return {r, g, b, a};
+}
+
 bool DocantoWin::Window::get_close_request() const {
 	return m_closeRequest;
 }

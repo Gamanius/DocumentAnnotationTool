@@ -17,4 +17,9 @@ namespace Docanto {
 	};
 }
 
+
+inline std::wostream& operator<<(std::wostream& os, const Docanto::Color& col) {
+	return os << L"[r=" << col.r << L", g=" << col.g << L", b=" << col.b << L", a=" << col.alpha << L"]";
+}
+
 #endif // !_BASIC_RENDER_H_

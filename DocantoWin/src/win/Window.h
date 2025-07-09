@@ -229,6 +229,7 @@ namespace DocantoWin {
 
 		bool is_window_maximized() const;
 
+		static Docanto::Color get_accent_color();
 
 		/// <summary>
 		/// Converts the given pixel to DIPs (device independent pixels)
