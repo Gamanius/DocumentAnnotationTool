@@ -55,14 +55,6 @@ void DocantoWin::MainWindowHandler::key(Window::VK key, bool pressed) {
 		}
 		break;
 	}
-	case O:
-	{
-
-		m_pdfhandler = std::make_shared<PDFHandler>(L"C:/repos/Docanto/pdf_tests/Annotation pdf.pdf", m_render);
-		m_pdfhandler->render();
-		m_mainwindow->send_paint_request();
-		break;
-	}
 	case DOWNARROW:
 	{
 		m_render->add_transform_matrix({ 0, -100 });
@@ -162,7 +154,9 @@ DocantoWin::MainWindowHandler::MainWindowHandler(HINSTANCE instance) {
 	auto path = open_file_dialog(L"PDF\0 * .pdf\0\0", m_mainwindow->get_hwnd());
 	Docanto::Logger::log("Got path ", path);
 	if (path.has_value()) {
+		Docanto::Timer t;
 		m_pdfhandler = std::make_shared<PDFHandler>(path.value(), m_render);
+		Docanto::Logger::log("Loaded PDF in ", t);
 	}
 	else {
 		exit(0);

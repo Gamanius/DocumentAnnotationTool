@@ -4,6 +4,8 @@
 #include "win/Direct2D.h"
 #include "pdf/PDFHandler.h"
 
+#include "helper/AppVariables.h"
+
 #include <array>
 
 namespace DocantoWin {
@@ -20,8 +22,11 @@ namespace DocantoWin {
 		};
 
 		std::array<GestureFinger, 5> m_gesturefinger;
-		std::array<GestureFinger, 5> m_touchpad;
 		Docanto::Geometry::Point<float> m_initial_offset = { 0, 0 };
+
+		bool m_isGestureTouchpad = false;
+		bool m_touchpadWasOneFingerActive = true;
+		bool m_touchpadMovedFar = false;
 
 		D2D1::Matrix3x2F m_initialScaleMatrix;
 		D2D1::Matrix3x2F m_initialScaleMatrixInv;
