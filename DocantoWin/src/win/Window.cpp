@@ -1,13 +1,16 @@
 #include "Window.h"
 
 #include <dwmapi.h>
-#pragma comment(lib, "dwmapi.lib")
 
 #include <windowsx.h>
 
 #include <hidusage.h>
 #include <hidsdi.h>
-#pragma comment(lib, "hid.lib")
+
+#include "helper/AppVariables.h"
+
+#include <winrt/Windows.UI.ViewManagement.h>
+
 
 #define CHECK_BIT(var,pos) ((var) & (1<<(pos)))
 
@@ -487,6 +490,9 @@ LRESULT DocantoWin::Window::parse_message(UINT uMsg, WPARAM wParam, LPARAM lPara
 
 
 DocantoWin::Window::Window(HINSTANCE h) {
+	// first update the appvariables
+	AppVariables::Colors::isDarkTheme = Window::is_dark_mode_on();
+
 	if (!SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2))
 		Docanto::Logger::warn("Could not set DPI awareness");
 
@@ -615,6 +621,36 @@ Docanto::Color DocantoWin::Window::get_accent_color() {
 	BYTE b = color & 0xFF;
 
 	return {r, g, b, a};
+}
+
+bool DocantoWin::Window::is_dark_mode_on() {
+	using namespace winrt::Windows::UI::ViewManagement;
+	auto IsColorLight = [](winrt::Windows::UI::Color& clr) -> bool {
+		return (((5 * clr.G) + (2 * clr.R) + clr.B) > (8 * 128));
+		};
+
+
+	auto settings = UISettings();
+	auto foreground = settings.GetColorValue(UIColorType::Foreground);
+	
+	return IsColorLight(foreground);
+}
+
+void DocantoWin::Window::dark_mode_callback() {
+	using namespace winrt::Windows::UI::ViewManagement;
+	auto IsColorLight = [](winrt::Windows::UI::Color& clr) -> bool {
+		return (((5 * clr.G) + (2 * clr.R) + clr.B) > (8 * 128));
+		};
+
+
+	auto settings = UISettings();
+	auto foreground = settings.GetColorValue(UIColorType::Foreground);
+	auto revoker = settings.ColorValuesChanged([&](auto&&...) {
+		auto foregroundRevoker = settings.GetColorValue(UIColorType::Foreground);
+		bool isDarkModeRevoker = static_cast<bool>(IsColorLight(foregroundRevoker));
+
+		PostMessage(m_hwnd, WM_PAINT, 0, 0);
+	});
 }
 
 bool DocantoWin::Window::get_close_request() const {

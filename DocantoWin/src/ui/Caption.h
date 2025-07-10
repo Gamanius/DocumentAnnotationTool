@@ -18,6 +18,8 @@ namespace DocantoWin {
 			Docanto::Geometry::Rectangle<float>,
 			Docanto::Geometry::Rectangle<float>> get_caption_rects() const;
 
+
+		void update_colors();
 	public:
 
 		Caption(std::shared_ptr<Direct2DRender> render);

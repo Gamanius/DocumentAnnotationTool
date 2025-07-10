@@ -230,6 +230,10 @@ namespace DocantoWin {
 		bool is_window_maximized() const;
 
 		static Docanto::Color get_accent_color();
+		static bool is_dark_mode_on();
+
+		// TODO maybe add a callback. for now it just calls WM_PAINT upon change of the theme
+		void dark_mode_callback();
 
 		/// <summary>
 		/// Converts the given pixel to DIPs (device independent pixels)

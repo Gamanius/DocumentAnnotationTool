@@ -14,6 +14,22 @@ namespace DocantoWin::AppVariables {
 	inline float TOUCHPAD_JITTER_DISTANCE = 50.0f;
 	// This controls how sensitive the panning is with the touchpad
 	inline float TOUCHPAD_PAN_SCALE_FACTOR = 0.7f;
+
+	namespace Colors {
+		// This needs to be updated manually (by the Window class since it knows that)
+		inline bool isDarkTheme = false;
+
+		enum class TYPE {
+			TASKBAR_COLOR
+		};
+
+		//              Index           Light theme     Dark theme
+		inline std::map<TYPE, std::pair<Docanto::Color, Docanto::Color>> ThemeColors = {
+			{TYPE::TASKBAR_COLOR, {{255, 255, 255}, {0, 255, 255}}}
+		};
+
+		Docanto::Color get(TYPE);
+	}
 }
 
 #endif // !_DOCANTOWIN_APPVARS_H_

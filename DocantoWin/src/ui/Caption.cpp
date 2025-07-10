@@ -1,5 +1,7 @@
 #include "Caption.h"
 
+#include "helper/AppVariables.h"
+
 std::tuple<Docanto::Geometry::Rectangle<float>, Docanto::Geometry::Rectangle<float>, Docanto::Geometry::Rectangle<float>, Docanto::Geometry::Rectangle<float>> DocantoWin::Caption::get_caption_rects() const {
 	auto window = m_render->get_attached_window();
 
@@ -18,11 +20,17 @@ std::tuple<Docanto::Geometry::Rectangle<float>, Docanto::Geometry::Rectangle<flo
 	};
 }
 
+void DocantoWin::Caption::update_colors() {
+	m_caption_color->SetColor(ColorToD2D1(AppVariables::Colors::get(AppVariables::Colors::TYPE::TASKBAR_COLOR)));
+}
+
 DocantoWin::Caption::Caption(std::shared_ptr<Direct2DRender> render) : m_render(render) {
 	m_caption_title_text_format = std::move(m_render->create_text_format(L"Consolas", m_caption_height));
 	m_title_text_color = std::move(m_render->create_brush({255, 255, 255, 255}));
 	m_caption_color = std::move(m_render->create_brush({50, 50, 255, 255}));
 	m_caption_button_line_color = std::move(m_render->create_brush({255, 255, 255, 255}));
+
+	update_colors();
 }
 
 void DocantoWin::Caption::draw() {
