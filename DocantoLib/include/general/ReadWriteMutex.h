@@ -31,8 +31,8 @@ namespace Docanto {
 		std::condition_variable thread_list_conditional;
 	public:
 		ReadWriteThreadSafeMutex(T&& item) : item(std::move(item)) {}
+		ReadWriteThreadSafeMutex() : item(T()) {}
 
-		ReadWriteThreadSafeMutex() = delete;
 		ReadWriteThreadSafeMutex(const ReadWriteThreadSafeMutex& other) = delete;
 		ReadWriteThreadSafeMutex& operator=(const ReadWriteThreadSafeMutex& other) = delete;
 

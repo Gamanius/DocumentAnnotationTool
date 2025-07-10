@@ -106,6 +106,7 @@ namespace DocantoWin {
 		void draw_rect_filled(Docanto::Geometry::Rectangle<float> r, Docanto::Color c);
 
 		void draw_bitmap(Docanto::Geometry::Point<float> where, BitmapObject& obj);
+		void draw_bitmap(Docanto::Geometry::Point<float> where, BitmapObject& obj, float dpi);
 
 		void set_current_transform_active();
 		void set_identity_transform_active();

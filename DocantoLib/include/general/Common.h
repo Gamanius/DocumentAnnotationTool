@@ -9,6 +9,7 @@
 
 #include <fstream>
 #include <filesystem>
+#include <functional>
 
 #include <mutex>
 #include <shared_mutex>

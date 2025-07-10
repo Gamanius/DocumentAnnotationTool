@@ -148,6 +148,17 @@ void DocantoWin::Direct2DRender::draw_bitmap(Docanto::Geometry::Point<float> whe
 	end_draw();
 }
 
+void DocantoWin::Direct2DRender::draw_bitmap(Docanto::Geometry::Point<float> where, BitmapObject& obj, float dpi) {
+	float x = 0, y = 0;
+	obj.m_object->GetDpi(&x, &y);
+	auto scale = x / dpi;
+
+	begin_draw();
+	auto size = obj.m_object->GetSize();
+	m_renderTarget->DrawBitmap(obj.m_object, D2D1::RectF(where.x, where.y, size.width * scale + where.x, size.height * scale + where.y));
+	end_draw();
+}
+
 void DocantoWin::Direct2DRender::draw_line(Docanto::Geometry::Point<float> p1, Docanto::Geometry::Point<float> p2, BrushObject& brush, float thick) {
 	begin_draw();
 	m_renderTarget->DrawLine(PointToD2D1(p1), PointToD2D1(p2), brush.m_object, thick);

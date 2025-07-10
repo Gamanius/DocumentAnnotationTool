@@ -58,10 +58,12 @@ Docanto::PageWrapper& Docanto::PDF::get_page(size_t page) {
 	return *(m_pages.at(page).get());
 }
 
-Docanto::Geometry::Dimension<float> Docanto::PDF::get_page_dimension(size_t page) {
+Docanto::Geometry::Dimension<float> Docanto::PDF::get_page_dimension(size_t page, float dpi) {
+	auto scale = dpi / MUPDF_DEFAULT_DPI;
+
 	auto ctx = GlobalPDFContext::get_instance().get();
 
 	auto s = fz_bound_page(*ctx, *(get_page(page).get()));
 	
-	return { s.x1 - s.x0, s.y1 - s.y0 };
+	return { (s.x1 - s.x0) * scale, (s.y1 - s.y0) * scale };
 }

@@ -27,15 +27,36 @@ struct fz_display_list {
 	size_t len;
 };
 
+struct DisplayListWrapper : public Docanto::ThreadSafeWrapper<fz_display_list*> {
+	using Docanto::ThreadSafeWrapper<fz_display_list*>::ThreadSafeWrapper;
+
+	~DisplayListWrapper() {
+		auto d = get().get();
+
+		if (d != nullptr) {
+			auto ctx = Docanto::GlobalPDFContext::get_instance().get();
+			fz_drop_display_list(*ctx, *d);
+		}
+	}
+};
+
 struct Docanto::PDFRenderer::impl {
+	ThreadSafeVector<std::unique_ptr<DisplayListWrapper>> m_page_content;
+	ThreadSafeVector<std::unique_ptr<DisplayListWrapper>> m_page_widgets;
+	ThreadSafeVector<std::unique_ptr<DisplayListWrapper>> m_page_annotat;
+
+	std::atomic_size_t m_last_id = 0;
+	ThreadSafeVector<PDFRenderInfo> m_previewbitmaps;
+
 
 	impl() = default;
 	~impl() = default;
 };
 
-Docanto::PDFRenderer::PDFRenderer(std::shared_ptr<PDF> pdf_obj) : pimpl(std::make_unique<impl>()) {
+Docanto::PDFRenderer::PDFRenderer(std::shared_ptr<PDF> pdf_obj, std::shared_ptr<IPDFRenderImageProcessor> processor) : pimpl(std::make_unique<impl>()) {
 	this->pdf_obj = pdf_obj;
-	update();
+	this->m_processor = processor;
+	create_preview();
 }
 
 Docanto::PDFRenderer::~PDFRenderer() = default;
@@ -66,6 +87,7 @@ Docanto::Image Docanto::PDFRenderer::get_image(size_t page, float dpi) {
 		obj.size = pixmap->h * pixmap->stride;
 		obj.stride = pixmap->stride;
 		obj.components = pixmap->n;
+		obj.dpi = dpi;
 
 		pixmap->samples = nullptr;
 	} fz_always(*ctx) {
@@ -75,9 +97,33 @@ Docanto::Image Docanto::PDFRenderer::get_image(size_t page, float dpi) {
 		return Docanto::Image();
 	}
 
-	return std::move(obj);
+	return obj;
 }
 
+
+void Docanto::PDFRenderer::create_preview(float dpi) {
+	Docanto::Logger::log("Creating preview");
+	Timer t;
+	size_t amount_of_pages = pdf_obj->get_page_count();
+
+	float y = 0;
+	for (size_t i = 0; i < amount_of_pages; i++) {
+		auto dims = pdf_obj->get_page_dimension(i, m_standard_dpi);
+		auto id = pimpl->m_last_id++;
+		m_processor->processImage(id, get_image(i, dpi));
+
+		auto prevs = pimpl->m_previewbitmaps.get_write();
+		prevs->push_back({ id, {0, y}, dpi });
+
+		y += dims.height + 10;
+	}
+	Docanto::Logger::log("Preview generation and processing took ", t);
+}
+
+const std::vector<Docanto::PDFRenderer::PDFRenderInfo>& Docanto::PDFRenderer::get_preview() {
+	auto d =  pimpl->m_previewbitmaps.get_read();
+	return *d.get();
+}
 
 void Docanto::PDFRenderer::update() {
 	// clear the list and copy all again
@@ -125,6 +171,17 @@ void Docanto::PDFRenderer::update() {
 			time2 = Timer();
 			fz_run_page_contents(*ctx, p, dev_content, fz_identity, nullptr);
 			Logger::log("Page ", i + 1, " Content Rendered in ", time2);
+
+			// get the list and add the lists
+			auto content = pimpl->m_page_content.get_write();
+			content->emplace_back(std::make_unique<DisplayListWrapper>(std::move(list_content)));
+
+			auto widgets = pimpl->m_page_widgets.get_write();
+			widgets->emplace_back(std::make_unique<DisplayListWrapper>(std::move(list_widget)));
+
+			auto annotat = pimpl->m_page_annotat.get_write();
+			annotat->emplace_back(std::make_unique<DisplayListWrapper>(std::move(list_annot)));
+
 
 		} fz_always(*ctx) {
 			// flush the device
