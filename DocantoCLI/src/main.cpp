@@ -4,23 +4,48 @@
 #include <crtdbg.h>
 #include <cstdlib>
 
+
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
 #include "DocantoLib.h"
 
-using namespace Docanto;
+#include <chrono>
 
+
+#include <winrt/Windows.UI.ViewManagement.h>
+#include <winrt/Windows.Foundation.Collections.h>
+using namespace winrt::Windows::UI::ViewManagement;
+
+using namespace Docanto; 
+inline bool IsColorLight(winrt::Windows::UI::Color& clr) {
+	return (((5 * clr.G) + (2 * clr.R) + clr.B) > (8 * 128));
+}
+
+using namespace std::literals::chrono_literals;
 int main() {
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 
 	Logger::init(&std::wcout);
+	
+	winrt::init_apartment();
+	auto settings = UISettings();
 
-	auto a = std::make_shared<PDF>("C:/repos/Docanto/pdf_tests/Ghent_PDF_Output_Suite_V50_Testpages/GhentPDFOutputSuite50_ReadMes.pdf");
-	PDFRenderer render(a);
-	auto i = render.get_image(0);
+	auto foreground = settings.GetColorValue(UIColorType::Foreground);
+	bool isDarkMode = static_cast<bool>(IsColorLight(foreground));
 
-	stbi_write_png("test.png", i.dims.width, i.dims.height, i.components, (void*)(i.data.get()), i.stride);
+	auto revoker = settings.ColorValuesChanged([settings](auto&&...) {
+		auto foregroundRevoker = settings.GetColorValue(UIColorType::Foreground);
+		bool isDarkModeRevoker = static_cast<bool>(IsColorLight(foregroundRevoker));
+		wprintf(L"isDarkModeRevoker: %d\n", isDarkModeRevoker);
+		});
+
+	static bool s_go = true;
+	while (s_go) {
+		std::this_thread::sleep_for(2s);
+	}
+
+	Logger::log(isDarkMode);
 
 	Logger::print_to_debug();
 }
