@@ -21,10 +21,10 @@ std::tuple<Docanto::Geometry::Rectangle<float>, Docanto::Geometry::Rectangle<flo
 }
 
 void DocantoWin::Caption::update_colors() {
-	m_caption_color->SetColor(ColorToD2D1(AppVariables::Colors::get(AppVariables::Colors::TYPE::ACCENT_COLOR)));
+	m_caption_color->SetColor(ColorToD2D1(AppVariables::Colors::get(AppVariables::Colors::TYPE::PRIMARY_COLOR)));
 	m_caption_button_line_color->SetColor(ColorToD2D1(AppVariables::Colors::get(AppVariables::Colors::TYPE::TEXT_COLOR)));
 	m_title_text_color->SetColor(ColorToD2D1(AppVariables::Colors::get(AppVariables::Colors::TYPE::TEXT_COLOR)));
-	m_caption_button_rect_color->SetColor(ColorToD2D1(AppVariables::Colors::get(AppVariables::Colors::TYPE::PRIMARY_COLOR)));
+	m_caption_button_rect_color->SetColor(ColorToD2D1(AppVariables::Colors::get(AppVariables::Colors::TYPE::SECONDARY_COLOR)));
 }
 
 DocantoWin::Caption::Caption(std::shared_ptr<Direct2DRender> render) : m_render(render) {
