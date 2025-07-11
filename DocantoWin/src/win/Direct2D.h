@@ -91,6 +91,7 @@ namespace DocantoWin {
 		void end_draw();
 
 		void clear(Docanto::Color c);
+		void clear();
 
 		void draw_text(const std::wstring& text, Docanto::Geometry::Point<float> pos, TextFormatObject& format, BrushObject& brush);
 		void draw_text(const std::wstring& text, Docanto::Geometry::Point<float> pos, Docanto::Color c, float size);

@@ -27,7 +27,7 @@ static std::optional<std::wstring> open_file_dialog(const wchar_t* filter, HWND 
 
 void DocantoWin::MainWindowHandler::paint() {
 	m_render->begin_draw();
-	m_render->clear({ 50, 50, 50 });
+	m_render->clear();
 
 	m_render->set_current_transform_active();
 	m_pdfhandler->draw();

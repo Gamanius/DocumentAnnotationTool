@@ -20,12 +20,20 @@ namespace DocantoWin::AppVariables {
 		inline bool isDarkTheme = false;
 
 		enum class TYPE {
-			TASKBAR_COLOR
+			BACKGROUND_COLOR,
+			TEXT_COLOR,
+			PRIMARY_COLOR,
+			SECONDARY_COLOR,
+			ACCENT_COLOR,
 		};
 
 		//              Index           Light theme     Dark theme
 		inline std::map<TYPE, std::pair<Docanto::Color, Docanto::Color>> ThemeColors = {
-			{TYPE::TASKBAR_COLOR, {{255, 255, 255}, {0, 255, 255}}}
+			{TYPE::BACKGROUND_COLOR, {{245, 245, 245}, {31 , 31 , 31 }}},
+			{TYPE::TEXT_COLOR,       {{26 , 13 , 0  }, {255, 242, 229}}},
+			{TYPE::PRIMARY_COLOR,    {{12 , 0  , 255}, {77 , 255, 83 }}},
+			{TYPE::SECONDARY_COLOR,  {{0  , 161, 182}, {77 , 255, 121}}},
+			{TYPE::ACCENT_COLOR,     {{255, 127, 0  }, {121, 0  , 143}}}
 		};
 
 		Docanto::Color get(TYPE);

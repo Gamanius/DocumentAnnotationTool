@@ -21,7 +21,10 @@ std::tuple<Docanto::Geometry::Rectangle<float>, Docanto::Geometry::Rectangle<flo
 }
 
 void DocantoWin::Caption::update_colors() {
-	m_caption_color->SetColor(ColorToD2D1(AppVariables::Colors::get(AppVariables::Colors::TYPE::TASKBAR_COLOR)));
+	m_caption_color->SetColor(ColorToD2D1(AppVariables::Colors::get(AppVariables::Colors::TYPE::ACCENT_COLOR)));
+	m_caption_button_line_color->SetColor(ColorToD2D1(AppVariables::Colors::get(AppVariables::Colors::TYPE::TEXT_COLOR)));
+	m_title_text_color->SetColor(ColorToD2D1(AppVariables::Colors::get(AppVariables::Colors::TYPE::TEXT_COLOR)));
+	m_caption_button_rect_color->SetColor(ColorToD2D1(AppVariables::Colors::get(AppVariables::Colors::TYPE::PRIMARY_COLOR)));
 }
 
 DocantoWin::Caption::Caption(std::shared_ptr<Direct2DRender> render) : m_render(render) {
@@ -29,11 +32,13 @@ DocantoWin::Caption::Caption(std::shared_ptr<Direct2DRender> render) : m_render(
 	m_title_text_color = std::move(m_render->create_brush({255, 255, 255, 255}));
 	m_caption_color = std::move(m_render->create_brush({50, 50, 255, 255}));
 	m_caption_button_line_color = std::move(m_render->create_brush({255, 255, 255, 255}));
+	m_caption_button_rect_color = std::move(m_render->create_brush({255, 255, 255, 255}));
 
 	update_colors();
 }
 
 void DocantoWin::Caption::draw() {
+	update_colors();
 	const int button_thickness = 1;
 	auto window = m_render->get_attached_window();
 
@@ -58,7 +63,7 @@ void DocantoWin::Caption::draw() {
 
 	// close button
 	if (hit == HTCLOSE) {
-		m_render->draw_rect_filled(close_btn_rec, { 255, 0, 0 });
+		m_render->draw_rect_filled(close_btn_rec, {255, 0, 0});
 	}
 	m_render->draw_line(
 		{ close_btn_rec.x + close_btn_rec.height / 4, close_btn_rec.height / 4 + close_btn_rec.y },
@@ -71,7 +76,7 @@ void DocantoWin::Caption::draw() {
 
 	// Maximize button
 	if (hit == HTMAXBUTTON) {
-		m_render->draw_rect_filled(max_btn_rec, { 100, 100, 255 });
+		m_render->draw_rect_filled(max_btn_rec, m_caption_button_rect_color);
 	}
 	m_render->draw_rect(
 		Docanto::Geometry::Rectangle<float>({ std::ceil(max_btn_rec.x + max_btn_rec.height / 4) + 0.5f, std::ceil(max_btn_rec.height / 4 + max_btn_rec.y) + 0.5f},
@@ -80,7 +85,7 @@ void DocantoWin::Caption::draw() {
 
 	// Minimize
 	if (hit == HTMINBUTTON) {
-		m_render->draw_rect_filled(min_btn_rec, { 100, 100, 255 });
+		m_render->draw_rect_filled(min_btn_rec, m_caption_button_rect_color);
 	}
 	m_render->draw_line(
 		{ std::ceil(min_btn_rec.x + min_btn_rec.height / 4) + 0.5f, std::ceil(min_btn_rec.height / 2 + min_btn_rec.y) + 0.5f },

@@ -2,6 +2,8 @@
 #include <wincodec.h>
 #include <d2d1.h>
 
+#include "helper/AppVariables.h"
+
 #pragma comment(lib, "d2d1.lib")
 #pragma comment(lib, "dwrite.lib")
 
@@ -85,6 +87,10 @@ void DocantoWin::Direct2DRender::clear(Docanto::Color c) {
 	begin_draw();
 	m_renderTarget->Clear(ColorToD2D1(c));
 	end_draw();
+}
+
+void DocantoWin::Direct2DRender::clear() {
+	clear(AppVariables::Colors::get(AppVariables::Colors::TYPE::BACKGROUND_COLOR));
 }
 
 std::shared_ptr<DocantoWin::Window> DocantoWin::Direct2DRender::get_attached_window() const {

@@ -33,12 +33,14 @@ int main() {
 
 	auto foreground = settings.GetColorValue(UIColorType::Foreground);
 	bool isDarkMode = static_cast<bool>(IsColorLight(foreground));
+	{
 
-	auto revoker = settings.ColorValuesChanged([settings](auto&&...) {
-		auto foregroundRevoker = settings.GetColorValue(UIColorType::Foreground);
-		bool isDarkModeRevoker = static_cast<bool>(IsColorLight(foregroundRevoker));
-		wprintf(L"isDarkModeRevoker: %d\n", isDarkModeRevoker);
-		});
+		auto revoker = settings.ColorValuesChanged([&](auto&&...) {
+			auto foregroundRevoker = settings.GetColorValue(UIColorType::Foreground);
+			bool isDarkModeRevoker = static_cast<bool>(IsColorLight(foregroundRevoker));
+			wprintf(L"isDarkModeRevoker: %d\n", isDarkModeRevoker);
+			});
+	}
 
 	static bool s_go = true;
 	while (s_go) {

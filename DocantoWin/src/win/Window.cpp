@@ -10,11 +10,15 @@
 #include "helper/AppVariables.h"
 
 #include <winrt/Windows.UI.ViewManagement.h>
-
+#include <winrt/Windows.Foundation.Collections.h>
 
 #define CHECK_BIT(var,pos) ((var) & (1<<(pos)))
 
 bool DocantoWin::Window::g_touchpadGestureInProgress = false;
+
+// needed only once
+static winrt::event_token winrt_darkthemecallbackrevoker;
+static auto winrt_uisettings = winrt::Windows::UI::ViewManagement::UISettings();
 
 DocantoWin::Window::VK winkey_to_vk(int windowsKey);
 
@@ -492,6 +496,7 @@ LRESULT DocantoWin::Window::parse_message(UINT uMsg, WPARAM wParam, LPARAM lPara
 DocantoWin::Window::Window(HINSTANCE h) {
 	// first update the appvariables
 	AppVariables::Colors::isDarkTheme = Window::is_dark_mode_on();
+	dark_mode_callback();
 
 	if (!SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2))
 		Docanto::Logger::warn("Could not set DPI awareness");
@@ -630,24 +635,36 @@ bool DocantoWin::Window::is_dark_mode_on() {
 		};
 
 
-	auto settings = UISettings();
-	auto foreground = settings.GetColorValue(UIColorType::Foreground);
+	auto foreground = winrt_uisettings.GetColorValue(UIColorType::Foreground);
 	
 	return IsColorLight(foreground);
 }
 
+
 void DocantoWin::Window::dark_mode_callback() {
 	using namespace winrt::Windows::UI::ViewManagement;
+	
+	// The callback has already been initialized
+	if (winrt_darkthemecallbackrevoker.value != 0) {
+		return;
+	}
+
 	auto IsColorLight = [](winrt::Windows::UI::Color& clr) -> bool {
 		return (((5 * clr.G) + (2 * clr.R) + clr.B) > (8 * 128));
 		};
 
 
-	auto settings = UISettings();
-	auto foreground = settings.GetColorValue(UIColorType::Foreground);
-	auto revoker = settings.ColorValuesChanged([&](auto&&...) {
-		auto foregroundRevoker = settings.GetColorValue(UIColorType::Foreground);
+	winrt_darkthemecallbackrevoker = winrt_uisettings.ColorValuesChanged([&](auto&&...) {
+		auto foregroundRevoker = winrt_uisettings.GetColorValue(UIColorType::Foreground);
 		bool isDarkModeRevoker = static_cast<bool>(IsColorLight(foregroundRevoker));
+		DocantoWin::AppVariables::Colors::isDarkTheme = isDarkModeRevoker;
+		
+		if (isDarkModeRevoker) {
+			Docanto::Logger::log("System theme changed to dark");
+		}
+		else {
+			Docanto::Logger::log("System theme changed to light");
+		}
 
 		PostMessage(m_hwnd, WM_PAINT, 0, 0);
 	});

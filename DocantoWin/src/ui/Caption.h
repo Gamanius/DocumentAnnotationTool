@@ -7,6 +7,7 @@ namespace DocantoWin {
 		Direct2DRender::BrushObject m_title_text_color;
 		Direct2DRender::BrushObject m_caption_color;
 		Direct2DRender::BrushObject m_caption_button_line_color;
+		Direct2DRender::BrushObject m_caption_button_rect_color;
 
 		float m_caption_height = 24.0f;
 
