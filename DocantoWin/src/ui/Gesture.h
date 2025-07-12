@@ -28,7 +28,7 @@ namespace DocantoWin {
 		bool m_touchpadWasOneFingerActive = true;
 		bool m_touchpadMovedFar = false;
 
-		D2D1::Matrix3x2F m_initialTransformMatrix;
+		D2D1::Matrix3x2F m_initialTranslationMatrix;
 		D2D1::Matrix3x2F m_initialTransformMatrixInv;
 
 		D2D1::Matrix3x2F m_initialRotationMatrix;

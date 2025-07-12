@@ -86,25 +86,25 @@ void DocantoWin::MainWindowHandler::key(Window::VK key, bool pressed) {
 	}
 	case DOWNARROW:
 	{
-		m_render->add_transform_matrix({ 0, -100 });
+		m_render->add_translation_matrix({ 0, -100 });
 		m_mainwindow->send_paint_request();
 		break;
 	}
 	case UPARROW:
 	{
-		m_render->add_transform_matrix({ 0, 100 });
+		m_render->add_translation_matrix({ 0, 100 });
 		m_mainwindow->send_paint_request();
 		break;
 	}
 	case LEFTARROW:
 	{
-		m_render->add_transform_matrix({ 100, 0 });
+		m_render->add_translation_matrix({ 100, 0 });
 		m_mainwindow->send_paint_request();
 		break;
 	}
 	case RIGHTARROW:
 	{
-		m_render->add_transform_matrix({ -100, 0 });
+		m_render->add_translation_matrix({ -100, 0 });
 		m_mainwindow->send_paint_request();
 		break;
 	}

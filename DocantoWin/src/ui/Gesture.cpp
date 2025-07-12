@@ -17,7 +17,7 @@ void DocantoWin::GestureHandler::process_one_finger(GestureFinger& finger) {
 	auto last_pos_local = full.TransformPoint(PointToD2D1(finger.last_position));
 	auto init_pos_local = full.TransformPoint(PointToD2D1(finger.initial_position));
 
-	m_render->set_transform_matrix(D2D1::Matrix3x2F::Translation(last_pos_local.x - init_pos_local.x, last_pos_local.y - init_pos_local.y) * m_initialTransformMatrix);
+	m_render->set_translation_matrix(D2D1::Matrix3x2F::Translation(last_pos_local.x - init_pos_local.x, last_pos_local.y - init_pos_local.y) * m_initialTranslationMatrix);
 }
 
 auto get_signed_angle(Docanto::Geometry::Point<float> vecA, Docanto::Geometry::Point<float> vecB) {
@@ -31,6 +31,9 @@ auto get_signed_angle(Docanto::Geometry::Point<float> vecA, Docanto::Geometry::P
 }
 
 void DocantoWin::GestureHandler::process_two_finger(GestureFinger& firstfinger, GestureFinger& secondfinger) {
+	// I'm sure there must be a better way since this doesnt look right
+
+	// Scaling
 	auto full = m_initialScaleMatrixInv;
 
 	auto first_last_pos_local = D2D1ToPoint(full.TransformPoint(PointToD2D1(firstfinger.last_position)));
@@ -46,8 +49,9 @@ void DocantoWin::GestureHandler::process_two_finger(GestureFinger& firstfinger, 
 
 	m_render->set_scale_matrix(new_scale_mat * m_initialScaleMatrix);
 
-	full = m_initialRotationMatrix * new_scale_mat  * m_initialScaleMatrix;
-	full.Invert(); // do rot here?
+	// Rotating
+	full = m_initialRotationMatrix * new_scale_mat * m_initialScaleMatrix;
+	full.Invert(); 
 
 	first_last_pos_local = D2D1ToPoint(full.TransformPoint(PointToD2D1(firstfinger.last_position)));
 	first_init_pos_local = D2D1ToPoint(full.TransformPoint(PointToD2D1(firstfinger.initial_position)));
@@ -64,7 +68,8 @@ void DocantoWin::GestureHandler::process_two_finger(GestureFinger& firstfinger, 
 
 	m_render->set_rotation_matrix(new_rot * m_initialRotationMatrix);
 
-	full = m_initialTransformMatrix * new_rot * m_initialRotationMatrix * new_scale_mat  * m_initialScaleMatrix;
+	// Paning
+	full = m_initialTranslationMatrix * new_rot * m_initialRotationMatrix * new_scale_mat  * m_initialScaleMatrix;
 	full.Invert(); 
 		
 	first_last_pos_local = D2D1ToPoint(full.TransformPoint(PointToD2D1(firstfinger.last_position)));
@@ -77,13 +82,13 @@ void DocantoWin::GestureHandler::process_two_finger(GestureFinger& firstfinger, 
 	auto last_center = (first_last_pos_local + second_last_pos_local) / 2.0f;
 
 	auto new_trans = D2D1::Matrix3x2F::Translation(last_center.x - init_center.x, last_center.y - init_center.y);
-	m_render->set_transform_matrix(new_trans * m_initialTransformMatrix);
+	m_render->set_translation_matrix(new_trans * m_initialTranslationMatrix);
 }
 
 void DocantoWin::GestureHandler::update_local_matrices() {
 	m_initial_offset = m_render->get_transform_pos();
 	m_initialScaleMatrix = m_render->get_scale_matrix();
-	m_initialTransformMatrix = m_render->get_transformation_matrix();
+	m_initialTranslationMatrix = m_render->get_transformation_matrix();
 	m_initialRotationMatrix = m_render->get_rotation_matrix();
 
 	m_initialScaleMatrixInv = m_initialScaleMatrix;
@@ -92,7 +97,7 @@ void DocantoWin::GestureHandler::update_local_matrices() {
 	m_initialRotationMatrixInv = m_initialRotationMatrix;
 	m_initialRotationMatrixInv.Invert();
 
-	m_initialTransformMatrixInv = m_initialTransformMatrix;
+	m_initialTransformMatrixInv = m_initialTranslationMatrix;
 	m_initialTransformMatrixInv.Invert();
 }
 
@@ -238,7 +243,9 @@ void DocantoWin::GestureHandler::update_gesture(const Window::PointerInfo& p) {
 			break;
 		}
 
+		Docanto::Timer t;
 		process_two_finger(firstfinger, secondfinger);
+		Docanto::Logger::log(t);
 
 		//check_bounds();
 		return;

@@ -21,7 +21,7 @@ namespace DocantoWin {
 
 		ID2D1HwndRenderTarget* m_renderTarget = nullptr;
 
-		D2D1::Matrix3x2F m_transformPosMatrix = D2D1::Matrix3x2F::Identity();
+		D2D1::Matrix3x2F m_transformTranslationMatrix = D2D1::Matrix3x2F::Identity();
 		D2D1::Matrix3x2F m_transformScaleMatrix = D2D1::Matrix3x2F::Identity();
 		D2D1::Matrix3x2F m_transformRotationMatrix = D2D1::Matrix3x2F::Identity();
 
@@ -114,9 +114,9 @@ namespace DocantoWin {
 		void set_current_transform_active();
 		void set_identity_transform_active();
 
-		void set_transform_matrix(Docanto::Geometry::Point<float> p);
-		void set_transform_matrix(D2D1::Matrix3x2F m);
-		void add_transform_matrix(Docanto::Geometry::Point<float> p);
+		void set_translation_matrix(Docanto::Geometry::Point<float> p);
+		void set_translation_matrix(D2D1::Matrix3x2F m);
+		void add_translation_matrix(Docanto::Geometry::Point<float> p);
 
 		void set_scale_matrix(float scale, Docanto::Geometry::Point<float> center);
 		void set_scale_matrix(D2D1::Matrix3x2F m);
@@ -135,6 +135,7 @@ namespace DocantoWin {
 		D2D1::Matrix3x2F get_transformation_matrix() const;
 		Docanto::Geometry::Point<float> get_zoom_center() const;
 		Docanto::Geometry::Point<float> get_transform_pos() const;
+		float get_angle() const;
 
 		std::shared_ptr<Window> get_attached_window() const;
 
