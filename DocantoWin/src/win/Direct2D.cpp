@@ -180,7 +180,7 @@ void DocantoWin::Direct2DRender::draw_line(Docanto::Geometry::Point<float> p1, D
 
 
 void DocantoWin::Direct2DRender::set_current_transform_active() {
-	m_renderTarget->SetTransform(m_transformPosMatrix * m_transformScaleMatrix);
+	m_renderTarget->SetTransform(m_transformPosMatrix * m_transformRotationMatrix * m_transformScaleMatrix);
 }
 
 void DocantoWin::Direct2DRender::set_identity_transform_active() {
@@ -210,10 +210,59 @@ void DocantoWin::Direct2DRender::set_scale_matrix(D2D1::Matrix3x2F m) {
 void DocantoWin::Direct2DRender::add_scale_matrix(float scale, Docanto::Geometry::Point<float> center) {
 	// calc the new scale matrix
 	// boi i wish i would know how this works again...
-	auto mat = D2D1::Matrix3x2F(m_transformScaleMatrix);
-	mat.Invert();
-	mat = D2D1::Matrix3x2F::Scale({ scale, scale }, mat.TransformPoint(PointToD2D1(center)));
-	m_transformScaleMatrix = mat * m_transformScaleMatrix;
+	auto full = m_transformScaleMatrix
+		* m_transformRotationMatrix
+		* m_transformPosMatrix;
+	full.Invert();
+
+	auto localPivot = full.TransformPoint(PointToD2D1(center));
+
+	auto scaleAbout = D2D1::Matrix3x2F::Scale(
+		{ scale, scale },
+		localPivot);
+
+	m_transformScaleMatrix = scaleAbout * m_transformScaleMatrix;
+}
+
+void DocantoWin::Direct2DRender::set_rotation_matrix(float angle, Docanto::Geometry::Point<float> center) {
+	m_transformRotationMatrix = D2D1::Matrix3x2F::Rotation(angle, PointToD2D1(center));
+}
+
+void DocantoWin::Direct2DRender::set_rotation_matrix(D2D1::Matrix3x2F m) {
+	m_transformRotationMatrix = m;
+}
+
+void DocantoWin::Direct2DRender::add_rotation_matrix(float angle, Docanto::Geometry::Point<float> center) {    
+	auto full =  m_transformRotationMatrix
+		* m_transformPosMatrix;
+	full.Invert();
+
+	auto localPivot = full.TransformPoint(PointToD2D1(center));
+
+	auto rotAbout = D2D1::Matrix3x2F::Rotation(
+		angle,
+		localPivot);
+
+	m_transformRotationMatrix = rotAbout * m_transformRotationMatrix;
+}
+
+Docanto::Geometry::Point<float> DocantoWin::Direct2DRender::inv_transform(Docanto::Geometry::Point<float> p) {
+	auto full = m_transformScaleMatrix
+		* m_transformRotationMatrix
+		* m_transformPosMatrix;
+	full.Invert();
+
+	auto localPivot = full.TransformPoint(PointToD2D1(p));
+
+	return { localPivot.x, localPivot.y };
+}
+
+Docanto::Geometry::Point<float> DocantoWin::Direct2DRender::transform(Docanto::Geometry::Point<float> p) {
+	auto local = (m_transformScaleMatrix
+		* m_transformRotationMatrix
+		* m_transformPosMatrix).TransformPoint(PointToD2D1(p));
+
+	return { local.x, local.y };
 }
 
 float DocantoWin::Direct2DRender::get_transform_scale() const {
@@ -222,6 +271,14 @@ float DocantoWin::Direct2DRender::get_transform_scale() const {
 
 D2D1::Matrix3x2F DocantoWin::Direct2DRender::get_scale_matrix() const {
 	return m_transformScaleMatrix;
+}
+
+D2D1::Matrix3x2F DocantoWin::Direct2DRender::get_rotation_matrix() const {
+	return m_transformRotationMatrix;
+}
+
+D2D1::Matrix3x2F DocantoWin::Direct2DRender::get_transformation_matrix() const {
+	return m_transformPosMatrix;
 }
 
 Docanto::Geometry::Point<float> DocantoWin::Direct2DRender::get_zoom_center() const {

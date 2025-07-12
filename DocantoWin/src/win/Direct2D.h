@@ -21,7 +21,9 @@ namespace DocantoWin {
 
 		ID2D1HwndRenderTarget* m_renderTarget = nullptr;
 
-		D2D1::Matrix3x2F m_transformPosMatrix = D2D1::Matrix3x2F::Identity(), m_transformScaleMatrix = D2D1::Matrix3x2F::Identity();
+		D2D1::Matrix3x2F m_transformPosMatrix = D2D1::Matrix3x2F::Identity();
+		D2D1::Matrix3x2F m_transformScaleMatrix = D2D1::Matrix3x2F::Identity();
+		D2D1::Matrix3x2F m_transformRotationMatrix = D2D1::Matrix3x2F::Identity();
 
 		std::atomic<UINT32> m_isRenderinProgress = 0;
 		std::mutex draw_lock;
@@ -115,12 +117,22 @@ namespace DocantoWin {
 		void set_transform_matrix(Docanto::Geometry::Point<float> p);
 		void set_transform_matrix(D2D1::Matrix3x2F m);
 		void add_transform_matrix(Docanto::Geometry::Point<float> p);
+
 		void set_scale_matrix(float scale, Docanto::Geometry::Point<float> center);
 		void set_scale_matrix(D2D1::Matrix3x2F m);
 		void add_scale_matrix(float scale, Docanto::Geometry::Point<float> center);
 
+		void set_rotation_matrix(float angle, Docanto::Geometry::Point<float> center);
+		void set_rotation_matrix(D2D1::Matrix3x2F m);
+		void add_rotation_matrix(float angle, Docanto::Geometry::Point<float> center);
+
+		Docanto::Geometry::Point<float> inv_transform(Docanto::Geometry::Point<float> p);
+		Docanto::Geometry::Point<float> transform(Docanto::Geometry::Point<float> p);
+
 		float get_transform_scale() const;
 		D2D1::Matrix3x2F get_scale_matrix() const;
+		D2D1::Matrix3x2F get_rotation_matrix() const;
+		D2D1::Matrix3x2F get_transformation_matrix() const;
 		Docanto::Geometry::Point<float> get_zoom_center() const;
 		Docanto::Geometry::Point<float> get_transform_pos() const;
 

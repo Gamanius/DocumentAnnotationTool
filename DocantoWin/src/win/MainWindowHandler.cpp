@@ -72,6 +72,18 @@ void DocantoWin::MainWindowHandler::key(Window::VK key, bool pressed) {
 		m_gesture = std::make_shared<GestureHandler>(m_render, m_pdfhandler);
 		break;
 	}
+	case E:
+	{
+		m_render->add_rotation_matrix(10, m_mainwindow->get_mouse_pos());
+		m_mainwindow->send_paint_request();
+		break;
+	}
+	case Q:
+	{
+		m_render->add_rotation_matrix(-10, m_mainwindow->get_mouse_pos());
+		m_mainwindow->send_paint_request();
+		break;
+	}
 	case DOWNARROW:
 	{
 		m_render->add_transform_matrix({ 0, -100 });
@@ -177,7 +189,6 @@ DocantoWin::MainWindowHandler::MainWindowHandler(HINSTANCE instance) {
 		this->pointer_up(d);
 	});
 
-	m_render->add_transform_matrix({ 100, 100 });
 	auto path = open_file_dialog(L"PDF\0 * .pdf\0\0", m_mainwindow->get_hwnd());
 	Docanto::Logger::log("Got path ", path);
 	if (path.has_value()) {

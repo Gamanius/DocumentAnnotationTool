@@ -19,6 +19,9 @@
 #define EPSILON 0.00001f
 #define FLOAT_EQUAL(a, b) (abs(a - b) < EPSILON)
 
+constexpr auto PI = 3.14159265359;
+constexpr auto RAD_TO_DEG = 180 / PI;
+
 inline Docanto::Geometry::Rectangle<long> RectToRectangle(const RECT& r) {
 	return Docanto::Geometry::Rectangle<long>(r.left, r.top, r.right - r.left, r.bottom - r.top);
 }
@@ -36,6 +39,10 @@ inline D2D1_RECT_F RectToD2D1(const Docanto::Geometry::Rectangle<float>& r) {
 }
 
 inline D2D1_POINT_2F PointToD2D1(const Docanto::Geometry::Point<float>& r) {
+	return { r.x, r.y };
+}
+
+inline Docanto::Geometry::Point<float> D2D1ToPoint(const D2D1_POINT_2F& r) {
 	return { r.x, r.y };
 }
 

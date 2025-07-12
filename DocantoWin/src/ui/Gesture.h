@@ -28,12 +28,19 @@ namespace DocantoWin {
 		bool m_touchpadWasOneFingerActive = true;
 		bool m_touchpadMovedFar = false;
 
+		D2D1::Matrix3x2F m_initialTransformMatrix;
+		D2D1::Matrix3x2F m_initialTransformMatrixInv;
+
+		D2D1::Matrix3x2F m_initialRotationMatrix;
+		D2D1::Matrix3x2F m_initialRotationMatrixInv;
+
 		D2D1::Matrix3x2F m_initialScaleMatrix;
 		D2D1::Matrix3x2F m_initialScaleMatrixInv;
 
 
 		void process_one_finger(GestureFinger& finger);
 		void process_two_finger(GestureFinger& finger1, GestureFinger& finger2);
+		void update_local_matrices();
 	public:
 		GestureHandler(std::shared_ptr<Direct2DRender> render, std::shared_ptr<PDFHandler> pdfhandler);
 

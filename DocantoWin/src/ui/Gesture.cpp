@@ -1,5 +1,8 @@
 #include "Gesture.h"
 
+#undef max
+#undef min
+
 DocantoWin::GestureHandler::GestureHandler(std::shared_ptr<Direct2DRender> render, std::shared_ptr<PDFHandler> pdfhandler) {
 	m_render = render;
 	m_pdfhandler = pdfhandler;
@@ -7,30 +10,90 @@ DocantoWin::GestureHandler::GestureHandler(std::shared_ptr<Direct2DRender> rende
 
 
 void DocantoWin::GestureHandler::process_one_finger(GestureFinger& finger) {
-	auto scale = m_render->get_transform_scale();
-	auto offst = finger.last_position - finger.initial_position;
-	Docanto::Geometry::Point<float> new_pos = (1 / scale) * offst;
-	m_render->set_transform_matrix(new_pos + m_initial_offset);
+	// we need to get the scale offset and invert it
+	auto full =  m_initialScaleMatrixInv
+		* m_initialRotationMatrixInv;
 
+	auto last_pos_local = full.TransformPoint(PointToD2D1(finger.last_position));
+	auto init_pos_local = full.TransformPoint(PointToD2D1(finger.initial_position));
+
+	m_render->set_transform_matrix(D2D1::Matrix3x2F::Translation(last_pos_local.x - init_pos_local.x, last_pos_local.y - init_pos_local.y) * m_initialTransformMatrix);
+}
+
+auto get_signed_angle(Docanto::Geometry::Point<float> vecA, Docanto::Geometry::Point<float> vecB) {
+	double dotProduct = vecA.x * vecB.x + vecA.y * vecB.y;
+	double magA = sqrt(vecA.x * vecA.x + vecA.y * vecA.y);
+	double magB = sqrt(vecB.x * vecB.x + vecB.y * vecB.y);
+	double crossProduct = vecA.x * vecB.y - vecA.y * vecB.x;
+	double cosTheta = dotProduct / (magA * magB);
+	cosTheta = std::max(-1.0, std::min(1.0, cosTheta));
+	return std::acos(cosTheta) * RAD_TO_DEG * (crossProduct > 0 ? 1 : -1);
 }
 
 void DocantoWin::GestureHandler::process_two_finger(GestureFinger& firstfinger, GestureFinger& secondfinger) {
-	// calculate the scaling factor
-	float distance = (firstfinger.last_position - secondfinger.last_position).distance();
-	float initialDistance = (firstfinger.initial_position - secondfinger.initial_position).distance();
-	float scale = distance / initialDistance;
+	auto full = m_initialScaleMatrixInv;
 
-	// calculate the center
-	auto lastcenter = (firstfinger.last_position + secondfinger.last_position) / 2.0f;
-	auto initialCenter = (firstfinger.initial_position + secondfinger.initial_position) / 2.0f;
+	auto first_last_pos_local = D2D1ToPoint(full.TransformPoint(PointToD2D1(firstfinger.last_position)));
+	auto first_init_pos_local = D2D1ToPoint(full.TransformPoint(PointToD2D1(firstfinger.initial_position)));
 
-	// set the matrix scale offset
-	auto newscale = D2D1::Matrix3x2F::Scale({ (float)(scale), (float)(scale) }, m_initialScaleMatrixInv.TransformPoint(PointToD2D1(initialCenter)));
-	m_render->set_scale_matrix(newscale * m_initialScaleMatrix);
+	auto second_last_pos_local = D2D1ToPoint(full.TransformPoint(PointToD2D1(secondfinger.last_position)));
+	auto second_init_pos_local = D2D1ToPoint(full.TransformPoint(PointToD2D1(secondfinger.initial_position)));
 
-	// and set the translation offset
-	auto translation = (1 / m_render->get_transform_scale()) * (lastcenter - initialCenter);
-	m_render->set_transform_matrix(m_initial_offset + translation);
+	auto scale =  (first_last_pos_local - second_last_pos_local).distance() / (second_init_pos_local - first_init_pos_local).distance();
+	auto pivot = (first_init_pos_local + second_init_pos_local) / 2.0f;
+
+	auto new_scale_mat = D2D1::Matrix3x2F::Scale(scale, scale, PointToD2D1(pivot));
+
+	m_render->set_scale_matrix(new_scale_mat * m_initialScaleMatrix);
+
+	full = m_initialRotationMatrix * new_scale_mat  * m_initialScaleMatrix;
+	full.Invert(); // do rot here?
+
+	first_last_pos_local = D2D1ToPoint(full.TransformPoint(PointToD2D1(firstfinger.last_position)));
+	first_init_pos_local = D2D1ToPoint(full.TransformPoint(PointToD2D1(firstfinger.initial_position)));
+
+	second_last_pos_local = D2D1ToPoint(full.TransformPoint(PointToD2D1(secondfinger.last_position)));
+	second_init_pos_local = D2D1ToPoint(full.TransformPoint(PointToD2D1(secondfinger.initial_position)));
+
+	auto veca = second_init_pos_local - first_init_pos_local;
+	auto vecb = second_last_pos_local - first_last_pos_local;
+	pivot = (first_init_pos_local + second_init_pos_local) / 2.0f;
+
+	auto angle = get_signed_angle(veca, vecb);
+	auto new_rot = D2D1::Matrix3x2F::Rotation(angle, PointToD2D1(pivot));
+
+	m_render->set_rotation_matrix(new_rot * m_initialRotationMatrix);
+
+	full = m_initialTransformMatrix * new_rot * m_initialRotationMatrix * new_scale_mat  * m_initialScaleMatrix;
+	full.Invert(); 
+		
+	first_last_pos_local = D2D1ToPoint(full.TransformPoint(PointToD2D1(firstfinger.last_position)));
+	first_init_pos_local = D2D1ToPoint(full.TransformPoint(PointToD2D1(firstfinger.initial_position)));
+
+	second_last_pos_local = D2D1ToPoint(full.TransformPoint(PointToD2D1(secondfinger.last_position)));
+	second_init_pos_local = D2D1ToPoint(full.TransformPoint(PointToD2D1(secondfinger.initial_position)));
+
+	auto init_center = (first_init_pos_local + second_init_pos_local) / 2.0f;
+	auto last_center = (first_last_pos_local + second_last_pos_local) / 2.0f;
+
+	auto new_trans = D2D1::Matrix3x2F::Translation(last_center.x - init_center.x, last_center.y - init_center.y);
+	m_render->set_transform_matrix(new_trans * m_initialTransformMatrix);
+}
+
+void DocantoWin::GestureHandler::update_local_matrices() {
+	m_initial_offset = m_render->get_transform_pos();
+	m_initialScaleMatrix = m_render->get_scale_matrix();
+	m_initialTransformMatrix = m_render->get_transformation_matrix();
+	m_initialRotationMatrix = m_render->get_rotation_matrix();
+
+	m_initialScaleMatrixInv = m_initialScaleMatrix;
+	m_initialScaleMatrixInv.Invert();
+
+	m_initialRotationMatrixInv = m_initialRotationMatrix;
+	m_initialRotationMatrixInv.Invert();
+
+	m_initialTransformMatrixInv = m_initialTransformMatrix;
+	m_initialTransformMatrixInv.Invert();
 }
 
 
@@ -50,21 +113,16 @@ void DocantoWin::GestureHandler::start_gesture(const Window::PointerInfo& p) {
 		break;
 	}
 
+	update_local_matrices();
+
 	byte amount_finger = amount_finger_active();
 	switch (amount_finger) {
 	case 1:
 	{
-		m_initial_offset = m_render->get_transform_pos();
 		return;
 	};
 	case 2:
 	{
-		m_initial_offset = m_render->get_transform_pos();
-		m_initialScaleMatrix = m_render->get_scale_matrix();
-
-		m_initialScaleMatrixInv = m_initialScaleMatrix;
-		m_initialScaleMatrixInv.Invert();
-
 		for (size_t i = 0; i < m_gesturefinger.size(); i++) {
 			if (!m_gesturefinger.at(i).active) {
 				continue;
@@ -193,6 +251,7 @@ void DocantoWin::GestureHandler::end_gesture(const Window::PointerInfo& p) {
 	m_touchpadWasOneFingerActive = true;
 	m_touchpadMovedFar = false;
 
+	update_local_matrices();
 	byte amount_finger = amount_finger_active();
 
 	switch (amount_finger) {
