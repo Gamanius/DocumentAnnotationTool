@@ -1,6 +1,8 @@
 #include "MainWindowHandler.h"
 
 
+Docanto::Geometry::Rectangle<float> rectangle;
+
 static std::optional<std::wstring> open_file_dialog(const wchar_t* filter, HWND windowhandle = nullptr) {
 	OPENFILENAME ofn;
 	WCHAR szFile[MAX_PATH] = { 0 };
@@ -26,6 +28,8 @@ static std::optional<std::wstring> open_file_dialog(const wchar_t* filter, HWND 
 }
 
 void DocantoWin::MainWindowHandler::paint() {
+	m_pdfhandler->request();
+
 	m_render->begin_draw();
 	m_render->clear();
 
@@ -34,6 +38,7 @@ void DocantoWin::MainWindowHandler::paint() {
 
 	m_render->set_identity_transform_active();
 	m_uicaption->draw();
+	m_render->draw_rect(rectangle, { 255,0,0,255});
 	m_render->end_draw();
 }
 void DocantoWin::MainWindowHandler::size(Docanto::Geometry::Dimension<long> d) {
@@ -120,6 +125,18 @@ void DocantoWin::MainWindowHandler::key(Window::VK key, bool pressed) {
 		m_mainwindow->send_paint_request();
 		break;
 	}
+	case BACKSPACE:
+	{
+		m_render->set_rotation_matrix(D2D1::Matrix3x2F::Identity());
+		m_render->set_scale_matrix(D2D1::Matrix3x2F::Identity());
+		m_render->set_translation_matrix(D2D1::Matrix3x2F::Identity());
+	}
+	case SPACE:
+	{
+		m_pdfhandler->render();
+		m_mainwindow->send_paint_request();
+	}
+
 	}
 }
 
@@ -142,8 +159,8 @@ void DocantoWin::MainWindowHandler::pointer_update(Window::PointerInfo p) {
 
 	if (p.type == Window::POINTER_TYPE::TOUCH or p.type == Window::POINTER_TYPE::TOUCHPAD) {
 		m_gesture->update_gesture(p);
+		m_mainwindow->send_paint_request();
 	}
-	m_mainwindow->send_paint_request();
 }
 
 void DocantoWin::MainWindowHandler::pointer_up(Window::PointerInfo p) {
@@ -154,6 +171,8 @@ void DocantoWin::MainWindowHandler::pointer_up(Window::PointerInfo p) {
 	if (p.type == Window::POINTER_TYPE::TOUCH or p.type == Window::POINTER_TYPE::TOUCHPAD) {
 		m_gesture->end_gesture(p);
 	}
+
+	m_pdfhandler->render();
 	m_mainwindow->send_paint_request();
 }
 

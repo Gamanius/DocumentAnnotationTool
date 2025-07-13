@@ -78,10 +78,9 @@ void DocantoWin::Caption::draw() {
 	if (hit == HTMAXBUTTON) {
 		m_render->draw_rect_filled(max_btn_rec, m_caption_button_rect_color);
 	}
-	m_render->draw_rect(
-		Docanto::Geometry::Rectangle<float>({ std::ceil(max_btn_rec.x + max_btn_rec.height / 4) + 0.5f, std::ceil(max_btn_rec.height / 4 + max_btn_rec.y) + 0.5f},
-		  { std::ceil(max_btn_rec.x + max_btn_rec.height * 3 / 4) + 0.5f, std::ceil(max_btn_rec.height * 3 / 4 + max_btn_rec.y) + 0.5f}),
-		m_caption_button_line_color, button_thickness);
+	Docanto::Geometry::Point<float> a = { std::ceil(max_btn_rec.x + max_btn_rec.height / 4) + 0.5f, std::ceil(max_btn_rec.height / 4 + max_btn_rec.y) + 0.5f };
+	Docanto::Geometry::Point<float> b = { std::ceil(max_btn_rec.x + max_btn_rec.height * 3 / 4) + 0.5f, std::ceil(max_btn_rec.height * 3 / 4 + max_btn_rec.y) + 0.5f };
+	m_render->draw_rect({a,b}, m_caption_button_line_color, button_thickness);
 
 	// Minimize
 	if (hit == HTMINBUTTON) {

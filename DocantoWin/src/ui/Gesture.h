@@ -9,6 +9,14 @@
 #include <array>
 
 namespace DocantoWin {
+	/// <summary>
+	/// This class is used for any Finger/Touchpad gestures like panning, zomming and rotating
+	/// 
+	/// TODO:
+	///		- The rotating with the fingers should snap to n * 90 deg
+	///		- Maybe add touchpad rotation?
+	///		- Limit the amount of zoom to and upper and lower bound 
+	/// </summary>
 	class GestureHandler {
 		std::shared_ptr<Direct2DRender> m_render;
 		// used for bounds

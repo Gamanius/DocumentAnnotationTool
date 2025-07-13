@@ -7,6 +7,9 @@
 #pragma comment(lib, "d2d1.lib")
 #pragma comment(lib, "dwrite.lib")
 
+#undef min
+#undef max
+
 ID2D1Factory* DocantoWin::Direct2DRender::m_factory = nullptr;
 IDWriteFactory3* DocantoWin::Direct2DRender::m_writeFactory = nullptr;
 
@@ -132,7 +135,7 @@ void DocantoWin::Direct2DRender::draw_rect(Docanto::Geometry::Rectangle<float> r
 }
 void DocantoWin::Direct2DRender::draw_rect(Docanto::Geometry::Rectangle<float> r, Docanto::Color c) {
 	m_solid_brush->SetColor(ColorToD2D1(c));
-	draw_rect(r, m_solid_brush);
+	draw_rect(r, m_solid_brush, 3);
 }
 
 void DocantoWin::Direct2DRender::draw_rect(Docanto::Geometry::Rectangle<float> r, BrushObject& brush, float thic) {
@@ -151,6 +154,12 @@ void DocantoWin::Direct2DRender::draw_bitmap(Docanto::Geometry::Point<float> whe
 	begin_draw();
 	auto size = obj.m_object->GetSize();
 	m_renderTarget->DrawBitmap(obj.m_object, D2D1::RectF(where.x, where.y, size.width + where.x , size.height + where.y));
+	end_draw();
+}
+
+void DocantoWin::Direct2DRender::draw_bitmap(Docanto::Geometry::Rectangle<float> rec, BitmapObject& obj) {
+	begin_draw();
+	m_renderTarget->DrawBitmap(obj.m_object, RectToD2D1(rec));
 	end_draw();
 }
 
@@ -251,9 +260,9 @@ void DocantoWin::Direct2DRender::add_rotation_matrix(float angle, Docanto::Geome
 }
 
 Docanto::Geometry::Point<float> DocantoWin::Direct2DRender::inv_transform(Docanto::Geometry::Point<float> p) {
-	auto full = m_transformScaleMatrix
+	auto full = m_transformTranslationMatrix
 		* m_transformRotationMatrix
-		* m_transformTranslationMatrix;
+		* m_transformScaleMatrix;
 	full.Invert();
 
 	auto localPivot = full.TransformPoint(PointToD2D1(p));
@@ -262,11 +271,43 @@ Docanto::Geometry::Point<float> DocantoWin::Direct2DRender::inv_transform(Docant
 }
 
 Docanto::Geometry::Point<float> DocantoWin::Direct2DRender::transform(Docanto::Geometry::Point<float> p) {
-	auto local = (m_transformScaleMatrix
-		* m_transformRotationMatrix
-		* m_transformTranslationMatrix).TransformPoint(PointToD2D1(p));
+	auto local = (m_transformTranslationMatrix 
+		* m_transformRotationMatrix 
+		* m_transformScaleMatrix).TransformPoint(PointToD2D1(p));
 
 	return { local.x, local.y };
+}
+
+Docanto::Geometry::Rectangle<float> DocantoWin::Direct2DRender::transform(Docanto::Geometry::Rectangle<float> r) {
+	auto a = r.upperleft();
+	auto b = r.lowerright();
+
+	a = transform(a);
+	b = transform(b);
+
+	return Docanto::Geometry::Rectangle<float>(a, b);
+}
+
+Docanto::Geometry::Rectangle<float> DocantoWin::Direct2DRender::inv_transform(Docanto::Geometry::Rectangle<float> r) {
+	auto a = r.upperleft();
+	auto b = r.upperright();
+	auto c = r.lowerleft();
+	auto d = r.lowerright();
+
+	a = inv_transform(a);
+	b = inv_transform(b);
+	c = inv_transform(c);
+	d = inv_transform(d);
+
+	Docanto::Geometry::Point<float> lefttop;
+	lefttop.x = std::min({ a.x,b.x,c.x,d.x });
+	lefttop.y = std::min({ a.y,b.y,c.y,d.y });
+
+	Docanto::Geometry::Point<float> rightbottom;
+	rightbottom.x = std::max({ a.x,b.x,c.x,d.x });
+	rightbottom.y = std::max({ a.y,b.y,c.y,d.y });
+
+	return Docanto::Geometry::Rectangle<float>(lefttop, rightbottom);
 }
 
 float DocantoWin::Direct2DRender::get_transform_scale() const {
@@ -299,6 +340,10 @@ Docanto::Geometry::Point<float> DocantoWin::Direct2DRender::get_transform_pos() 
 
 float DocantoWin::Direct2DRender::get_angle() const {
 	return -std::atan2(m_transformRotationMatrix._21, m_transformRotationMatrix._11);
+}
+
+float DocantoWin::Direct2DRender::get_dpi() {
+	return get_attached_window()->get_dpi();
 }
 
 

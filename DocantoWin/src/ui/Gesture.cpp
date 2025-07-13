@@ -1,4 +1,5 @@
 #include "Gesture.h"
+#include "helper/AppVariables.h"
 
 #undef max
 #undef min
@@ -50,23 +51,26 @@ void DocantoWin::GestureHandler::process_two_finger(GestureFinger& firstfinger, 
 	m_render->set_scale_matrix(new_scale_mat * m_initialScaleMatrix);
 
 	// Rotating
-	full = m_initialRotationMatrix * new_scale_mat * m_initialScaleMatrix;
-	full.Invert(); 
+	auto new_rot = D2D1::Matrix3x2F::Identity();
+	if (AppVariables::TOUCH_ALLOW_ROTATION) {
+		full = m_initialRotationMatrix * new_scale_mat * m_initialScaleMatrix;
+		full.Invert(); 
 
-	first_last_pos_local = D2D1ToPoint(full.TransformPoint(PointToD2D1(firstfinger.last_position)));
-	first_init_pos_local = D2D1ToPoint(full.TransformPoint(PointToD2D1(firstfinger.initial_position)));
+		first_last_pos_local = D2D1ToPoint(full.TransformPoint(PointToD2D1(firstfinger.last_position)));
+		first_init_pos_local = D2D1ToPoint(full.TransformPoint(PointToD2D1(firstfinger.initial_position)));
 
-	second_last_pos_local = D2D1ToPoint(full.TransformPoint(PointToD2D1(secondfinger.last_position)));
-	second_init_pos_local = D2D1ToPoint(full.TransformPoint(PointToD2D1(secondfinger.initial_position)));
+		second_last_pos_local = D2D1ToPoint(full.TransformPoint(PointToD2D1(secondfinger.last_position)));
+		second_init_pos_local = D2D1ToPoint(full.TransformPoint(PointToD2D1(secondfinger.initial_position)));
 
-	auto veca = second_init_pos_local - first_init_pos_local;
-	auto vecb = second_last_pos_local - first_last_pos_local;
-	pivot = (first_init_pos_local + second_init_pos_local) / 2.0f;
+		auto veca = second_init_pos_local - first_init_pos_local;
+		auto vecb = second_last_pos_local - first_last_pos_local;
+		pivot = (first_init_pos_local + second_init_pos_local) / 2.0f;
 
-	auto angle = get_signed_angle(veca, vecb);
-	auto new_rot = D2D1::Matrix3x2F::Rotation(angle, PointToD2D1(pivot));
+		auto angle = get_signed_angle(veca, vecb);
+		auto new_rot = D2D1::Matrix3x2F::Rotation(angle, PointToD2D1(pivot));
 
-	m_render->set_rotation_matrix(new_rot * m_initialRotationMatrix);
+		m_render->set_rotation_matrix(new_rot * m_initialRotationMatrix);
+	}
 
 	// Paning
 	full = m_initialTranslationMatrix * new_rot * m_initialRotationMatrix * new_scale_mat  * m_initialScaleMatrix;
@@ -243,9 +247,7 @@ void DocantoWin::GestureHandler::update_gesture(const Window::PointerInfo& p) {
 			break;
 		}
 
-		Docanto::Timer t;
 		process_two_finger(firstfinger, secondfinger);
-		Docanto::Logger::log(t);
 
 		//check_bounds();
 		return;

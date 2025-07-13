@@ -17,6 +17,7 @@ namespace DocantoWin {
 			PDFHandlerImageProcessor(std::shared_ptr<Direct2DRender> render);
 
 			void processImage(size_t id, const Docanto::Image& img) override;
+			void deleteImage(size_t id) override;
 		};
 
 		std::shared_ptr<PDFHandlerImageProcessor> m_pdfimageprocessor;
@@ -27,6 +28,7 @@ namespace DocantoWin {
 		PDFHandler(const std::filesystem::path& p, std::shared_ptr<Direct2DRender> render);
 
 		void render();
+		void request();
 		void draw();
 
 		std::shared_ptr<Docanto::PDF> get_pdf() const;

@@ -15,6 +15,9 @@ namespace DocantoWin::AppVariables {
 	// This controls how sensitive the panning is with the touchpad
 	inline float TOUCHPAD_PAN_SCALE_FACTOR = 0.7f;
 
+	// if set to false you cannot rotate using finger gestures
+	inline bool  TOUCH_ALLOW_ROTATION = false;
+
 	namespace Colors {
 		// This needs to be updated manually (by the Window class since it knows that)
 		inline bool isDarkTheme = false;

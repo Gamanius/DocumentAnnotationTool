@@ -14,6 +14,7 @@ namespace Docanto {
 	class BasicRender {
 	public:
 		virtual void draw_rect(Geometry::Rectangle<float> r, Color c) = 0;
+		virtual float get_dpi() = 0;
 	};
 }
 

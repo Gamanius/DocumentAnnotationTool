@@ -80,6 +80,28 @@ namespace Docanto {
 			return { p.x * static_cast<T>(f), p.y * static_cast<T>(f) };
 		}
 
+
+		template <typename T>
+		struct Dimension {
+			T width;
+			T height;
+
+			template <typename W>
+			operator Dimension<W>() const {
+				return Dimension<W>((W)width, (W)height);
+			}
+
+			template <typename F>
+			Dimension<T> operator / (const F& f) const {
+				return Dimension<T>(width / static_cast<T>(f), height / static_cast<T>(f));
+			}
+
+			template <typename F>
+			Dimension<T> operator *(const F& f) const {
+				return Dimension<T>(width * static_cast<T>(f), height * static_cast<T>(f));
+			}
+		};
+
 		template <typename T>
 		struct Rectangle {
 			T x      = 0;
@@ -90,6 +112,7 @@ namespace Docanto {
 			Rectangle() = default;
 			Rectangle(T x, T y, T width, T height) : x(x), y(y), width(width), height(height) {}
 			Rectangle(Point<T> p1, Point<T> p2) : x(p1.x), y(p1.y), width(p2.x - p1.x), height(p2.y - p1.y) {}
+			Rectangle(Point<T> p1, Dimension<T> p2) : x(p1.x), y(p1.y), width(p2.width), height(p2.height) {}
 
 
 			Rectangle(const Rectangle& r) : x(r.x), y(r.y), width(r.width), height(r.height) {}
@@ -128,26 +151,6 @@ namespace Docanto {
 
 		};
 
-		template <typename T>
-		struct Dimension {
-			T width;
-			T height;
-
-			template <typename W>
-			operator Dimension<W>() const {
-				return Dimension<W>((W)width, (W)height);
-			}
-
-			template <typename F>
-			Dimension<T> operator / (const F& f) const {
-				return Dimension<T>(width / static_cast<T>(f), height / static_cast<T>(f));
-			}
-
-			template <typename F>
-			Dimension<T> operator *(const F& f) const {
-				return Dimension<T>(width * static_cast<T>(f), height * static_cast<T>(f));
-			}
-		};
 	}
 }
 

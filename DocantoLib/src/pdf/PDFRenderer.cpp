@@ -44,10 +44,15 @@ struct Docanto::PDFRenderer::impl {
 	ThreadSafeVector<std::unique_ptr<DisplayListWrapper>> m_page_content;
 	ThreadSafeVector<std::unique_ptr<DisplayListWrapper>> m_page_widgets;
 	ThreadSafeVector<std::unique_ptr<DisplayListWrapper>> m_page_annotat;
+	ThreadSafeVector<Geometry::Point<float>> m_page_pos;
 
 	std::atomic_size_t m_last_id = 0;
 	ThreadSafeVector<PDFRenderInfo> m_previewbitmaps;
+	ThreadSafeVector<PDFRenderInfo> m_highDefBitmaps;
 
+
+	Geometry::Rectangle<float> m_current_viewport;
+	float m_current_dpi;
 
 	impl() = default;
 	~impl() = default;
@@ -56,10 +61,61 @@ struct Docanto::PDFRenderer::impl {
 Docanto::PDFRenderer::PDFRenderer(std::shared_ptr<PDF> pdf_obj, std::shared_ptr<IPDFRenderImageProcessor> processor) : pimpl(std::make_unique<impl>()) {
 	this->pdf_obj = pdf_obj;
 	this->m_processor = processor;
+
+	position_pdfs();
 	create_preview();
+	update();
 }
 
 Docanto::PDFRenderer::~PDFRenderer() = default;
+
+Docanto::Image get_image_from_list(DisplayListWrapper* wrap, Docanto::Geometry::Rectangle<float> scissor, float dpi) {
+	// now we can render it
+	fz_matrix ctm;
+	auto scale = dpi / MUPDF_DEFAULT_DPI;
+	ctm = fz_scale(scale, scale);
+	auto pixmap_scale = fz_scale(dpi/96, dpi/96);
+	auto transform = fz_translate(-scissor.x, -scissor.y);
+	// this is to calculate the size of the pixmap using the source
+	auto pixmap_size = fz_irect_from_rect(fz_transform_rect(fz_make_rect(scissor.x, scissor.y, scissor.width, scissor.height), pixmap_scale));
+
+	fz_pixmap* pixmap = nullptr;
+	fz_device* drawdevice = nullptr;
+
+	auto ctx = Docanto::GlobalPDFContext::get_instance().get();
+
+	Docanto::Image obj;
+	fz_try(*ctx) {
+		// ___---___ Rendering part ___---___
+		// create new pixmap
+		pixmap = fz_new_pixmap_with_bbox(*ctx, fz_device_rgb(*ctx), pixmap_size, nullptr, 1);
+		// create draw device
+		drawdevice = fz_new_draw_device(*ctx, fz_concat(transform, ctm), pixmap);
+		// render to draw device
+		fz_clear_pixmap_with_value(*ctx, pixmap, 0xff); // for the white background
+		fz_run_display_list(*ctx, *(wrap->get().get()), drawdevice, fz_identity, fz_make_rect(scissor.x, scissor.y, scissor.right(), scissor.bottom()), nullptr);
+
+		fz_close_device(*ctx, drawdevice);
+		// ___---___ Bitmap creatin and display part ___---___
+		// create the bitmap
+		obj.data = std::unique_ptr<byte>(pixmap->samples); // , size, (unsigned int)pixmap->stride, 96); // default dpi of the pixmap
+		obj.dims = { (size_t)(pixmap_size.x1 - pixmap_size.x0), (size_t)(pixmap_size.y1 - pixmap_size.y0) };
+		obj.size = pixmap->h * pixmap->stride;
+		obj.stride = pixmap->stride;
+		obj.components = pixmap->n;
+		obj.dpi = dpi;
+
+		pixmap->samples = nullptr;
+
+	} fz_always(*ctx) {
+		// drop all devices
+		fz_drop_device(*ctx, drawdevice);
+		fz_drop_pixmap(*ctx, pixmap);
+	} fz_catch(*ctx) {
+		Docanto::Logger::log("MUPdf Error: ", fz_convert_error(*ctx, &((*ctx)->error.errcode)));
+	}
+	return obj;
+}
 
 Docanto::Image Docanto::PDFRenderer::get_image(size_t page, float dpi) {
 	fz_matrix ctm;
@@ -101,10 +157,23 @@ Docanto::Image Docanto::PDFRenderer::get_image(size_t page, float dpi) {
 }
 
 
+void Docanto::PDFRenderer::position_pdfs() {
+	size_t amount_of_pages = pdf_obj->get_page_count();
+	auto positions = pimpl->m_page_pos.get_write();
+
+	float y = 0;
+	for (size_t i = 0; i < amount_of_pages; i++) {
+		auto dims = pdf_obj->get_page_dimension(i, m_standard_dpi);
+		positions->push_back({0, y});
+		y += dims.height + 10;
+	}
+}
+
 void Docanto::PDFRenderer::create_preview(float dpi) {
 	Docanto::Logger::log("Creating preview");
 	Timer t;
 	size_t amount_of_pages = pdf_obj->get_page_count();
+	auto   positions       = pimpl->m_page_pos.get_read();
 
 	float y = 0;
 	for (size_t i = 0; i < amount_of_pages; i++) {
@@ -113,7 +182,7 @@ void Docanto::PDFRenderer::create_preview(float dpi) {
 		m_processor->processImage(id, get_image(i, dpi));
 
 		auto prevs = pimpl->m_previewbitmaps.get_write();
-		prevs->push_back({ id, {0, y}, dpi });
+		prevs->push_back({ id, {positions->at(i), dims}, dpi });
 
 		y += dims.height + 10;
 	}
@@ -123,6 +192,66 @@ void Docanto::PDFRenderer::create_preview(float dpi) {
 const std::vector<Docanto::PDFRenderer::PDFRenderInfo>& Docanto::PDFRenderer::get_preview() {
 	auto d =  pimpl->m_previewbitmaps.get_read();
 	return *d.get();
+}
+
+const std::vector<Docanto::PDFRenderer::PDFRenderInfo>& Docanto::PDFRenderer::draw() {
+	auto d =  pimpl->m_highDefBitmaps.get_read();
+	return *d.get();
+}
+
+
+void Docanto::PDFRenderer::request(Geometry::Rectangle<float> view, float dpi) {
+	pimpl->m_current_viewport = view;
+	pimpl->m_current_dpi = dpi;
+}
+
+void Docanto::PDFRenderer::render() {
+	{
+		auto vec = pimpl->m_highDefBitmaps.get_write();
+		for (auto &item : *vec.get()) {
+			m_processor->deleteImage(item.id);
+		}
+		vec->clear();
+	}
+
+	size_t amount_of_pages = pdf_obj->get_page_count();
+	auto   positions = pimpl->m_page_pos.get_read();
+
+	size_t amount = 0;
+	for (size_t i = 0; i < amount_of_pages; i++) {
+		auto dims = pdf_obj->get_page_dimension(i, m_standard_dpi);
+
+		auto pdf_rec = Geometry::Rectangle<float>(positions->at(i), dims);
+
+		if (!pdf_rec.intersects(pimpl->m_current_viewport)) {
+			continue;
+		}
+
+		auto cont = pimpl->m_page_content.get_read()->at(i).get();
+		auto img = get_image_from_list(cont, {{0,0},dims}, pimpl->m_current_dpi);
+		auto id = pimpl->m_last_id++;
+		m_processor->processImage(id, img);
+
+		auto prevs = pimpl->m_highDefBitmaps.get_write();
+		prevs->push_back({ id, pdf_rec, pimpl->m_current_dpi });
+	}
+}
+
+void Docanto::PDFRenderer::debug_draw(std::shared_ptr<BasicRender> render) {
+	size_t amount_of_pages = pdf_obj->get_page_count();
+	auto   positions = pimpl->m_page_pos.get_read();
+
+	size_t amount = 0;
+	for (size_t i = 0; i < amount_of_pages; i++) {
+		auto dims = pdf_obj->get_page_dimension(i, m_standard_dpi);
+
+		auto pdf_rec = Geometry::Rectangle<float>(positions->at(i), dims);
+
+		if (pdf_rec.intersects(pimpl->m_current_viewport)) {
+			render->draw_rect(pdf_rec, { 255 });
+			amount++;
+		}
+	}
 }
 
 void Docanto::PDFRenderer::update() {

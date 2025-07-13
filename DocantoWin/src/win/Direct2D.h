@@ -99,7 +99,7 @@ namespace DocantoWin {
 		void draw_text(const std::wstring& text, Docanto::Geometry::Point<float> pos, Docanto::Color c, float size);
 
 		void draw_rect(Docanto::Geometry::Rectangle<float> r, Docanto::Color c);
-		void draw_rect(Docanto::Geometry::Rectangle<float> r, Docanto::Color c, float thick = 1);
+		void draw_rect(Docanto::Geometry::Rectangle<float> r, Docanto::Color c, float thick);
 		void draw_rect(Docanto::Geometry::Rectangle<float> r, BrushObject& brush, float thick = 1);
 
 		void draw_line(Docanto::Geometry::Point<float> p1, Docanto::Geometry::Point<float> p2, BrushObject& brush, float thick = 1);
@@ -109,6 +109,7 @@ namespace DocantoWin {
 		void draw_rect_filled(Docanto::Geometry::Rectangle<float> r, Docanto::Color c);
 
 		void draw_bitmap(Docanto::Geometry::Point<float> where, BitmapObject& obj);
+		void draw_bitmap(Docanto::Geometry::Rectangle<float> rec, BitmapObject& obj);
 		void draw_bitmap(Docanto::Geometry::Point<float> where, BitmapObject& obj, float dpi);
 
 		void set_current_transform_active();
@@ -128,6 +129,8 @@ namespace DocantoWin {
 
 		Docanto::Geometry::Point<float> inv_transform(Docanto::Geometry::Point<float> p);
 		Docanto::Geometry::Point<float> transform(Docanto::Geometry::Point<float> p);
+		Docanto::Geometry::Rectangle<float> transform(Docanto::Geometry::Rectangle<float> r);
+		Docanto::Geometry::Rectangle<float> inv_transform(Docanto::Geometry::Rectangle<float> r);
 
 		float get_transform_scale() const;
 		D2D1::Matrix3x2F get_scale_matrix() const;
@@ -136,6 +139,7 @@ namespace DocantoWin {
 		Docanto::Geometry::Point<float> get_zoom_center() const;
 		Docanto::Geometry::Point<float> get_transform_pos() const;
 		float get_angle() const;
+		float get_dpi() override;
 
 		std::shared_ptr<Window> get_attached_window() const;
 
