@@ -12,13 +12,17 @@ void DocantoWin::PDFHandler::draw() {
 	auto& preview_info = m_pdfrender->get_preview();
 
 	for (const auto& info : preview_info) {
-		//m_render->draw_bitmap(info.pos, m_pdfimageprocessor->m_all_bitmaps[info.id]);
+		m_render->draw_bitmap(info.recs, m_pdfimageprocessor->m_all_bitmaps[info.id]);
 	}
 
 	auto& highdef = m_pdfrender->draw();
 
 	for (const auto& info : highdef) {
+		if (m_pdfimageprocessor->m_all_bitmaps[info.id].m_object == nullptr) {
+			continue;
+		}
 		m_render->draw_bitmap(info.recs, m_pdfimageprocessor->m_all_bitmaps[info.id]);
+		m_render->draw_rect(info.recs, { 0, 0, 255 });
 	}
 
 	m_pdfrender->debug_draw(m_render);

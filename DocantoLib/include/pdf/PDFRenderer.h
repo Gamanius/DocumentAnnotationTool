@@ -28,6 +28,7 @@ namespace Docanto {
 		std::shared_ptr<IPDFRenderImageProcessor> m_processor;
 
 		float m_standard_dpi = 96;
+		float m_margin = 1;
 
 		void create_preview(float dpi = MUPDF_DEFAULT_DPI);
 		void position_pdfs();

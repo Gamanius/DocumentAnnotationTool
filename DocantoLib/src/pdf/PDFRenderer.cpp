@@ -71,35 +71,32 @@ Docanto::PDFRenderer::~PDFRenderer() = default;
 
 Docanto::Image get_image_from_list(DisplayListWrapper* wrap, Docanto::Geometry::Rectangle<float> scissor, float dpi) {
 	// now we can render it
-	fz_matrix ctm;
-	auto scale = dpi / MUPDF_DEFAULT_DPI;
-	ctm = fz_scale(scale, scale);
-	auto pixmap_scale = fz_scale(dpi/96, dpi/96);
-	auto transform = fz_translate(-scissor.x, -scissor.y);
-	// this is to calculate the size of the pixmap using the source
-	auto pixmap_size = fz_irect_from_rect(fz_transform_rect(fz_make_rect(scissor.x, scissor.y, scissor.width, scissor.height), pixmap_scale));
+	auto fz_scissor = fz_make_rect(scissor.x, scissor.y, scissor.right(), scissor.bottom());
+	auto ctm = fz_transform_page(fz_scissor, dpi, 0);
 
 	fz_pixmap* pixmap = nullptr;
 	fz_device* drawdevice = nullptr;
 
 	auto ctx = Docanto::GlobalPDFContext::get_instance().get();
+	auto bound = fz_transform_rect(fz_scissor, ctm);
+	auto bbox = fz_round_rect(bound);
 
 	Docanto::Image obj;
 	fz_try(*ctx) {
 		// ___---___ Rendering part ___---___
 		// create new pixmap
-		pixmap = fz_new_pixmap_with_bbox(*ctx, fz_device_rgb(*ctx), pixmap_size, nullptr, 1);
+		pixmap = fz_new_pixmap_with_bbox(*ctx, fz_device_rgb(*ctx), bbox, nullptr, 1);
 		// create draw device
-		drawdevice = fz_new_draw_device(*ctx, fz_concat(transform, ctm), pixmap);
+		drawdevice = fz_new_draw_device(*ctx, fz_identity, pixmap);
 		// render to draw device
 		fz_clear_pixmap_with_value(*ctx, pixmap, 0xff); // for the white background
-		fz_run_display_list(*ctx, *(wrap->get().get()), drawdevice, fz_identity, fz_make_rect(scissor.x, scissor.y, scissor.right(), scissor.bottom()), nullptr);
+		fz_run_display_list(*ctx, *(wrap->get().get()), drawdevice, ctm, bound, nullptr);
 
 		fz_close_device(*ctx, drawdevice);
 		// ___---___ Bitmap creatin and display part ___---___
 		// create the bitmap
 		obj.data = std::unique_ptr<byte>(pixmap->samples); // , size, (unsigned int)pixmap->stride, 96); // default dpi of the pixmap
-		obj.dims = { (size_t)(pixmap_size.x1 - pixmap_size.x0), (size_t)(pixmap_size.y1 - pixmap_size.y0) };
+		obj.dims = { (size_t)(bbox.x1 - bbox.x0), (size_t)(bbox.y1 - bbox.y0) };
 		obj.size = pixmap->h * pixmap->stride;
 		obj.stride = pixmap->stride;
 		obj.components = pixmap->n;
@@ -119,10 +116,10 @@ Docanto::Image get_image_from_list(DisplayListWrapper* wrap, Docanto::Geometry::
 
 
 std::vector<Docanto::Geometry::Rectangle<float>> Docanto::PDFRenderer::chunk(size_t page) {
-	auto dims = pdf_obj->get_page_dimension(page, m_standard_dpi);
+	auto dims = pdf_obj->get_page_dimension(page);
 	auto  pos = pimpl->m_page_pos.get_read()->at(page);
 
-	size_t scale = std::floor(pimpl->m_current_dpi / m_standard_dpi);
+	size_t scale = std::floor(pimpl->m_current_dpi / MUPDF_DEFAULT_DPI);
 	size_t amount_cells = 3 * scale + 1;
 	Geometry::Dimension<float> cell_dim = { dims.width / amount_cells, dims.height / amount_cells };
 	
@@ -147,10 +144,10 @@ std::vector<Docanto::Geometry::Rectangle<float>> Docanto::PDFRenderer::chunk(siz
 	for (size_t x = topleft.x; x < bottomright.x; ++x) {
 		for (size_t y = topleft.y; y < bottomright.y; ++y) {
 			chunks.push_back({
-				x * cell_dim.width,
-				y * cell_dim.height,
-				cell_dim.width,
-				cell_dim.height
+				x * cell_dim.width - m_margin,
+				y * cell_dim.height - m_margin,
+				cell_dim.width + m_margin,
+				cell_dim.height + m_margin
 				});
 		}
 	}
@@ -159,28 +156,35 @@ std::vector<Docanto::Geometry::Rectangle<float>> Docanto::PDFRenderer::chunk(siz
 }
 
 Docanto::Image Docanto::PDFRenderer::get_image(size_t page, float dpi) {
-	fz_matrix ctm;
-	auto size = pdf_obj->get_page_dimension(page) * dpi / MUPDF_DEFAULT_DPI;
-	ctm = fz_scale((dpi / MUPDF_DEFAULT_DPI), (dpi / MUPDF_DEFAULT_DPI));
-
-	fz_pixmap* pixmap = nullptr;
-	fz_device* drawdevice = nullptr;
+	float scale = dpi / MUPDF_DEFAULT_DPI;
+	fz_matrix ctm = fz_scale(scale, scale);
 
 	auto ctx = GlobalPDFContext::get_instance().get();
 	auto doc = pdf_obj->get();
 	auto pag = pdf_obj->get_page(page).get();
 
+	auto page_bounds = fz_bound_page(*ctx, *pag);
+
+	fz_rect transformed = fz_transform_rect(page_bounds, ctm);
+	fz_irect device_bbox = fz_round_rect(transformed);
+	int w = device_bbox.x1 - device_bbox.x0;
+	int h = device_bbox.y1 - device_bbox.y0;
+
+	fz_pixmap* pixmap = nullptr;
+	fz_device* drawdevice = nullptr;
+
 	Image obj;
 
 	fz_try(*ctx) {
-		pixmap = fz_new_pixmap(*ctx, fz_device_rgb(*ctx), size.width, size.height, nullptr, 1);
+		pixmap = fz_new_pixmap_with_bbox(*ctx, fz_device_rgb(*ctx), device_bbox, nullptr, 1);
 		fz_clear_pixmap_with_value(*ctx, pixmap, 0xff); // for the white background
+
 		drawdevice = fz_new_draw_device(*ctx, fz_identity, pixmap);
 		fz_run_page(*ctx, *pag, drawdevice, ctm, nullptr);
 		fz_close_device(*ctx, drawdevice);
 
 		obj.data = std::unique_ptr<byte>(pixmap->samples); // , size, (unsigned int)pixmap->stride, 96); // default dpi of the pixmap
-		obj.dims = size ;
+		obj.dims = { size_t(w), size_t(h) };
 		obj.size = pixmap->h * pixmap->stride;
 		obj.stride = pixmap->stride;
 		obj.components = pixmap->n;
@@ -204,7 +208,7 @@ void Docanto::PDFRenderer::position_pdfs() {
 
 	float y = 0;
 	for (size_t i = 0; i < amount_of_pages; i++) {
-		auto dims = pdf_obj->get_page_dimension(i, m_standard_dpi);
+		auto dims = pdf_obj->get_page_dimension(i);
 		positions->push_back({0, y});
 		y += dims.height + 10;
 	}
@@ -218,7 +222,7 @@ void Docanto::PDFRenderer::create_preview(float dpi) {
 
 	float y = 0;
 	for (size_t i = 0; i < amount_of_pages; i++) {
-		auto dims = pdf_obj->get_page_dimension(i, m_standard_dpi);
+		auto dims = pdf_obj->get_page_dimension(i);
 		auto id = pimpl->m_last_id++;
 		m_processor->processImage(id, get_image(i, dpi));
 
@@ -268,13 +272,25 @@ void Docanto::PDFRenderer::render() {
 			continue;
 		}
 
-		auto cont = pimpl->m_page_content.get_read()->at(i).get();
-		auto img = get_image_from_list(cont, {{0,0},dims}, pimpl->m_current_dpi);
-		auto id = pimpl->m_last_id++;
-		m_processor->processImage(id, img);
+		//auto cont = pimpl->m_page_content.get_read()->at(i).get();
+		//Geometry::Rectangle<float> cunk = { 100, 200, 500, 500 };
+		//auto img = get_image_from_list(cont, cunk, 96 * 2);
+		//auto id = pimpl->m_last_id++;
+		//m_processor->processImage(id, img);
+		//auto prevs = pimpl->m_highDefBitmaps.get_write();
+		//prevs->push_back({ id, {positions->at(i) + cunk.upperleft(), cunk.dims()}, 96 * 2 });
 
-		auto prevs = pimpl->m_highDefBitmaps.get_write();
-		prevs->push_back({ id, pdf_rec, pimpl->m_current_dpi });
+		auto chunks = chunk(i);
+		auto cont = pimpl->m_page_content.get_read()->at(i).get();
+		for (size_t j = 0; j < chunks.size(); j++) {
+			auto scale = (std::floor(pimpl->m_current_dpi / m_standard_dpi) + 1) * m_standard_dpi;
+			auto img = get_image_from_list(cont, chunks.at(j), scale);
+			auto id = pimpl->m_last_id++;
+			m_processor->processImage(id, img);
+			auto prevs = pimpl->m_highDefBitmaps.get_write();
+			prevs->push_back({ id, {positions->at(i) + chunks.at(j).upperleft(),chunks.at(j).dims()}, pimpl->m_current_dpi});
+		}
+
 	}
 }
 
@@ -284,12 +300,11 @@ void Docanto::PDFRenderer::debug_draw(std::shared_ptr<BasicRender> render) {
 
 	size_t amount = 0;
 	for (size_t i = 0; i < amount_of_pages; i++) {
-		auto dims = pdf_obj->get_page_dimension(i, m_standard_dpi);
+		auto dims = pdf_obj->get_page_dimension(i);
 
 		auto pdf_rec = Geometry::Rectangle<float>(positions->at(i), dims);
 
 		if (pdf_rec.intersects(pimpl->m_current_viewport)) {
-			render->draw_rect(pdf_rec, { 255 });
 			amount++;
 			auto recs = chunk(i);
 
@@ -297,6 +312,7 @@ void Docanto::PDFRenderer::debug_draw(std::shared_ptr<BasicRender> render) {
 				r = { r.upperleft() + positions->at(i), Geometry::Dimension<float>(r.dims())};
 				render->draw_rect(r, { 0, 255 });
 			}
+			render->draw_rect(pdf_rec, { 255 });
 		}
 	}
 
