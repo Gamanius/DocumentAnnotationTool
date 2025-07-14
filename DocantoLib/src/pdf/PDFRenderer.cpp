@@ -6,6 +6,8 @@
 #include "../../include/general/Timer.h"
 #include "../../include/general/ReadWriteMutex.h"
 
+#define FLOAT_EQUAL(a, b) (std::abs(a - b) < 0.001)
+
 typedef struct {
 	unsigned int cmd : 5;
 	unsigned int size : 9;
@@ -114,8 +116,12 @@ Docanto::Image get_image_from_list(DisplayListWrapper* wrap, Docanto::Geometry::
 	return obj;
 }
 
+std::pair<float, float> Docanto::PDFRenderer::get_chunk_dpi_bound() {
+	size_t scale = std::floor(pimpl->m_current_dpi / MUPDF_DEFAULT_DPI);
+	return { scale * MUPDF_DEFAULT_DPI, (scale + 1) * MUPDF_DEFAULT_DPI };
+}
 
-std::vector<Docanto::Geometry::Rectangle<float>> Docanto::PDFRenderer::chunk(size_t page) {
+std::pair<std::vector<Docanto::Geometry::Rectangle<float>>, float> Docanto::PDFRenderer::get_chunks(size_t page) {
 	auto dims = pdf_obj->get_page_dimension(page);
 	auto  pos = pimpl->m_page_pos.get_read()->at(page);
 
@@ -152,7 +158,7 @@ std::vector<Docanto::Geometry::Rectangle<float>> Docanto::PDFRenderer::chunk(siz
 		}
 	}
 
-	return chunks;
+	return { chunks, get_chunk_dpi_bound().second };
 }
 
 Docanto::Image Docanto::PDFRenderer::get_image(size_t page, float dpi) {
@@ -250,21 +256,96 @@ void Docanto::PDFRenderer::request(Geometry::Rectangle<float> view, float dpi) {
 	pimpl->m_current_dpi = dpi;
 }
 
-void Docanto::PDFRenderer::render() {
-	{
-		auto vec = pimpl->m_highDefBitmaps.get_write();
-		for (auto &item : *vec.get()) {
-			m_processor->deleteImage(item.id);
+
+void Docanto::PDFRenderer::remove_from_processor(size_t id) {
+	auto vec = pimpl->m_highDefBitmaps.get_write();
+
+	std::erase_if(*vec, [id](const auto& obj) {
+		return obj.id == id;
+	});
+
+	m_processor->deleteImage(id);
+}
+
+void Docanto::PDFRenderer::add_to_processor() {
+	// TODO
+}
+
+size_t Docanto::PDFRenderer::cull_bitmaps() {
+	auto vec = pimpl->m_highDefBitmaps.get_write();
+	size_t amount = 0;
+	auto [ lower_dpi, higher_dpi ] = get_chunk_dpi_bound();
+
+	for (int i = vec->size() - 1; i >= 0; i--) {
+		auto& item = vec->at(i);
+
+		if (item.recs.intersects(pimpl->m_current_viewport) and // intersection test
+			(FLOAT_EQUAL(item.dpi, higher_dpi)) /*dpi test*/) {
+			continue;
 		}
-		vec->clear();
+
+		amount++;
+		remove_from_processor(item.id);
 	}
+
+	return amount;
+}
+
+size_t Docanto::PDFRenderer::cull_chunks(std::vector<Geometry::Rectangle<float>>& chunks, size_t page) {
+	auto bitmaps = pimpl->m_highDefBitmaps.get_write();
+	bool del = false;
+	size_t amount = 0;
+	auto position = pimpl->m_page_pos.get_read()->at(page);
+
+	for (int i = chunks.size() - 1; i >= 0; i--) {
+		del = false;
+		for (size_t j = 0; j < bitmaps->size(); j++) {
+			auto chunk = chunks[i];
+			auto bitma = bitmaps->at(j);
+
+			if (FLOAT_EQUAL(chunk.x + position.x, bitma.recs.x) and FLOAT_EQUAL(chunk.y + position.y, bitma.recs.y)) {
+				del = true;
+				break;
+			}
+		}
+
+		if (del) {
+			amount++;
+			chunks.erase(chunks.begin() + i);
+		}
+	}
+	
+	return amount;
+}
+
+
+void Docanto::PDFRenderer::process_chunks(const std::vector<Geometry::Rectangle<float>>& chunks, size_t page) {
+	auto [_, dpi] = get_chunk_dpi_bound();
+
+	auto cont = pimpl->m_page_content.get_read()->at(page).get();
+	auto position = pimpl->m_page_pos.get_read()->at(page);
+
+	for (size_t j = 0; j < chunks.size(); j++) {
+		auto img = get_image_from_list(cont, chunks.at(j), dpi);
+
+		auto id = pimpl->m_last_id++;
+		m_processor->processImage(id, img);
+
+		auto prevs = pimpl->m_highDefBitmaps.get_write();
+		prevs->push_back({ id, {position + chunks.at(j).upperleft(),chunks.at(j).dims()}, dpi });
+	}
+}
+
+
+void Docanto::PDFRenderer::render() {
+	cull_bitmaps();
 
 	size_t amount_of_pages = pdf_obj->get_page_count();
 	auto   positions = pimpl->m_page_pos.get_read();
 
 	size_t amount = 0;
 	for (size_t i = 0; i < amount_of_pages; i++) {
-		auto dims = pdf_obj->get_page_dimension(i, m_standard_dpi);
+		auto dims = pdf_obj->get_page_dimension(i);
 
 		auto pdf_rec = Geometry::Rectangle<float>(positions->at(i), dims);
 
@@ -272,25 +353,9 @@ void Docanto::PDFRenderer::render() {
 			continue;
 		}
 
-		//auto cont = pimpl->m_page_content.get_read()->at(i).get();
-		//Geometry::Rectangle<float> cunk = { 100, 200, 500, 500 };
-		//auto img = get_image_from_list(cont, cunk, 96 * 2);
-		//auto id = pimpl->m_last_id++;
-		//m_processor->processImage(id, img);
-		//auto prevs = pimpl->m_highDefBitmaps.get_write();
-		//prevs->push_back({ id, {positions->at(i) + cunk.upperleft(), cunk.dims()}, 96 * 2 });
-
-		auto chunks = chunk(i);
-		auto cont = pimpl->m_page_content.get_read()->at(i).get();
-		for (size_t j = 0; j < chunks.size(); j++) {
-			auto scale = (std::floor(pimpl->m_current_dpi / m_standard_dpi) + 1) * m_standard_dpi;
-			auto img = get_image_from_list(cont, chunks.at(j), scale);
-			auto id = pimpl->m_last_id++;
-			m_processor->processImage(id, img);
-			auto prevs = pimpl->m_highDefBitmaps.get_write();
-			prevs->push_back({ id, {positions->at(i) + chunks.at(j).upperleft(),chunks.at(j).dims()}, pimpl->m_current_dpi});
-		}
-
+		auto [chunks, dpi] = get_chunks(i);
+		cull_chunks(chunks, i);
+		process_chunks(chunks, i);
 	}
 }
 
@@ -306,7 +371,7 @@ void Docanto::PDFRenderer::debug_draw(std::shared_ptr<BasicRender> render) {
 
 		if (pdf_rec.intersects(pimpl->m_current_viewport)) {
 			amount++;
-			auto recs = chunk(i);
+			auto [recs, _] = get_chunks(i);
 
 			for (auto& r : recs) {
 				r = { r.upperleft() + positions->at(i), Geometry::Dimension<float>(r.dims())};
@@ -314,6 +379,12 @@ void Docanto::PDFRenderer::debug_draw(std::shared_ptr<BasicRender> render) {
 			}
 			render->draw_rect(pdf_rec, { 255 });
 		}
+	}
+
+
+	auto& highdef = draw();
+	for (const auto& info : highdef) {
+		render->draw_rect(info.recs, { 0, 0, 255 });
 	}
 
 }

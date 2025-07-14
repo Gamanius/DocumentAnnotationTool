@@ -22,10 +22,17 @@ void DocantoWin::PDFHandler::draw() {
 			continue;
 		}
 		m_render->draw_bitmap(info.recs, m_pdfimageprocessor->m_all_bitmaps[info.id]);
-		m_render->draw_rect(info.recs, { 0, 0, 255 });
 	}
 
-	m_pdfrender->debug_draw(m_render);
+	if (m_debug_draw) m_pdfrender->debug_draw(m_render);
+}
+
+void DocantoWin::PDFHandler::set_debug_draw(bool b) {
+	m_debug_draw = b;
+}
+
+void DocantoWin::PDFHandler::toggle_debug_draw() {
+	set_debug_draw(!m_debug_draw);
 }
 
 std::shared_ptr<Docanto::PDF> DocantoWin::PDFHandler::get_pdf() const {

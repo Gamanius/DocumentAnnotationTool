@@ -23,6 +23,7 @@ namespace DocantoWin {
 		std::shared_ptr<PDFHandlerImageProcessor> m_pdfimageprocessor;
 		std::shared_ptr<Direct2DRender> m_render;
 
+		bool m_debug_draw = false;
 
 	public:
 		PDFHandler(const std::filesystem::path& p, std::shared_ptr<Direct2DRender> render);
@@ -30,6 +31,8 @@ namespace DocantoWin {
 		void render();
 		void request();
 		void draw();
+		void set_debug_draw(bool b = true);
+		void toggle_debug_draw();
 
 		std::shared_ptr<Docanto::PDF> get_pdf() const;
 	};
