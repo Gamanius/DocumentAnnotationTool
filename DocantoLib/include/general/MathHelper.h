@@ -131,6 +131,7 @@ namespace Docanto {
 			Point<T> upperright() const { return { right(), y }; }
 			Point<T> lowerleft() const { return { x, bottom() }; }
 			Point<T> lowerright() const { return { right(), bottom() }; }
+			Dimension<T> dims() const { return { width, height }; }
 
 			template <typename W>
 			operator Rectangle<W>() const {

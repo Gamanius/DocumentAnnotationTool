@@ -31,6 +31,7 @@ namespace Docanto {
 
 		void create_preview(float dpi = MUPDF_DEFAULT_DPI);
 		void position_pdfs();
+		std::vector<Geometry::Rectangle<float>> chunk(size_t page);
 	public:
 		PDFRenderer(std::shared_ptr<PDF> pdf_obj, std::shared_ptr<IPDFRenderImageProcessor> processor);
 		~PDFRenderer();

@@ -117,6 +117,47 @@ Docanto::Image get_image_from_list(DisplayListWrapper* wrap, Docanto::Geometry::
 	return obj;
 }
 
+
+std::vector<Docanto::Geometry::Rectangle<float>> Docanto::PDFRenderer::chunk(size_t page) {
+	auto dims = pdf_obj->get_page_dimension(page, m_standard_dpi);
+	auto  pos = pimpl->m_page_pos.get_read()->at(page);
+
+	size_t scale = std::floor(pimpl->m_current_dpi / m_standard_dpi);
+	size_t amount_cells = 3 * scale + 1;
+	Geometry::Dimension<float> cell_dim = { dims.width / amount_cells, dims.height / amount_cells };
+	
+	// transform the viewport to docspace
+	auto doc_space_screen = Docanto::Geometry::Rectangle<float>(pimpl->m_current_viewport.upperleft() - pos, pimpl->m_current_viewport.lowerright() - pos);
+
+	Geometry::Point<size_t> topleft = {
+		(size_t)std::clamp(std::floor(doc_space_screen.upperleft().x /  dims.width * amount_cells), 0.0f, (float)amount_cells),
+		(size_t)std::clamp(std::floor(doc_space_screen.upperleft().y / dims.height * amount_cells), 0.0f, (float)amount_cells),
+	};
+
+	Geometry::Point<size_t> bottomright = {
+		(size_t)std::clamp(std::ceil(doc_space_screen.lowerright().x / dims.width * amount_cells), 0.0f, (float)amount_cells),
+		(size_t)std::clamp(std::ceil(doc_space_screen.lowerright().y / dims.height * amount_cells), 0.0f, (float)amount_cells),
+	};
+
+	auto chunks = std::vector<Docanto::Geometry::Rectangle<float>>();
+	auto dx = bottomright.x - topleft.x;
+	auto dy = bottomright.y - topleft.y;
+	chunks.reserve(dx * dy);
+
+	for (size_t x = topleft.x; x < bottomright.x; ++x) {
+		for (size_t y = topleft.y; y < bottomright.y; ++y) {
+			chunks.push_back({
+				x * cell_dim.width,
+				y * cell_dim.height,
+				cell_dim.width,
+				cell_dim.height
+				});
+		}
+	}
+
+	return chunks;
+}
+
 Docanto::Image Docanto::PDFRenderer::get_image(size_t page, float dpi) {
 	fz_matrix ctm;
 	auto size = pdf_obj->get_page_dimension(page) * dpi / MUPDF_DEFAULT_DPI;
@@ -250,8 +291,15 @@ void Docanto::PDFRenderer::debug_draw(std::shared_ptr<BasicRender> render) {
 		if (pdf_rec.intersects(pimpl->m_current_viewport)) {
 			render->draw_rect(pdf_rec, { 255 });
 			amount++;
+			auto recs = chunk(i);
+
+			for (auto& r : recs) {
+				r = { r.upperleft() + positions->at(i), Geometry::Dimension<float>(r.dims())};
+				render->draw_rect(r, { 0, 255 });
+			}
 		}
 	}
+
 }
 
 void Docanto::PDFRenderer::update() {
