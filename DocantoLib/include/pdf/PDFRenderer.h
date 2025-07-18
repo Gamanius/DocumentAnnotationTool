@@ -27,20 +27,28 @@ namespace Docanto {
 
 		std::shared_ptr<IPDFRenderImageProcessor> m_processor;
 
+		// this function gets called when a bitmaps was processed
+		std::function<void(size_t)> m_render_callback;
+
 		float m_standard_dpi = 96;
 		float m_margin = 1;
 
 		void remove_from_processor(size_t id);
 		void add_to_processor();
 
+		size_t remove_finished_queue_item();
 		size_t cull_bitmaps();
 		size_t cull_chunks(std::vector<Geometry::Rectangle<float>>& chunks, size_t pagee);
+
+		void process_chunks(const std::vector<Geometry::Rectangle<float>>& chunks, size_t page);
 		void create_preview(float dpi = MUPDF_DEFAULT_DPI);
 		void position_pdfs();
+
 		std::pair<std::vector<Geometry::Rectangle<float>>, float> get_chunks(size_t page);
 		std::pair<float, float> get_chunk_dpi_bound();
 
-		void process_chunks(const std::vector<Geometry::Rectangle<float>>& chunks, size_t page);
+		void async_render(); 
+
 	public:
 		PDFRenderer(std::shared_ptr<PDF> pdf_obj, std::shared_ptr<IPDFRenderImageProcessor> processor);
 		~PDFRenderer();
@@ -52,6 +60,7 @@ namespace Docanto {
 
 		void request(Geometry::Rectangle<float> view, float dpi);
 		void render();
+		void set_rendercallback(std::function<void(size_t)> fun);
 				
 		void debug_draw(std::shared_ptr<BasicRender> render);
 

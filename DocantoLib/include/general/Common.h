@@ -2,9 +2,11 @@
 #define _COMMON_H_
 
 #include <string>
-#include <map>
 #include <optional>
 #include <memory>
+
+#include <deque>
+#include <map>
 #include <vector>
 
 #include <fstream>
