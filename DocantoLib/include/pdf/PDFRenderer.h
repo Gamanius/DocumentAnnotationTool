@@ -38,6 +38,7 @@ namespace Docanto {
 		void add_to_processor();
 
 		size_t remove_finished_queue_item();
+		size_t abort_queue_item();
 		size_t cull_bitmaps();
 		size_t cull_chunks(std::vector<Geometry::Rectangle<float>>& chunks, size_t pagee);
 
@@ -57,7 +58,7 @@ namespace Docanto {
 		Image get_image(size_t page, float dpi = MUPDF_DEFAULT_DPI);
 
 		const std::vector<PDFRenderInfo>& get_preview();
-		ThreadSafeVector<PDFRenderInfo>* draw();
+		Docanto::ReadWrapper<std::vector<Docanto::PDFRenderer::PDFRenderInfo>> draw();
 
 		void request(Geometry::Rectangle<float> view, float dpi);
 		void render();

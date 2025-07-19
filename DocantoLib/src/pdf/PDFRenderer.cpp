@@ -147,7 +147,12 @@ Docanto::Image get_image_from_list(fz_context* ctx, fz_display_list* wrap, const
 		fz_drop_device(ctx, drawdevice);
 		fz_drop_pixmap(ctx, pixmap);
 	} fz_catch(ctx) {
-		Docanto::Logger::log("MUPdf Error: ", fz_convert_error(ctx, &((ctx)->error.errcode)));
+		if (cookie->abort == 1) {
+			fz_ignore_error(ctx);
+		}
+		else {
+			Docanto::Logger::error("MUPdf Error: ", fz_convert_error(ctx, &((ctx)->error.errcode)));
+		}
 	}
 	return obj;
 }
@@ -155,9 +160,6 @@ Docanto::Image get_image_from_list(fz_context* ctx, fz_display_list* wrap, const
 Docanto::Image get_image_from_list(DisplayListWrapper* wrap, Docanto::Geometry::Rectangle<float> scissor, float dpi) {
 	return get_image_from_list(*(Docanto::GlobalPDFContext::get_instance().get()), *(wrap->get().get()), scissor, dpi);
 }
-
-
-
 
 std::pair<float, float> Docanto::PDFRenderer::get_chunk_dpi_bound() {
 	size_t scale = std::floor(pimpl->m_current_dpi / MUPDF_DEFAULT_DPI);
@@ -288,9 +290,8 @@ const std::vector<Docanto::PDFRenderer::PDFRenderInfo>& Docanto::PDFRenderer::ge
 	return *d.get();
 }
 
-ThreadSafeVector<Docanto::PDFRenderer::PDFRenderInfo>* Docanto::PDFRenderer::draw() {
-	return &pimpl->m_highDefBitmaps;
-	
+Docanto::ReadWrapper<std::vector<Docanto::PDFRenderer::PDFRenderInfo>> Docanto::PDFRenderer::draw() {
+	return pimpl->m_highDefBitmaps.get_read();
 }
 
 
@@ -403,6 +404,29 @@ void Docanto::PDFRenderer::process_chunks(const std::vector<Geometry::Rectangle<
 	}
 }
 
+size_t Docanto::PDFRenderer::abort_queue_item() {
+	std::scoped_lock<std::mutex> lock(pimpl->m_render_worker_queue_mutex);
+	auto& queue = pimpl->m_jobs;
+	size_t amount = 0;
+
+	auto [_, dpi] = get_chunk_dpi_bound();
+
+	for (auto it = queue.begin(); it != queue.end(); it++) {
+		auto& item = *it;
+
+		if (item->info.recs.intersects(pimpl->m_current_viewport) and // intersection test
+			(FLOAT_EQUAL(item->info.dpi, dpi)) /*dpi test*/) {
+			continue;
+		}
+
+		amount++;
+		item->status = impl::RenderStatus::CANCELD;
+		item->cookie.abort = 1;
+	}
+
+	return amount;
+}
+
 size_t Docanto::PDFRenderer::remove_finished_queue_item() {
 	std::scoped_lock<std::mutex> lock(pimpl->m_render_worker_queue_mutex);
 	auto& queue = pimpl->m_jobs;
@@ -427,6 +451,7 @@ void Docanto::PDFRenderer::request(Geometry::Rectangle<float> view, float dpi) {
 	pimpl->m_current_dpi = dpi;
 
 	remove_finished_queue_item();
+	abort_queue_item();
 
 	cull_bitmaps();
 
@@ -522,8 +547,13 @@ void Docanto::PDFRenderer::async_render() {
 			auto& queue = pimpl->m_jobs;
 			for (size_t i = 0; i < queue.size(); i++) {
 				auto& job = queue.at(i);
-
-				if (job->status == impl::RenderStatus::WAITING) {
+				
+				// "accept" canceld jobs so we can remove them
+				if (job->status == impl::RenderStatus::CANCELD) {
+					job->status = impl::RenderStatus::DONE;
+				} 
+				// accept any jobs that are currently in the queue
+				else if (job->status == impl::RenderStatus::WAITING) {
 					job->status = impl::RenderStatus::PROCESSING;
 					job->render_id = std::this_thread::get_id();
 					// we need to safe the pointer since we cannot retrieve it later without being const
@@ -542,6 +572,12 @@ void Docanto::PDFRenderer::async_render() {
 		}
 
 		auto cont_img = get_image_from_list(ctx, t_content_list[current_job->page], current_job->chunk_rec, current_job->info.dpi, &(current_job->cookie));
+		
+		// we have to check if the rendering was aborted
+		if (current_job->cookie.abort or current_job->status == impl::RenderStatus::CANCELD) {
+			current_job->status = impl::RenderStatus::DONE;
+			continue;
+		}
 
 		// add the new image to the list
 		m_processor->processImage(current_job->info.id, cont_img);
@@ -599,7 +635,7 @@ void Docanto::PDFRenderer::debug_draw(std::shared_ptr<BasicRender> render) {
 
 
 	auto list = draw();
-	auto& highdef = *(list->get_read().get());
+	auto& highdef = *(list);
 
 	for (const auto& info : highdef) {
 		render->draw_rect(info.recs, { 0, 0, 255 });

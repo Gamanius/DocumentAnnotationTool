@@ -16,6 +16,10 @@ namespace DocantoWin {
 
 		static bool g_touchpadGestureInProgress;
 
+
+		Docanto::Timer m_last_paint;
+		bool m_paint_timer_active = false;
+
 	public:
 		enum WINDOW_STATE {
 			HIDDEN,

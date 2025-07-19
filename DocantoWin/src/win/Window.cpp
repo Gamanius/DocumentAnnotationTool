@@ -480,13 +480,33 @@ LRESULT DocantoWin::Window::parse_message(UINT uMsg, WPARAM wParam, LPARAM lPara
 		}
 		return DefWindowProc(m_hwnd, uMsg, wParam, lParam);
 	}
+	case WM_TIMER:
+	{
+		if (wParam == WM_PAINT) {
+			SendMessage(m_hwnd, WM_PAINT, 0, 0);
+			m_paint_timer_active = false;
+			KillTimer(m_hwnd, WM_PAINT);
+		}
+		break;
+	}
 	case WM_PAINT:
 	{
+		// we have to limit the amount of draw calls
+		// so we dont overstress the gpu and induce 
+		// high battery usage 
+		if (m_last_paint.delta_ms() < AppVariables::WINDOW_PAINT_REFRESH_TIME_MS) {
+			if (m_paint_timer_active == false) {
+				m_paint_timer_active = true;
+				SetTimer(m_hwnd, WM_PAINT, AppVariables::WINDOW_PAINT_REFRESH_TIME_MS, NULL);
+			}
+			return true;
+		}
+		m_last_paint = Docanto::Timer();
 		if (m_callback_paint) {
 			m_callback_paint();
 		}
 		ValidateRect(m_hwnd, nullptr);
-		return 0;
+		return true;
 	}
 	}
 	return DefWindowProc(m_hwnd, uMsg, wParam, lParam);
@@ -679,7 +699,7 @@ void DocantoWin::Window::send_close_request() {
 }
 
 void DocantoWin::Window::send_paint_request() {
-	InvalidateRect(m_hwnd, nullptr, true);
+	InvalidateRect(m_hwnd, nullptr, false);
 }
 
 void DocantoWin::Window::set_state(WINDOW_STATE state) {

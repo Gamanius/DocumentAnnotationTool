@@ -20,10 +20,10 @@ void DocantoWin::PDFHandler::draw() {
 		m_render->draw_bitmap(info.recs, bitmaps->at(info.id));
 	}
 
-	auto list = m_pdfrender->draw()->get_read();
-	auto highdef = list.get();
+	auto list = m_pdfrender->draw();
+	auto& highdef = *list;
 
-	for (const auto& info : *highdef) {
+	for (const auto& info : highdef) {
 		if (bitmaps->find(info.id) == bitmaps->end()) {
 			Docanto::Logger::warn("Couldnt find ", info.id);
 			continue;
