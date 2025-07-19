@@ -3,6 +3,7 @@
 
 #include "../general/Common.h"
 #include "../general/Image.h"
+#include "../general/ReadWriteMutex.h"
 #include "../general/BasicRender.h"
 #include "PDF.h"
 
@@ -56,7 +57,7 @@ namespace Docanto {
 		Image get_image(size_t page, float dpi = MUPDF_DEFAULT_DPI);
 
 		const std::vector<PDFRenderInfo>& get_preview();
-		const std::vector<PDFRenderInfo>& draw();
+		ThreadSafeVector<PDFRenderInfo>* draw();
 
 		void request(Geometry::Rectangle<float> view, float dpi);
 		void render();

@@ -284,9 +284,9 @@ const std::vector<Docanto::PDFRenderer::PDFRenderInfo>& Docanto::PDFRenderer::ge
 	return *d.get();
 }
 
-const std::vector<Docanto::PDFRenderer::PDFRenderInfo>& Docanto::PDFRenderer::draw() {
-	auto d =  pimpl->m_highDefBitmaps.get_read();
-	return *d.get();
+ThreadSafeVector<Docanto::PDFRenderer::PDFRenderInfo>* Docanto::PDFRenderer::draw() {
+	return &pimpl->m_highDefBitmaps;
+	
 }
 
 
@@ -405,6 +405,9 @@ size_t Docanto::PDFRenderer::remove_finished_queue_item() {
 	for (auto it = queue->begin(); it != queue->end();) {
 		auto stat = it->get()->get_read()->status;
 		if (stat == impl::RenderStatus::DONE) {
+			{
+				it->get()->get_write();
+			}
 			queue->erase(it);
 			amount++;
 			it = queue->begin();
@@ -422,6 +425,7 @@ void Docanto::PDFRenderer::request(Geometry::Rectangle<float> view, float dpi) {
 	pimpl->m_current_dpi = dpi;
 
 	remove_finished_queue_item();
+
 
 	cull_bitmaps();
 
@@ -549,8 +553,10 @@ void Docanto::PDFRenderer::async_render() {
 		if (m_render_callback)
 			m_render_callback(curr->info.id);
 
-
-		current_job->get_write()->status = impl::RenderStatus::DONE;
+		{
+			auto temp = current_job->get_write();
+			temp->status = impl::RenderStatus::DONE;
+		}
 	}
 
 	for (size_t i = 0; i < t_content_list.size(); i++) {
@@ -597,7 +603,9 @@ void Docanto::PDFRenderer::debug_draw(std::shared_ptr<BasicRender> render) {
 	}
 
 
-	auto& highdef = draw();
+	auto list = draw();
+	auto& highdef = *(list->get_read().get());
+
 	for (const auto& info : highdef) {
 		render->draw_rect(info.recs, { 0, 0, 255 });
 	}

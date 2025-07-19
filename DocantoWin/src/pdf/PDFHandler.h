@@ -11,7 +11,7 @@ namespace DocantoWin {
 		std::shared_ptr<Docanto::PDFRenderer> m_pdfrender;
 
 		struct PDFHandlerImageProcessor : public Docanto::IPDFRenderImageProcessor {
-			std::map<size_t, Direct2DRender::BitmapObject> m_all_bitmaps;
+			Docanto::ThreadSafeWrapper<std::map<size_t, Direct2DRender::BitmapObject>> m_all_bitmaps;
 			std::shared_ptr<Direct2DRender> m_render;
 
 			PDFHandlerImageProcessor(std::shared_ptr<Direct2DRender> render);

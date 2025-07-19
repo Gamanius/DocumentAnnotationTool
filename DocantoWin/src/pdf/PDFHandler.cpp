@@ -6,22 +6,28 @@ DocantoWin::PDFHandler::PDFHandler(const std::filesystem::path& p, std::shared_p
 	m_pdfimageprocessor = std::make_shared<PDFHandlerImageProcessor>(render);
 	m_pdf = std::make_shared<PDF>(p);
 	m_pdfrender = std::make_shared<PDFRenderer>(m_pdf, m_pdfimageprocessor);
+
+	m_pdfrender->set_rendercallback([&](size_t) {
+		PostMessage(m_render->get_attached_window()->get_hwnd(), WM_PAINT, 0, 0);
+		});
 }
 
 void DocantoWin::PDFHandler::draw() {
 	auto& preview_info = m_pdfrender->get_preview();
+	auto bitmaps = m_pdfimageprocessor->m_all_bitmaps.get();
 
 	for (const auto& info : preview_info) {
-		m_render->draw_bitmap(info.recs, m_pdfimageprocessor->m_all_bitmaps[info.id]);
+		m_render->draw_bitmap(info.recs, bitmaps->at(info.id));
 	}
 
-	auto& highdef = m_pdfrender->draw();
+	auto list = m_pdfrender->draw()->get_read();
+	auto highdef = list.get();
 
-	for (const auto& info : highdef) {
-		if (m_pdfimageprocessor->m_all_bitmaps[info.id].m_object == nullptr) {
+	for (const auto& info : *highdef) {
+		if (bitmaps->at(info.id).m_object == nullptr) {
 			continue;
 		}
-		m_render->draw_bitmap(info.recs, m_pdfimageprocessor->m_all_bitmaps[info.id]);
+		m_render->draw_bitmap(info.recs, bitmaps->at(info.id));
 	}
 
 	if (m_debug_draw) m_pdfrender->debug_draw(m_render);
@@ -58,11 +64,23 @@ DocantoWin::PDFHandler::PDFHandlerImageProcessor::PDFHandlerImageProcessor(std::
 }
 
 void DocantoWin::PDFHandler::PDFHandlerImageProcessor::processImage(size_t id, const Docanto::Image& img) {
-	m_all_bitmaps[id] = m_render->create_bitmap(img);
+	auto bitmaps = m_all_bitmaps.get();
+
+	if (bitmaps->find(id) != bitmaps->end()) {
+		DebugBreak();
+	}
+
+	bitmaps->operator[](id) = m_render->create_bitmap(img);
+
+	if (bitmaps->at(id) == nullptr) {
+		DebugBreak();
+
+	}
 }
 
 void DocantoWin::PDFHandler::PDFHandlerImageProcessor::deleteImage(size_t id) {
-	if (m_all_bitmaps.find(id) != m_all_bitmaps.end()) {
-		m_all_bitmaps.erase(id);
+	auto bitmaps = m_all_bitmaps.get();
+	if (bitmaps->find(id) != bitmaps->end()) {
+		bitmaps->erase(id);
 	}
 }

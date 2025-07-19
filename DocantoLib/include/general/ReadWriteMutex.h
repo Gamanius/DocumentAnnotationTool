@@ -13,6 +13,7 @@ namespace Docanto {
 	template <typename T>
 	class ReadWriteThreadSafeMutex {
 		T item;
+
 	protected:
 		enum class ACCESS_TYPE {
 			READ_ACCESS,
@@ -26,9 +27,83 @@ namespace Docanto {
 			ACCESS_TYPE access = ACCESS_TYPE::NO_ACCESS;
 		};
 
-		std::mutex thread_list_mutex;
+		struct QueueItem {
+			std::thread::id id;
+			ACCESS_TYPE requested_access = ACCESS_TYPE::NO_ACCESS;
+		};
+
+		std::mutex wrapper_mutex;
+		std::condition_variable wrapper_conditional;
+
 		std::map<std::thread::id, ThreadInfo> thread_list;
-		std::condition_variable thread_list_conditional;
+		std::queue<QueueItem> wait_queue;
+	
+
+		void add_read(std::thread::id id) {
+			if (thread_list.find(id) == thread_list.end()) {
+				thread_list[id] = { 0, 0, ACCESS_TYPE::READ_ACCESS };
+			}
+
+			thread_list[id].read_locks++;
+		}
+
+		void add_write(std::thread::id id) {
+			if (thread_list.find(id) == thread_list.end()) {
+				thread_list[id] = { 0, 0, ACCESS_TYPE::WRITE_ACCESS };
+			}
+
+			thread_list[id].write_locks++;
+		}
+
+		void remove_read(std::thread::id id) {
+			if (thread_list.find(id) == thread_list.end()) { return; }
+
+			thread_list[id].read_locks--;
+
+			// if there is no lock remaining well remove it
+			if (thread_list[id].write_locks == 0 and thread_list[id].read_locks == 0) {
+				thread_list.erase(id);
+				return;
+			}
+		}
+
+		void remove_write(std::thread::id id) {
+			if (thread_list.find(id) == thread_list.end()) { return; }
+
+			thread_list[id].write_locks--;
+			
+			// if there are no lock remaining we can remove it
+			if (thread_list[id].write_locks == 0 and thread_list[id].read_locks == 0) {
+				thread_list.erase(id);
+				return;
+			}
+
+			// if there is at least one read lock remaining we give it read access back
+			if (thread_list[id].write_locks == 0 and thread_list[id].read_locks != 0) {
+				thread_list[id].access = ACCESS_TYPE::READ_ACCESS;
+			}
+		}
+
+		bool can_write(std::thread::id id) {
+			for (auto& [list_id, item] : thread_list) {
+				// if there is any thread which hold a lock of any kind
+				// we cannot write
+				if (list_id != id) {
+					return false;
+				}
+			}
+			return true;
+		}
+
+		bool can_read(std::thread::id id) {
+			for (auto& [list_id, item] : thread_list) {
+				// we only cant read if there is another thread which has write access
+				if (list_id != id and item.access == ACCESS_TYPE::WRITE_ACCESS) {
+					return false;
+				}
+			}
+			return true;
+		}
 	public:
 		ReadWriteThreadSafeMutex(T&& item) : item(std::move(item)) {}
 		ReadWriteThreadSafeMutex() : item(T()) {}
@@ -40,11 +115,11 @@ namespace Docanto {
 		ReadWriteThreadSafeMutex& operator=(ReadWriteThreadSafeMutex&& other) noexcept = delete;
 
 		WriteWrapper<T> get_write() {
-			return std::move(WriteWrapper<T>(&item, this));
+			return WriteWrapper<T>(&item, this);
 		}
 
 		ReadWrapper<T> get_read() {
-			return std::move(ReadWrapper<T>(&item, this));
+			return ReadWrapper<T>(&item, this);
 		}
 
 		friend class ReadWrapper<T>;
@@ -58,37 +133,52 @@ namespace Docanto {
 	public:
 		ReadWrapper(const T* obj, ReadWriteThreadSafeMutex<T>* r) : wrapper(r), obj(obj) {
 			auto local_id = std::this_thread::get_id();
-			//Docanto::Logger::log("Getting read", " Reads: ", wrapper->thread_list[local_id].read_locks, " Writes ", wrapper->thread_list[local_id].write_locks);
-			std::unique_lock<std::mutex> lock(wrapper->thread_list_mutex);
 
-			// First try to find the thread in the map. If its already in there it has READ access guarantee
-			if (wrapper->thread_list.find(local_id) != wrapper->thread_list.end()) {
-				wrapper->thread_list[local_id].read_locks += 1;
+			std::unique_lock<std::mutex> lock(wrapper->wrapper_mutex);
+			// check the position of the queue
+			if (wrapper->wait_queue.size() == 0 and wrapper->can_read(local_id)) {
+				// now we need to check if there is another thread which is locking
+				wrapper->add_read(local_id);
+				wrapper->wrapper_conditional.notify_all();
 				return;
 			}
 
-			// if this is not the case we have to check if there is any other thread who has write access
-			auto check_access = [&]() -> bool {
-				bool access = true;
-				for (auto& [key, val] : wrapper->thread_list) {
-					if (val.access == wrapper->ACCESS_TYPE::WRITE_ACCESS && key != local_id) {
-						access = false;
-					}
-				}
-				return access;
-			};
+			// check if we already have a read lock to avoid deadlock
+			if (wrapper->thread_list.find(local_id) != wrapper->thread_list.end()) {
+				wrapper->add_read(local_id);
+				wrapper->wrapper_conditional.notify_all();
+				return;
+			}
 
-			// first check if there are other threads that want to write
-			wrapper->thread_list_conditional.wait(lock, check_access);
+			// else we need to wait until its our turn
+			wrapper->wait_queue.push({ local_id, wrapper->ACCESS_TYPE::READ_ACCESS });
+			wrapper->wrapper_conditional.wait(lock, [&]() -> bool {
+				const auto& it = wrapper->wait_queue.front();
+				return it.id == local_id and it.requested_access == wrapper->ACCESS_TYPE::READ_ACCESS and wrapper->can_read(local_id);
+			});
 
-			// if everything is clear we can add our thread to the list of threads 
-			wrapper->thread_list.insert({ local_id, {1, 0, wrapper->ACCESS_TYPE::READ_ACCESS} });
+			wrapper->wait_queue.pop();
+			wrapper->add_read(local_id);
+
+			wrapper->wrapper_conditional.notify_all();
 		}
+
+		~ReadWrapper() {
+			if (wrapper == nullptr) {
+				return;
+			}
+
+			std::unique_lock<std::mutex> lock(wrapper->wrapper_mutex);
+			auto local_id = std::this_thread::get_id();
+
+			wrapper->remove_read(local_id);
+			wrapper->wrapper_conditional.notify_all();
+		}
+
 		ReadWrapper(const ReadWrapper& other) = delete;
 		ReadWrapper& operator=(const ReadWrapper& other) = delete;
 
 		ReadWrapper(ReadWrapper&& other) noexcept {
-			std::unique_lock<std::mutex> lock(other.wrapper->thread_list_mutex);
 			this->wrapper = other.wrapper;
 			other.wrapper = nullptr;
 
@@ -98,7 +188,6 @@ namespace Docanto {
 
 		ReadWrapper& operator=(ReadWrapper&& other) noexcept {
 			if (this != &other) {
-				std::unique_lock<std::mutex> lock(other.wrapper->thread_list_mutex);
 				this->wrapper = other.wrapper;
 				other.wrapper = nullptr;
 
@@ -106,30 +195,6 @@ namespace Docanto {
 				other.obj = nullptr;
 			}
 			return *this;
-		}
-
-
-
-		~ReadWrapper() {
-			// if wrapper is null then this class can be thrown away
-			if (wrapper == nullptr) {
-				return;
-			}
-			auto local_id = std::this_thread::get_id();
-			//Docanto::Logger::log("Removing read", " Reads: ", wrapper->thread_list[local_id].read_locks, " Writes ", wrapper->thread_list[local_id].write_locks);
-
-			std::unique_lock<std::mutex> lock(wrapper->thread_list_mutex);
-
-			// first decrease the read locks 
-			--wrapper->thread_list[local_id].read_locks;
-
-			// if both read locks and write locks are 0 then we can remove this thread from the watch list
-			if (wrapper->thread_list[local_id].read_locks == 0 and wrapper->thread_list[local_id].write_locks == 0) {
-				wrapper->thread_list.erase(local_id);
-			}
-
-			wrapper->thread_list_conditional.notify_all();
-			wrapper = nullptr;
 		}
 
 		const T* get() const {
@@ -147,60 +212,55 @@ namespace Docanto {
 	public:
 		WriteWrapper(T* obj, ReadWriteThreadSafeMutex<T>* r) : wrapper(r), obj(obj) {
 			auto local_id = std::this_thread::get_id();
-			//Docanto::Logger::log("Getting write", " Reads: ", wrapper->thread_list[local_id].read_locks, " Writes ", wrapper->thread_list[local_id].write_locks);
 
-			std::unique_lock<std::mutex> lock(wrapper->thread_list_mutex);
-
-			// if we are in the list we may need to upgrade our permission
-			if (wrapper->thread_list.find(local_id) != wrapper->thread_list.end()
-				and wrapper->thread_list[local_id].access == wrapper->ACCESS_TYPE::WRITE_ACCESS) {
-					wrapper->thread_list[local_id].write_locks += 1;
-					return;
+			std::unique_lock<std::mutex> lock(wrapper->wrapper_mutex);
+			// check the position of the queue
+			if (wrapper->wait_queue.size() == 0 and wrapper->can_write(local_id)) {
+				// now we need to check if there is another thread which is locking
+				wrapper->add_write(local_id);
+				wrapper->wrapper_conditional.notify_all();
+				return;
 			}
 
-			// since we dont already have write access we have to wait until every thread givevs back the object
-			// this is only the case when the map is empty or has one entry containing this thread ID
-			// check if we can have the access to the variable
-			auto check_access = [&]() -> bool {
-				// case where the list is empty we can acquire the lock
-				if (wrapper->thread_list.empty()) {
-					return true;
-				}
-
-				// case where the list only contains this thread id
-				if (wrapper->thread_list.find(local_id) != wrapper->thread_list.end() and wrapper->thread_list.size() == 1) {
-					return true;
-				}
-
-				// last case where multiple threads are waiting but all of them have no access
-				bool access = true;
-				for (auto& [key, val] : wrapper->thread_list) {
-					if (val.access != wrapper->ACCESS_TYPE::NO_ACCESS) {
-						access = false;
-						break;
-					}
-				}
-
-				return access;
-				};
-
-			wrapper->thread_list_conditional.wait(lock, check_access);
-
-			// add to the map
-			if (wrapper->thread_list.find(local_id) != wrapper->thread_list.end()) {
-				wrapper->thread_list[local_id].write_locks += 1;
-				wrapper->thread_list[local_id].access = wrapper->ACCESS_TYPE::WRITE_ACCESS;
+			// check if we already have a write lock to avoid deadlock
+			if (wrapper->thread_list.find(local_id) != wrapper->thread_list.end() and 
+				wrapper->thread_list[local_id].access == wrapper->ACCESS_TYPE::WRITE_ACCESS) {
+				wrapper->add_write(local_id);
+				wrapper->wrapper_conditional.notify_all();
+				return;
 			}
-			else {
-				wrapper->thread_list.insert({ local_id, {0, 1, wrapper->ACCESS_TYPE::WRITE_ACCESS} });
+
+			// else we need to wait until its our turn
+			wrapper->wait_queue.push({ local_id, wrapper->ACCESS_TYPE::WRITE_ACCESS });
+			wrapper->wrapper_conditional.wait(lock, [&]() -> bool {
+				const auto& it = wrapper->wait_queue.front();
+				return it.id == local_id and it.requested_access == wrapper->ACCESS_TYPE::WRITE_ACCESS and wrapper->can_write(local_id);
+				});
+
+			wrapper->wait_queue.pop();
+			wrapper->add_write(local_id);
+
+			wrapper->wrapper_conditional.notify_all();
+		}
+
+
+		~WriteWrapper() {
+			if (wrapper == nullptr) {
+				return;
 			}
+
+			std::unique_lock<std::mutex> lock(wrapper->wrapper_mutex);
+			auto local_id = std::this_thread::get_id();
+			
+			wrapper->remove_write(local_id);
+
+			wrapper->wrapper_conditional.notify_all();
 		}
 
 		WriteWrapper(const WriteWrapper& other) = delete;
 		WriteWrapper& operator=(const WriteWrapper& other) = delete;
 
 		WriteWrapper(WriteWrapper&& other) noexcept {
-			std::unique_lock<std::mutex> lock(other.wrapper->thread_list_mutex);
 			this->wrapper = other.wrapper;
 			other.wrapper = nullptr;
 
@@ -210,7 +270,6 @@ namespace Docanto {
 
 		WriteWrapper& operator=(WriteWrapper&& other) noexcept {
 			if (this != &other) {
-				std::unique_lock<std::mutex> lock(other.wrapper->thread_list_mutex);
 
 				this->wrapper = other.wrapper;
 				other.wrapper = nullptr;
@@ -222,28 +281,6 @@ namespace Docanto {
 		}
 
 
-		~WriteWrapper() {
-			// if wrapper is null then this class can be thrown away
-			if (wrapper == nullptr) {
-				return;
-			}
-			auto local_id = std::this_thread::get_id();
-			//Docanto::Logger::log("Removing write", " Reads: ", wrapper->thread_list[local_id].read_locks, " Writes ", wrapper->thread_list[local_id].write_locks);
-			std::unique_lock<std::mutex> lock(wrapper->thread_list_mutex);
-
-			--wrapper->thread_list[local_id].write_locks;
-			// downgrade the access level
-			if (wrapper->thread_list[local_id].write_locks == 0) {
-				wrapper->thread_list[local_id].access = wrapper->ACCESS_TYPE::READ_ACCESS;
-			}
-
-			// if both read locks and write locks are 0 then we can remove this thread from the watch list
-			if (wrapper->thread_list[local_id].read_locks == 0 and wrapper->thread_list[local_id].write_locks == 0) {
-				wrapper->thread_list.erase(local_id);
-			}
-
-			wrapper->thread_list_conditional.notify_all();
-		}
 
 		T* get() const {
 			return obj;
@@ -252,7 +289,6 @@ namespace Docanto {
 		T* operator->()const { return obj; }
 		T& operator*() const { return *obj; }
 	};
-
 }
 
 template <typename T>

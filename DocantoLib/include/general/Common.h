@@ -6,6 +6,8 @@
 #include <memory>
 
 #include <deque>
+#include <queue>
+#include <forward_list>
 #include <map>
 #include <vector>
 
