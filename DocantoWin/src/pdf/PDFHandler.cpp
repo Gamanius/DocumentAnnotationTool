@@ -13,6 +13,11 @@ DocantoWin::PDFHandler::PDFHandler(const std::filesystem::path& p, std::shared_p
 }
 
 void DocantoWin::PDFHandler::draw() {
+	auto recs = m_pdfrender->get_clipped_page_recs();
+	for (const auto& r : recs) {
+		m_render->draw_rect_filled(r, {255, 255, 255});
+	}
+
 	auto& preview_info = m_pdfrender->get_preview();
 	auto bitmaps = m_pdfimageprocessor->m_all_bitmaps.get();
 

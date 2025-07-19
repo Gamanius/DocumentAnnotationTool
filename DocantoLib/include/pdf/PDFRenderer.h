@@ -32,6 +32,7 @@ namespace Docanto {
 		std::function<void(size_t)> m_render_callback;
 
 		float m_standard_dpi = 96;
+		float m_preview_dpi = MUPDF_DEFAULT_DPI;
 		float m_margin = 1;
 
 		void remove_from_processor(size_t id);
@@ -59,6 +60,7 @@ namespace Docanto {
 
 		const std::vector<PDFRenderInfo>& get_preview();
 		Docanto::ReadWrapper<std::vector<Docanto::PDFRenderer::PDFRenderInfo>> draw();
+		std::vector<Geometry::Rectangle<double>> get_clipped_page_recs();
 
 		void request(Geometry::Rectangle<float> view, float dpi);
 		void render();

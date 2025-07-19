@@ -83,6 +83,13 @@ void DocantoWin::MainWindowHandler::key(Window::VK key, bool pressed) {
 		m_gesture = std::make_shared<GestureHandler>(m_render, m_pdfhandler);
 		break;
 	}
+	case R: 
+	{
+		AppVariables::TOUCH_ALLOW_ROTATION = !AppVariables::TOUCH_ALLOW_ROTATION;
+		m_render->set_rotation_matrix(0, { 0, 0 });
+		m_mainwindow->send_paint_request();
+		break;
+	}
 	case E:
 	{
 		m_render->add_rotation_matrix(10, m_mainwindow->get_mouse_pos());

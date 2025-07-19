@@ -91,7 +91,7 @@ Docanto::PDFRenderer::PDFRenderer(std::shared_ptr<PDF> pdf_obj, std::shared_ptr<
 	this->m_processor = processor;
 
 	position_pdfs();
-	create_preview();
+	//create_preview();
 	update();
 
 	// add two threads for now
@@ -290,6 +290,23 @@ const std::vector<Docanto::PDFRenderer::PDFRenderInfo>& Docanto::PDFRenderer::ge
 	return *d.get();
 }
 
+std::vector<Docanto::Geometry::Rectangle<double>> Docanto::PDFRenderer::get_clipped_page_recs() {
+	size_t amount_of_pages = pdf_obj->get_page_count();
+	auto& positions = pimpl->m_page_pos;
+	std::vector<Docanto::Geometry::Rectangle<double>> recs;
+
+	float y = 0;
+	for (size_t i = 0; i < amount_of_pages; i++) {
+		auto dims = pdf_obj->get_page_dimension(i);
+		Docanto::Geometry::Rectangle<double> rec = { positions[i], dims };
+		if (rec.intersects(pimpl->m_current_viewport)) {
+			recs.push_back(rec);
+		}
+	}
+
+	return recs;
+}
+
 Docanto::ReadWrapper<std::vector<Docanto::PDFRenderer::PDFRenderInfo>> Docanto::PDFRenderer::draw() {
 	return pimpl->m_highDefBitmaps.get_read();
 }
@@ -312,21 +329,49 @@ void Docanto::PDFRenderer::add_to_processor() {
 
 size_t Docanto::PDFRenderer::cull_bitmaps() {
 	auto vec = pimpl->m_highDefBitmaps.get_write();
+	std::vector<size_t> ids_to_delete;
 	size_t amount = 0;
 	auto [ lower_dpi, higher_dpi ] = get_chunk_dpi_bound();
 
-	for (auto it = vec->rbegin(); it != vec->rend();) {
+	for (auto it = vec->rbegin(); it != vec->rend(); it++) {
 		auto& item = *it;
+		bool intersetcts = item.recs.intersects(pimpl->m_current_viewport);
+		bool del = false;
 
-		if (item.recs.intersects(pimpl->m_current_viewport) and // intersection test
+		if (intersetcts and // intersection test
 			(FLOAT_EQUAL(item.dpi, higher_dpi)) /*dpi test*/) {
-			++it;
 			continue;
 		}
 
+		if (intersetcts) {
+			// check if its intersects with other recs which have our target dpi
+			for (auto it2 = vec->rbegin(); it2 != vec->rend(); it2++) {
+				if (it == it2) {
+					continue;
+				}
+
+				if (!FLOAT_EQUAL(it2->dpi, higher_dpi)) {
+					continue;
+				}
+
+				// if its intersecting with any other rec we can remove it
+				if (it2->recs.intersects(item.recs)) {
+					del = true;
+					break;
+				}
+			}
+
+			if (del == false) {
+				continue;
+			}
+		}
+
+		ids_to_delete.push_back(item.id);
 		amount++;
-		remove_from_processor(item.id);
-		it = vec->rbegin();
+	}
+
+	for (auto ids : ids_to_delete) {
+		remove_from_processor(ids);
 	}
 
 	return amount;
