@@ -41,6 +41,8 @@ namespace DocantoWin::AppVariables {
 
 		Docanto::Color get(TYPE);
 	}
+
+	inline size_t WINDOW_PAINT_REFRESH_TIME_MS = 16;
 }
 
 #endif // !_DOCANTOWIN_APPVARS_H_

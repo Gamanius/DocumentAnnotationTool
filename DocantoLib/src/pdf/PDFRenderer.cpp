@@ -56,6 +56,9 @@ struct Docanto::PDFRenderer::impl {
 		Geometry::Rectangle<float> chunk_rec;
 		RenderStatus status = RenderStatus::WAITING;
 		fz_cookie cookie = {};
+
+		// for debug only
+		std::thread::id render_id;
 	};
 
 	ThreadSafeVector<std::unique_ptr<DisplayListWrapper>> m_page_content;
@@ -68,10 +71,11 @@ struct Docanto::PDFRenderer::impl {
 	ThreadSafeVector<PDFRenderInfo> m_highDefBitmaps;
 
 	// todo the render jobs themselves need to be treadsafe
-	ThreadSafeDeque<std::unique_ptr<Docanto::ReadWriteThreadSafeMutex<RenderJob>>> m_jobs;
 	std::vector<std::thread> m_render_worker;
 	bool m_should_worker_die = false;
 
+	// the queue needs to be synchronized using the below mutex!
+	std::deque<std::shared_ptr<RenderJob>> m_jobs;
 	std::mutex m_render_worker_queue_mutex;
 	std::condition_variable m_render_worker_queue_condition_var;
 
@@ -330,7 +334,8 @@ size_t Docanto::PDFRenderer::cull_bitmaps() {
 size_t Docanto::PDFRenderer::cull_chunks(std::vector<Geometry::Rectangle<float>>& chunks, size_t page) {
 	// TODO we also should look into the queue
 	auto bitmaps = pimpl->m_highDefBitmaps.get_read();
-	auto render_queue = pimpl->m_jobs.get_read();
+	std::scoped_lock<std::mutex> lock(pimpl->m_render_worker_queue_mutex);
+	auto& render_queue = pimpl->m_jobs;
 
 	size_t amount = 0;
 	auto position = pimpl->m_page_pos.at(page);
@@ -350,8 +355,8 @@ size_t Docanto::PDFRenderer::cull_chunks(std::vector<Geometry::Rectangle<float>>
 			}
 		}
 
-		for (size_t j = 0; j < render_queue->size(); j++) {
-			auto queue_item = render_queue->at(j).get()->get_read();
+		for (size_t j = 0; j < render_queue.size(); j++) {
+			auto queue_item = render_queue.at(j);
 
 			// only consider the queue items which are on the correct page
 			if (queue_item->page != page) {
@@ -399,18 +404,15 @@ void Docanto::PDFRenderer::process_chunks(const std::vector<Geometry::Rectangle<
 }
 
 size_t Docanto::PDFRenderer::remove_finished_queue_item() {
-	auto queue = pimpl->m_jobs.get_write();
+	std::scoped_lock<std::mutex> lock(pimpl->m_render_worker_queue_mutex);
+	auto& queue = pimpl->m_jobs;
 	size_t amount = 0;
 
-	for (auto it = queue->begin(); it != queue->end();) {
-		auto stat = it->get()->get_read()->status;
-		if (stat == impl::RenderStatus::DONE) {
-			{
-				it->get()->get_write();
-			}
-			queue->erase(it);
+	for (auto it = queue.begin(); it != queue.end();) {
+		if ((*it)->status == impl::RenderStatus::DONE) {
+			queue.erase(it);
 			amount++;
-			it = queue->begin();
+			it = queue.begin();
 		}
 		else {
 			it++;
@@ -425,7 +427,6 @@ void Docanto::PDFRenderer::request(Geometry::Rectangle<float> view, float dpi) {
 	pimpl->m_current_dpi = dpi;
 
 	remove_finished_queue_item();
-
 
 	cull_bitmaps();
 
@@ -448,17 +449,19 @@ void Docanto::PDFRenderer::request(Geometry::Rectangle<float> view, float dpi) {
 
 		for (auto& chunk_rec : chunks) {
 			// add the new chunks to the queue
-			auto queue = pimpl->m_jobs.get_write();
+			std::scoped_lock<std::mutex> lock(pimpl->m_render_worker_queue_mutex);
+			auto& queue = pimpl->m_jobs;
 
 			impl::RenderJob job;
 			job.chunk_rec = chunk_rec;
 			job.page = i;
+			job.status = impl::RenderStatus::WAITING;
 
 			job.info.dpi = dpi;
 			job.info.id = pimpl->m_last_id.fetch_add(1);
 			job.info.recs = { positions.at(i) + chunk_rec.upperleft(), chunk_rec.dims()};
 
-			queue->push_front(std::make_unique<Docanto::ReadWriteThreadSafeMutex<impl::RenderJob>>(std::move(job)));
+			queue.push_front(std::make_shared<impl::RenderJob>(job));
 		}
 
 		pimpl->m_render_worker_queue_condition_var.notify_all();
@@ -510,53 +513,45 @@ void Docanto::PDFRenderer::async_render() {
 		// wait until a signal is received
 		std::unique_lock<std::mutex> lock(pimpl->m_render_worker_queue_mutex);
 		pimpl->m_render_worker_queue_condition_var.wait(lock, [this] {
-			auto queue = pimpl->m_jobs.get_read();
-			return pimpl->m_should_worker_die or queue->size() != 0;
+			return pimpl->m_should_worker_die or pimpl->m_jobs.size() != 0;
 			});
-		lock.unlock();
 
 		// get any item from the render queue
-		ReadWriteThreadSafeMutex<impl::RenderJob>* current_job = nullptr;
-		fz_cookie* current_cookie;
+		std::shared_ptr<impl::RenderJob> current_job = nullptr;
 		{
-			auto queue = pimpl->m_jobs.get_write();
-			for (size_t i = 0; i < queue->size(); i++) {
-				auto job = queue->at(i).get();
-				auto job_item = job->get_read();
+			auto& queue = pimpl->m_jobs;
+			for (size_t i = 0; i < queue.size(); i++) {
+				auto& job = queue.at(i);
 
-				if (job_item->status == impl::RenderStatus::WAITING) {
-					auto write_job = job->get_write();
-					write_job->status = impl::RenderStatus::PROCESSING;
-
+				if (job->status == impl::RenderStatus::WAITING) {
+					job->status = impl::RenderStatus::PROCESSING;
+					job->render_id = std::this_thread::get_id();
 					// we need to safe the pointer since we cannot retrieve it later without being const
-					current_cookie = &(write_job->cookie);
 					current_job = job;
 					break;
 				}
 			}
 		}
 
+		// unlock again
+		lock.unlock();
+
 		// we didnt find any rendering jobs and we can go back to waiting
 		if (current_job == nullptr) {
 			continue;
 		}
 
-		auto curr = current_job->get_read();
-
-		auto cont_img = get_image_from_list(ctx, t_content_list[curr->page], curr->chunk_rec, curr->info.dpi, current_cookie);
+		auto cont_img = get_image_from_list(ctx, t_content_list[current_job->page], current_job->chunk_rec, current_job->info.dpi, &(current_job->cookie));
 
 		// add the new image to the list
-		m_processor->processImage(curr->info.id, cont_img);
-		pimpl->m_highDefBitmaps.get_write()->push_back(curr->info);
+		m_processor->processImage(current_job->info.id, cont_img);
+		pimpl->m_highDefBitmaps.get_write()->push_back(current_job->info);
 
 		// call the callback
 		if (m_render_callback)
-			m_render_callback(curr->info.id);
+			m_render_callback(current_job->info.id);
 
-		{
-			auto temp = current_job->get_write();
-			temp->status = impl::RenderStatus::DONE;
-		}
+		current_job->status = impl::RenderStatus::DONE;
 	}
 
 	for (size_t i = 0; i < t_content_list.size(); i++) {

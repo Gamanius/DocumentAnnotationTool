@@ -24,6 +24,10 @@ void DocantoWin::PDFHandler::draw() {
 	auto highdef = list.get();
 
 	for (const auto& info : *highdef) {
+		if (bitmaps->find(info.id) == bitmaps->end()) {
+			Docanto::Logger::warn("Couldnt find ", info.id);
+			continue;
+		}
 		if (bitmaps->at(info.id).m_object == nullptr) {
 			continue;
 		}
@@ -65,17 +69,7 @@ DocantoWin::PDFHandler::PDFHandlerImageProcessor::PDFHandlerImageProcessor(std::
 
 void DocantoWin::PDFHandler::PDFHandlerImageProcessor::processImage(size_t id, const Docanto::Image& img) {
 	auto bitmaps = m_all_bitmaps.get();
-
-	if (bitmaps->find(id) != bitmaps->end()) {
-		DebugBreak();
-	}
-
 	bitmaps->operator[](id) = m_render->create_bitmap(img);
-
-	if (bitmaps->at(id) == nullptr) {
-		DebugBreak();
-
-	}
 }
 
 void DocantoWin::PDFHandler::PDFHandlerImageProcessor::deleteImage(size_t id) {
