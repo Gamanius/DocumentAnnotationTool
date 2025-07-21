@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36301.6 d17.14
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DocantoWin", "DocantoWin\DocantoWin.vcxproj", "{841BFDF8-18DD-4BDA-8127-A4F839AFDAB7}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DocantoLib", "DocantoLib\DocantoLib.vcxproj", "{DBFAE128-FAFF-48DE-87A8-61287348BF91}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{841BFDF8-18DD-4BDA-8127-A4F839AFDAB7}.Debug|x64.ActiveCfg = Debug|x64
+		{841BFDF8-18DD-4BDA-8127-A4F839AFDAB7}.Debug|x64.Build.0 = Debug|x64
+		{841BFDF8-18DD-4BDA-8127-A4F839AFDAB7}.Release|x64.ActiveCfg = Release|x64
+		{841BFDF8-18DD-4BDA-8127-A4F839AFDAB7}.Release|x64.Build.0 = Release|x64
+		{DBFAE128-FAFF-48DE-87A8-61287348BF91}.Debug|x64.ActiveCfg = Debug|x64
+		{DBFAE128-FAFF-48DE-87A8-61287348BF91}.Debug|x64.Build.0 = Debug|x64
+		{DBFAE128-FAFF-48DE-87A8-61287348BF91}.Release|x64.ActiveCfg = Release|x64
+		{DBFAE128-FAFF-48DE-87A8-61287348BF91}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {F15646F4-955A-496A-B747-24AC6D8D5118}
+	EndGlobalSection
+EndGlobal
