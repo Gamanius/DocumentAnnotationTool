@@ -5,14 +5,24 @@
 
 #include <functional>
 
+#ifndef _UNICODE
 #define _UNICODE
+#endif
+#ifndef UNICODE
 #define UNICODE
+#endif
 
 #include <Windows.h>
 #include <map>
 
 #include <d2d1.h>
 #include <dwrite_3.h>
+
+#pragma comment(lib, "windowsapp.lib")
+#pragma comment(lib, "d3d11.lib")
+#pragma comment(lib, "d2d1.lib")
+#pragma comment(lib, "dwmapi.lib")
+#pragma comment(lib, "hid.lib")
 
 #define APPLICATION_NAME L"Docanto"
 
