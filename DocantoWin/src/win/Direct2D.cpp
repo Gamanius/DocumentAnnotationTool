@@ -6,6 +6,9 @@
 #include <winrt\Windows.Graphics.Effects.h>
 #include <winrt\Windows.UI.Composition.h>
 #include <windows.ui.composition.interop.h>
+
+#include "winrt\Microsoft.Graphics.Canvas.Effects.h"
+
 #include <DispatcherQueue.h>
 #include <d2d1_3.h>
 #include <d3d11_3.h>
@@ -146,16 +149,6 @@ DocantoWin::Direct2DRender::Direct2DRender(std::shared_ptr<Window> w) : m_window
 	ICompositionSurface surface = m_surfaceInterop.as<ICompositionSurface>();
 
 	m_surfaceBrush = m_compositor.CreateSurfaceBrush(surface);
-
-	POINT offset = { 0,0 };
-	winrt::com_ptr<ID2D1DeviceContext> d2dDeviceContext;
-	m_surfaceInterop->BeginDraw(nullptr, __uuidof(ID2D1DeviceContext), (void**)d2dDeviceContext.put(), &offset);
-
-	d2dDeviceContext->Clear();
-
-	d2dDeviceContext->DrawBitmap(m_d2dBitmap.get());
-
-	m_surfaceInterop->EndDraw();
 
 	// create gpu rsc
 	m_solid_brush = create_brush({});

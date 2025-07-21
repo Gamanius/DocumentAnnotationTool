@@ -72,22 +72,22 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <OutDir>$(SolutionDir)out\$(Configuration)$(PlatformShortName)\</OutDir>
-    <IntDir>$(SolutionDir)out\int\$(Configuration)$(PlatformShortName)\</IntDir>
+    <IntDir>$(SolutionDir)out\int\$(ProjectName)\$(Configuration)$(PlatformShortName)\</IntDir>
     <TargetName>$(ProjectName)$(Configuration)$(PlatformShortName)</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <OutDir>$(SolutionDir)out\$(Configuration)$(PlatformShortName)\</OutDir>
-    <IntDir>$(SolutionDir)out\int\$(Configuration)$(PlatformShortName)\</IntDir>
+    <IntDir>$(SolutionDir)out\int\$(ProjectName)\$(Configuration)$(PlatformShortName)\</IntDir>
     <TargetName>$(ProjectName)$(Configuration)$(PlatformShortName)</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <OutDir>$(SolutionDir)out\$(Configuration)$(PlatformShortName)\</OutDir>
-    <IntDir>$(SolutionDir)out\int\$(Configuration)$(PlatformShortName)\</IntDir>
+    <IntDir>$(SolutionDir)out\int\$(ProjectName)\$(Configuration)$(PlatformShortName)\</IntDir>
     <TargetName>$(ProjectName)$(Configuration)$(PlatformShortName)</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>$(SolutionDir)out\$(Configuration)$(PlatformShortName)\</OutDir>
-    <IntDir>$(SolutionDir)out\int\$(Configuration)$(PlatformShortName)\</IntDir>
+    <IntDir>$(SolutionDir)out\int\$(ProjectName)\$(Configuration)$(PlatformShortName)\</IntDir>
     <TargetName>$(ProjectName)$(Configuration)$(PlatformShortName)</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
