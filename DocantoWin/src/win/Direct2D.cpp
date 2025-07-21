@@ -2,6 +2,15 @@
 #include <wincodec.h>
 #include <d2d1.h>
 
+#include <winrt\Windows.UI.Composition.Desktop.h>
+#include <winrt\Windows.Graphics.Effects.h>
+#include <winrt\Windows.UI.Composition.h>
+#include <windows.ui.composition.interop.h>
+#include <DispatcherQueue.h>
+#include <d2d1_3.h>
+#include <d3d11_3.h>
+#include <wrl.h>
+
 #include "helper/AppVariables.h"
 
 #pragma comment(lib, "d2d1.lib")
@@ -10,10 +19,27 @@
 #undef min
 #undef max
 
-ID2D1Factory* DocantoWin::Direct2DRender::m_factory = nullptr;
-IDWriteFactory3* DocantoWin::Direct2DRender::m_writeFactory = nullptr;
+winrt::com_ptr<ID2D1Device>         m_d2dDevice  = nullptr;
+winrt::com_ptr<ID2D1Factory1>       m_d2dFactory = nullptr;
+winrt::com_ptr<IDWriteFactory3>     m_d2dwriteFactory = nullptr;
+winrt::com_ptr<ID2D1Bitmap1>        m_d2dBitmap  = nullptr;
+winrt::com_ptr<IWICImagingFactory2> m_wicFactory = nullptr;
 
-DocantoWin::Direct2DRender::Direct2DRender(std::shared_ptr<Window> w) : m_window(w) {
+winrt::com_ptr<ID3D11Device>        m_d3dDevice  = nullptr;
+
+
+winrt::Windows::System::DispatcherQueueController m_dispatcherQueueController = nullptr;
+
+winrt::com_ptr<winrt::Windows::UI::Composition::ICompositionGraphicsDevice> m_graphicsDevice;
+winrt::com_ptr<ABI::Windows::UI::Composition::ICompositionDrawingSurfaceInterop> m_surfaceInterop;
+winrt::Windows::UI::Composition::CompositionVirtualDrawingSurface m_virtualSurface = nullptr;
+winrt::Windows::UI::Composition::CompositionSurfaceBrush m_surfaceBrush = nullptr;
+
+winrt::Windows::UI::Composition::Compositor m_compositor = nullptr;
+
+winrt::Windows::UI::Composition::Desktop::DesktopWindowTarget m_target = nullptr;
+
+bool DocantoWin::Direct2DRender::createD2DResources() {
 	D2D1_FACTORY_OPTIONS option{};
 
 #ifdef _DEBUG
@@ -23,41 +49,113 @@ DocantoWin::Direct2DRender::Direct2DRender(std::shared_ptr<Window> w) : m_window
 #endif // _DEBUG
 
 	HRESULT result = S_OK;
-	if (m_factory == nullptr) {
-		result = D2D1CreateFactory(D2D1_FACTORY_TYPE_MULTI_THREADED, option, &m_factory);
-		
+	if (m_d2dFactory == nullptr) {
+		result = D2D1CreateFactory(D2D1_FACTORY_TYPE_MULTI_THREADED, option, m_d2dFactory.put());
+
 		if (!WIN_ASSERT_OK(result, "Could not initialize Direct2D")) {
-			return;
+			return false;
 		}
 	}
-	else {
-		m_factory->AddRef();
-	}
+
 
 	// create some text rendering
-	if (m_writeFactory == nullptr) {
-		result = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory3), reinterpret_cast<IUnknown**>(&m_writeFactory));
+	if (m_d2dwriteFactory == nullptr) {
+		result = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory3), (IUnknown**)m_d2dwriteFactory.put_void());
 		if (result != S_OK) {
 			Docanto::Logger::error("Could not initilaize text rendering");
+			return false;
 		}
 	}
-	else {
-		m_writeFactory->AddRef();
+
+	if (m_d3dDevice == nullptr) {
+		result = D3D11CreateDevice(
+			nullptr,
+			D3D_DRIVER_TYPE_HARDWARE,
+			nullptr,
+			D3D11_CREATE_DEVICE_BGRA_SUPPORT,
+			nullptr, 0,
+			D3D11_SDK_VERSION,
+			m_d3dDevice.put(),
+			nullptr,
+			nullptr);
+
+		if (result != S_OK) {
+			return false;
+		}
 	}
 
-	auto props = D2D1::HwndRenderTargetProperties(m_window->m_hwnd, DimensionToD2D1(m_window->get_window_size()));
-	props.presentOptions = D2D1_PRESENT_OPTIONS_IMMEDIATELY;
-	result = m_factory->CreateHwndRenderTarget(
-		D2D1::RenderTargetProperties(),
-		props,
-		&m_renderTarget
-	);
+	namespace abi = ABI::Windows::UI::Composition;
 
-	m_renderTarget->SetAntialiasMode(D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+	winrt::com_ptr<IDXGIDevice> const dxdevice = m_d3dDevice.as<IDXGIDevice>();
+	winrt::com_ptr<abi::ICompositorInterop> interopCompositor = m_compositor.as<abi::ICompositorInterop>();
 
-	if (result != S_OK) {
-		Docanto::Logger::error("Could not initilaize HWND rendering");
-	}	
+	m_d2dFactory->CreateDevice(dxdevice.get(), m_d2dDevice.put());
+	interopCompositor->CreateGraphicsDevice(m_d2dDevice.get(), reinterpret_cast<abi::ICompositionGraphicsDevice**>(winrt::put_abi(m_graphicsDevice)));
+	result = CoCreateInstance(CLSID_WICImagingFactory2, nullptr, CLSCTX_INPROC_SERVER, __uuidof(m_wicFactory), m_wicFactory.put_void());
+	WIN_ASSERT_OK(result, "CoCreateInstance");
+
+	return true;
+
+}
+
+bool DocantoWin::Direct2DRender::initWinrt() {
+	if (m_dispatcherQueueController == nullptr) {
+		DispatcherQueueOptions options
+		{
+			sizeof(DispatcherQueueOptions),
+			DQTYPE_THREAD_CURRENT,
+			DQTAT_COM_ASTA
+		};
+
+		winrt::Windows::System::DispatcherQueueController controller{ nullptr };
+		auto result = CreateDispatcherQueueController(options, reinterpret_cast<ABI::Windows::System::IDispatcherQueueController**>(winrt::put_abi(controller)));
+		m_dispatcherQueueController = controller;
+
+		if (result != S_OK) {
+			return false;
+		}
+	}
+	return true;
+}
+
+DocantoWin::Direct2DRender::Direct2DRender(std::shared_ptr<Window> w) : m_window(w) {
+	using namespace winrt;
+	using namespace winrt::Windows::UI;
+	using namespace winrt::Windows::UI::Composition;
+	namespace abi = ABI::Windows::UI::Composition::Desktop;
+	
+
+	this->initWinrt();
+	m_compositor = Compositor();
+	auto interop = m_compositor.as<ABI::Windows::UI::Composition::Desktop::ICompositorDesktopInterop >();
+	winrt::Windows::UI::Composition::Desktop::DesktopWindowTarget target{ nullptr };
+	check_hresult(interop->CreateDesktopWindowTarget(m_window->get_hwnd(), false, reinterpret_cast<ABI::Windows::UI::Composition::Desktop::IDesktopWindowTarget**>(winrt::put_abi(target))));
+	m_target = target;
+
+	this->createD2DResources();
+
+	auto graphicsDevice2 = m_graphicsDevice.as<ICompositionGraphicsDevice2>();
+
+	m_virtualSurface = graphicsDevice2.CreateVirtualDrawingSurface(
+		{ 256, 256 },
+		winrt::Windows::Graphics::DirectX::DirectXPixelFormat::R16G16B16A16Float,
+		winrt::Windows::Graphics::DirectX::DirectXAlphaMode::Premultiplied);
+
+	m_surfaceInterop = m_virtualSurface.as<ABI::Windows::UI::Composition::ICompositionDrawingSurfaceInterop>();
+
+	ICompositionSurface surface = m_surfaceInterop.as<ICompositionSurface>();
+
+	m_surfaceBrush = m_compositor.CreateSurfaceBrush(surface);
+
+	POINT offset = { 0,0 };
+	winrt::com_ptr<ID2D1DeviceContext> d2dDeviceContext;
+	m_surfaceInterop->BeginDraw(nullptr, __uuidof(ID2D1DeviceContext), (void**)d2dDeviceContext.put(), &offset);
+
+	d2dDeviceContext->Clear();
+
+	d2dDeviceContext->DrawBitmap(m_d2dBitmap.get());
+
+	m_surfaceInterop->EndDraw();
 
 	// create gpu rsc
 	m_solid_brush = create_brush({});
@@ -67,9 +165,6 @@ DocantoWin::Direct2DRender::Direct2DRender(std::shared_ptr<Window> w) : m_window
 }
 
 DocantoWin::Direct2DRender::~Direct2DRender() {
-	SafeRelease(m_factory);
-	SafeRelease(m_renderTarget);
-	SafeRelease(m_writeFactory);
 }
 
 void DocantoWin::Direct2DRender::begin_draw() {
@@ -351,7 +446,7 @@ DocantoWin::Direct2DRender::TextFormatObject DocantoWin::Direct2DRender::create_
 	TextFormatObject text;
 	IDWriteTextFormat* textformat = nullptr;
 
-	HRESULT result = m_writeFactory->CreateTextFormat(
+	HRESULT result = m_d2dwriteFactory->CreateTextFormat(
 		font.c_str(),
 		nullptr,
 		DWRITE_FONT_WEIGHT_NORMAL,
@@ -374,7 +469,7 @@ DocantoWin::Direct2DRender::TextFormatObject DocantoWin::Direct2DRender::create_
 DocantoWin::Direct2DRender::TextLayoutObject DocantoWin::Direct2DRender::create_text_layout(const std::wstring &text, TextFormatObject& format) {
 	TextLayoutObject obj;
 	IDWriteTextLayout* textLayout;
-	auto result = m_writeFactory->CreateTextLayout(
+	auto result = m_d2dwriteFactory->CreateTextLayout(
 		text.c_str(),
 		(uint32_t)text.length(),
 		format.m_object,

@@ -15,10 +15,6 @@ namespace DocantoWin {
 
 	class Direct2DRender : public Docanto::BasicRender {
 		std::shared_ptr<Window> m_window;
-
-		static ID2D1Factory* m_factory;
-		static IDWriteFactory3* m_writeFactory;
-
 		ID2D1HwndRenderTarget* m_renderTarget = nullptr;
 
 		D2D1::Matrix3x2F m_transformTranslationMatrix = D2D1::Matrix3x2F::Identity();
@@ -28,6 +24,8 @@ namespace DocantoWin {
 		std::atomic<UINT32> m_isRenderinProgress = 0;
 		std::mutex draw_lock;
 
+		bool createD2DResources();
+		bool initWinrt();
 
 	public:
 		template <typename T>
