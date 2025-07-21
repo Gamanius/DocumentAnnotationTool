@@ -26,6 +26,7 @@ namespace DocantoWin {
 
 		bool createD2DResources();
 		bool initWinrt();
+		void createBlur();
 
 	public:
 		template <typename T>

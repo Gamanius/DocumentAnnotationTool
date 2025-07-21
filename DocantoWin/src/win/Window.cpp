@@ -540,8 +540,8 @@ DocantoWin::Window::Window(HINSTANCE h) {
 		// to the top of the screen
 		| WS_MINIMIZEBOX;  // Add minimize button to support minimizing by clicking on the taskbar icon
 
-	m_hwnd = CreateWindowEx(WS_EX_APPWINDOW, wc.lpszClassName, APPLICATION_NAME,
-		window_style, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
+	m_hwnd = CreateWindowEx(WS_EX_APPWINDOW | WS_EX_LAYERED, wc.lpszClassName, APPLICATION_NAME,
+		WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
 		0, 0, h, this);
 
 	if (!m_hwnd) {

@@ -31,6 +31,9 @@ winrt::com_ptr<IWICImagingFactory2> m_wicFactory = nullptr;
 winrt::com_ptr<ID3D11Device>        m_d3dDevice  = nullptr;
 
 
+winrt::com_ptr<ID2D1DeviceContext> temp_d2dDeviceContext;
+winrt::com_ptr<ID2D1DeviceContext> d2dContext;
+
 winrt::Windows::System::DispatcherQueueController m_dispatcherQueueController = nullptr;
 
 winrt::com_ptr<winrt::Windows::UI::Composition::ICompositionGraphicsDevice> m_graphicsDevice;
@@ -92,7 +95,12 @@ bool DocantoWin::Direct2DRender::createD2DResources() {
 	winrt::com_ptr<IDXGIDevice> const dxdevice = m_d3dDevice.as<IDXGIDevice>();
 	winrt::com_ptr<abi::ICompositorInterop> interopCompositor = m_compositor.as<abi::ICompositorInterop>();
 
+
 	m_d2dFactory->CreateDevice(dxdevice.get(), m_d2dDevice.put());
+	m_d2dDevice->CreateDeviceContext(
+		D2D1_DEVICE_CONTEXT_OPTIONS_NONE,
+		d2dContext.put());
+
 	interopCompositor->CreateGraphicsDevice(m_d2dDevice.get(), reinterpret_cast<abi::ICompositionGraphicsDevice**>(winrt::put_abi(m_graphicsDevice)));
 	result = CoCreateInstance(CLSID_WICImagingFactory2, nullptr, CLSCTX_INPROC_SERVER, __uuidof(m_wicFactory), m_wicFactory.put_void());
 	WIN_ASSERT_OK(result, "CoCreateInstance");
@@ -121,11 +129,42 @@ bool DocantoWin::Direct2DRender::initWinrt() {
 	return true;
 }
 
-DocantoWin::Direct2DRender::Direct2DRender(std::shared_ptr<Window> w) : m_window(w) {
+void DocantoWin::Direct2DRender::createBlur() {
 	using namespace winrt;
 	using namespace winrt::Windows::UI;
 	using namespace winrt::Windows::UI::Composition;
+	using namespace winrt::Windows::UI::Composition::Desktop;
+
+	auto root = m_target.Root().as<SpriteVisual>();
+	if (root) {
+		using namespace winrt::Microsoft::Graphics::Canvas;
+
+		// GaussianBlurEffect only
+		auto blur = Effects::GaussianBlurEffect();
+		blur.Name(L"Blur");
+		blur.BorderMode(Effects::EffectBorderMode::Hard);
+		blur.BlurAmount(5.f); // Adjust blur intensity
+		blur.Source(CompositionEffectSourceParameter(L"Backdrop"));
+
+		// Create blur brush
+		auto blurBrush = m_compositor.CreateEffectFactory(blur).CreateBrush();
+		blurBrush.SetSourceParameter(L"Backdrop", m_compositor.CreateBackdropBrush());
+
+		// Apply blur brush directly to the root visual
+		root.Brush(blurBrush);
+
+	}
+}
+
+DocantoWin::Direct2DRender::Direct2DRender(std::shared_ptr<Window> w) : m_window(w) {
+
 	namespace abi = ABI::Windows::UI::Composition::Desktop;
+
+	using namespace winrt;
+	using namespace winrt::Windows::UI;
+	using namespace winrt::Windows::UI::Composition;
+	using namespace winrt::Windows::UI::Composition::Desktop;
+	using namespace winrt::Microsoft::Graphics::Canvas;
 	
 
 	this->initWinrt();
@@ -149,6 +188,48 @@ DocantoWin::Direct2DRender::Direct2DRender(std::shared_ptr<Window> w) : m_window
 	ICompositionSurface surface = m_surfaceInterop.as<ICompositionSurface>();
 
 	m_surfaceBrush = m_compositor.CreateSurfaceBrush(surface);
+	auto backdropVisual = m_compositor.CreateSpriteVisual();
+	backdropVisual.RelativeSizeAdjustment({ 1.0f, 1.0f }); // Fill parent
+
+	// GaussianBlurEffect
+	auto blur = Effects::GaussianBlurEffect();
+	blur.Name(L"Blur");
+	blur.BorderMode(Effects::EffectBorderMode::Hard);
+	blur.BlurAmount(5.f); // Adjust blur intensity
+	blur.Source(CompositionEffectSourceParameter(L"Backdrop")); // Sample what's behind this visual
+
+	// Create blur brush
+	auto blurEffectFactory = m_compositor.CreateEffectFactory(blur);
+	auto blurBrush = blurEffectFactory.CreateBrush();
+	blurBrush.SetSourceParameter(L"Backdrop", m_compositor.CreateBackdropBrush()); // Use backdrop from the window
+
+	// Apply blur brush to the backdrop visual
+	backdropVisual.Brush(blurBrush);
+
+	// --- 2. Create the visual for your Direct2D content ---
+	// This is typically what your `m_target.Root()` refers to,
+	// or you can create a new visual heirarchy here.
+	// Let's assume m_rootVisual is your main content visual (which uses m_surfaceBrush)
+	auto m_rootVisual = m_compositor.CreateSpriteVisual();
+	m_rootVisual.RelativeSizeAdjustment({ 1.0f, 1.0f });
+
+	// Assign your Direct2D surface brush to this visual
+	m_rootVisual.Brush(m_surfaceBrush);
+
+	// --- 3. Manage the composition tree ---
+	// The m_target.Root() will now be a container visual for these two.
+	// Or, you can set backdropVisual directly as m_target.Root()
+	// and then add m_rootVisual as a child of backdropVisual.
+
+	// Option A: Use the existing root, add backdrop as a child behind D2D content
+	// This assumes m_target.Root() is already a ContainerVisual or you set it up to be.
+	// For simplicity, let's create a new root that holds both:
+	auto mainContainer = m_compositor.CreateContainerVisual();
+	mainContainer.RelativeSizeAdjustment({ 1.0f, 1.0f });
+	mainContainer.Children().InsertAtTop(m_rootVisual);    // D2D content is on top
+	mainContainer.Children().InsertAtTop(backdropVisual); // Blur is at the bottom
+
+	m_target.Root(mainContainer);
 
 	// create gpu rsc
 	m_solid_brush = create_brush({});
@@ -162,8 +243,10 @@ DocantoWin::Direct2DRender::~Direct2DRender() {
 
 void DocantoWin::Direct2DRender::begin_draw() {
 	std::lock_guard lock(draw_lock);
-	if (m_isRenderinProgress == 0)
-		m_renderTarget->BeginDraw();
+	if (m_isRenderinProgress == 0) {
+			POINT offset = { 0,0 };
+			m_surfaceInterop->BeginDraw(nullptr, __uuidof(ID2D1DeviceContext), (void**)temp_d2dDeviceContext.put(), &offset);
+	}
 	m_isRenderinProgress++;
 }
 
@@ -171,12 +254,12 @@ void DocantoWin::Direct2DRender::end_draw() {
 	std::lock_guard lock(draw_lock);
 	m_isRenderinProgress--;
 	if (m_isRenderinProgress == 0)
-		m_renderTarget->EndDraw();
+		m_surfaceInterop->EndDraw();
 }
 
 void DocantoWin::Direct2DRender::clear(Docanto::Color c) {
 	begin_draw();
-	m_renderTarget->Clear(ColorToD2D1(c));
+	temp_d2dDeviceContext->Clear(ColorToD2D1(c));
 	end_draw();
 }
 
@@ -189,12 +272,12 @@ std::shared_ptr<DocantoWin::Window> DocantoWin::Direct2DRender::get_attached_win
 }
 
 void DocantoWin::Direct2DRender::resize(Docanto::Geometry::Dimension<long> r) {
-	m_renderTarget->Resize(DimensionToD2D1(r));
+	//m_renderTarget->Resize(DimensionToD2D1(r));
 
 	// we should also check if the dpi changed
 	UINT dpiX, dpiY;
 	dpiX = dpiY = GetDpiForWindow(m_window->m_hwnd);
-	m_renderTarget->SetDpi(static_cast<float>(dpiX), static_cast<float>(dpiY));
+	//m_d2dDevice->SetDpi(static_cast<float>(dpiX), static_cast<float>(dpiY));
 }
 
 void DocantoWin::Direct2DRender::draw_text(const std::wstring& text, Docanto::Geometry::Point<float> pos, TextFormatObject& format, BrushObject& brush) {
@@ -202,7 +285,7 @@ void DocantoWin::Direct2DRender::draw_text(const std::wstring& text, Docanto::Ge
 
 	begin_draw();
 
-	m_renderTarget->DrawTextLayout(
+	temp_d2dDeviceContext->DrawTextLayout(
 		m_window->PxToDp(pos),
 		layout.m_object,
 		brush.m_object,
@@ -227,27 +310,27 @@ void DocantoWin::Direct2DRender::draw_rect(Docanto::Geometry::Rectangle<float> r
 }
 
 void DocantoWin::Direct2DRender::draw_rect(Docanto::Geometry::Rectangle<float> r, BrushObject& brush, float thic) {
-	m_renderTarget->DrawRectangle(RectToD2D1(r), brush.m_object, thic);
+	temp_d2dDeviceContext->DrawRectangle(RectToD2D1(r), brush.m_object, thic);
 }
 void DocantoWin::Direct2DRender::draw_rect_filled(Docanto::Geometry::Rectangle<float> r, BrushObject& brush) {
-	m_renderTarget->FillRectangle(RectToD2D1(r), brush.m_object);
+	temp_d2dDeviceContext->FillRectangle(RectToD2D1(r), brush.m_object);
 }
 
 void DocantoWin::Direct2DRender::draw_rect_filled(Docanto::Geometry::Rectangle<float> r, Docanto::Color c) {
 	m_solid_brush->SetColor(ColorToD2D1(c));
-	m_renderTarget->FillRectangle(RectToD2D1(r), m_solid_brush);
+	temp_d2dDeviceContext->FillRectangle(RectToD2D1(r), m_solid_brush);
 }
 
 void DocantoWin::Direct2DRender::draw_bitmap(Docanto::Geometry::Point<float> where, BitmapObject& obj) {
 	begin_draw();
 	auto size = obj.m_object->GetSize();
-	m_renderTarget->DrawBitmap(obj.m_object, D2D1::RectF(where.x, where.y, size.width + where.x , size.height + where.y));
+	temp_d2dDeviceContext->DrawBitmap(obj.m_object, D2D1::RectF(where.x, where.y, size.width + where.x , size.height + where.y));
 	end_draw();
 }
 
 void DocantoWin::Direct2DRender::draw_bitmap(Docanto::Geometry::Rectangle<float> rec, BitmapObject& obj) {
 	begin_draw();
-	m_renderTarget->DrawBitmap(obj.m_object, RectToD2D1(rec));
+	temp_d2dDeviceContext->DrawBitmap(obj.m_object, RectToD2D1(rec));
 	end_draw();
 }
 
@@ -258,13 +341,13 @@ void DocantoWin::Direct2DRender::draw_bitmap(Docanto::Geometry::Point<float> whe
 
 	begin_draw();
 	auto size = obj.m_object->GetSize();
-	m_renderTarget->DrawBitmap(obj.m_object, D2D1::RectF(where.x, where.y, size.width * scale + where.x, size.height * scale + where.y));
+	temp_d2dDeviceContext->DrawBitmap(obj.m_object, D2D1::RectF(where.x, where.y, size.width * scale + where.x, size.height * scale + where.y));
 	end_draw();
 }
 
 void DocantoWin::Direct2DRender::draw_line(Docanto::Geometry::Point<float> p1, Docanto::Geometry::Point<float> p2, BrushObject& brush, float thick) {
 	begin_draw();
-	m_renderTarget->DrawLine(PointToD2D1(p1), PointToD2D1(p2), brush.m_object, thick);
+	temp_d2dDeviceContext->DrawLine(PointToD2D1(p1), PointToD2D1(p2), brush.m_object, thick);
 	end_draw();
 }
 
@@ -277,11 +360,11 @@ void DocantoWin::Direct2DRender::draw_line(Docanto::Geometry::Point<float> p1, D
 
 
 void DocantoWin::Direct2DRender::set_current_transform_active() {
-	m_renderTarget->SetTransform(m_transformTranslationMatrix * m_transformRotationMatrix * m_transformScaleMatrix);
+	temp_d2dDeviceContext->SetTransform(m_transformTranslationMatrix * m_transformRotationMatrix * m_transformScaleMatrix);
 }
 
 void DocantoWin::Direct2DRender::set_identity_transform_active() {
-	m_renderTarget->SetTransform(D2D1::Matrix3x2F::Identity());
+	temp_d2dDeviceContext->SetTransform(D2D1::Matrix3x2F::Identity());
 }
 
 void DocantoWin::Direct2DRender::set_translation_matrix(Docanto::Geometry::Point<float> p) {
@@ -487,7 +570,7 @@ DocantoWin::Direct2DRender::BitmapObject DocantoWin::Direct2DRender::create_bitm
 	prop.dpiY = static_cast<float>(i.dpi);
 	prop.pixelFormat.alphaMode = D2D1_ALPHA_MODE_PREMULTIPLIED;
 	prop.pixelFormat.format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	HRESULT res = m_renderTarget->CreateBitmap(DimensionToD2D1(i.dims), i.data.get(), i.stride, prop, &pBitmap);
+	HRESULT res = d2dContext->CreateBitmap(DimensionToD2D1(i.dims), i.data.get(), i.stride, prop, &pBitmap);
 	if (res != S_OK) {
 		Docanto::Logger::error("Could not create bitmap");
 	}
@@ -501,7 +584,7 @@ DocantoWin::Direct2DRender::BitmapObject DocantoWin::Direct2DRender::create_bitm
 DocantoWin::Direct2DRender::BrushObject DocantoWin::Direct2DRender::create_brush(Docanto::Color c) {
 	BrushObject obj;
 	ID2D1SolidColorBrush* brush = nullptr;
-	auto result = m_renderTarget->CreateSolidColorBrush(ColorToD2D1(c), &brush);
+	auto result = d2dContext->CreateSolidColorBrush(ColorToD2D1(c), &brush);
 	if (result != S_OK) {
 		Docanto::Logger::error("Could not create D2D1 brush");
 	}

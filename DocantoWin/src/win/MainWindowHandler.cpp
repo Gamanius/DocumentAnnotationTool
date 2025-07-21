@@ -28,15 +28,15 @@ static std::optional<std::wstring> open_file_dialog(const wchar_t* filter, HWND 
 }
 
 void DocantoWin::MainWindowHandler::paint() {
-	m_pdfhandler->request();
+	//m_pdfhandler->request();
 
 	m_render->begin_draw();
-	m_render->clear();
+	m_render->clear({255, 255, 0, 255});
 
-	m_render->set_current_transform_active();
-	m_pdfhandler->draw();
+	//m_render->set_current_transform_active();
+	//m_pdfhandler->draw();
 
-	m_render->set_identity_transform_active();
+	//m_render->set_identity_transform_active();
 	m_uicaption->draw();
 	m_render->draw_rect(rectangle, { 255,0,0,255});
 	m_render->end_draw();
