@@ -35,6 +35,7 @@ namespace DocantoWin {
 		void toggle_debug_draw();
 
 		std::shared_ptr<Docanto::PDF> get_pdf() const;
+		std::shared_ptr<Docanto::PDFRenderer> get_pdfrender() const;
 	};
 }
 

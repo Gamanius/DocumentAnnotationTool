@@ -6,6 +6,7 @@
 
 #include "ui/Caption.h"
 #include "ui/Gesture.h"
+#include "ui/UIHandler.h"
 
 #include "pdf/PDFHandler.h"
 
@@ -18,6 +19,8 @@ namespace DocantoWin {
 		std::shared_ptr<GestureHandler> m_gesture;
 
 		std::shared_ptr<PDFHandler> m_pdfhandler;
+
+		std::shared_ptr<UIHandler> m_uihandler;
 
 		void paint();
 		void size(Docanto::Geometry::Dimension<long> d);

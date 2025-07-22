@@ -1,7 +1,6 @@
 #include "MainWindowHandler.h"
 
-
-Docanto::Geometry::Rectangle<float> rectangle;
+#include "ui/TestElement.h"
 
 static std::optional<std::wstring> open_file_dialog(const wchar_t* filter, HWND windowhandle = nullptr) {
 	OPENFILENAME ofn;
@@ -37,8 +36,8 @@ void DocantoWin::MainWindowHandler::paint() {
 	m_pdfhandler->draw();
 
 	m_render->set_identity_transform_active();
+	m_uihandler->draw();
 	m_uicaption->draw();
-	m_render->draw_rect(rectangle, { 255,0,0,255});
 	m_render->end_draw();
 }
 void DocantoWin::MainWindowHandler::size(Docanto::Geometry::Dimension<long> d) {
@@ -166,6 +165,10 @@ void DocantoWin::MainWindowHandler::pointer_down(Window::PointerInfo p) {
 	if (!m_gesture) {
 		return;
 	}
+
+
+	m_uihandler->pointer_down(p.pos);
+
 	// there will never be a touchpad pointer down event since we cant track them
 	if (p.type == Window::POINTER_TYPE::TOUCH or p.type == Window::POINTER_TYPE::TOUCHPAD) {
 		m_gesture->start_gesture(p);
@@ -179,16 +182,23 @@ void DocantoWin::MainWindowHandler::pointer_update(Window::PointerInfo p) {
 		return;
 	}
 
+	m_uihandler->pointer_update(p.pos);
+
 	if (p.type == Window::POINTER_TYPE::TOUCH or p.type == Window::POINTER_TYPE::TOUCHPAD) {
 		m_gesture->update_gesture(p);
 		m_mainwindow->send_paint_request();
 	}
+
+
+	m_mainwindow->send_paint_request();
 }
 
 void DocantoWin::MainWindowHandler::pointer_up(Window::PointerInfo p) {
 	if (!m_gesture) {
 		return;
 	}
+
+	m_uihandler->pointer_up(p.pos);
 
 	if (p.type == Window::POINTER_TYPE::TOUCH or p.type == Window::POINTER_TYPE::TOUCHPAD) {
 		m_gesture->end_gesture(p);
@@ -198,10 +208,14 @@ void DocantoWin::MainWindowHandler::pointer_up(Window::PointerInfo p) {
 	m_mainwindow->send_paint_request();
 }
 
+std::shared_ptr<DocantoWin::Window> w;
 DocantoWin::MainWindowHandler::MainWindowHandler(HINSTANCE instance) {
 	m_mainwindow = std::make_shared<Window>(instance);
 	m_render = std::make_shared<Direct2DRender>(m_mainwindow);
 	m_uicaption = std::make_shared<Caption>(m_render);
+	m_uihandler = std::make_shared<UIHandler>(m_render);
+
+	m_uihandler->add(std::make_shared<TestElement>(L"test"));
 
 	m_mainwindow->set_callback_nchittest([&](Docanto::Geometry::Point<long> p) -> int {
 		return m_uicaption->hittest(p);

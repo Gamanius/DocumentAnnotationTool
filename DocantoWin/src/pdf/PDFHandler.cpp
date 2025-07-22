@@ -54,6 +54,10 @@ std::shared_ptr<Docanto::PDF> DocantoWin::PDFHandler::get_pdf() const {
 	return m_pdf;
 }
 
+std::shared_ptr<Docanto::PDFRenderer> DocantoWin::PDFHandler::get_pdfrender() const {
+	return m_pdfrender;
+}
+
 void DocantoWin::PDFHandler::render() {
 	m_pdfrender->render();
 

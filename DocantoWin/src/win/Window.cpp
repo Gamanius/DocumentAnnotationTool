@@ -480,6 +480,14 @@ LRESULT DocantoWin::Window::parse_message(UINT uMsg, WPARAM wParam, LPARAM lPara
 		}
 		return DefWindowProc(m_hwnd, uMsg, wParam, lParam);
 	}
+	case WM_GETMINMAXINFO:
+	{
+		LPMINMAXINFO lpMMI = (LPMINMAXINFO)lParam;
+		lpMMI->ptMinTrackSize.x = m_min_window_size.width;
+		lpMMI->ptMinTrackSize.y = m_min_window_size.height;
+
+		return 0;
+	}
 	case WM_TIMER:
 	{
 		if (wParam == WM_PAINT) {
@@ -507,6 +515,10 @@ LRESULT DocantoWin::Window::parse_message(UINT uMsg, WPARAM wParam, LPARAM lPara
 		}
 		ValidateRect(m_hwnd, nullptr);
 		return true;
+	}
+	case WM_ERASEBKGND:
+	{
+		return 0;
 	}
 	}
 	return DefWindowProc(m_hwnd, uMsg, wParam, lParam);
@@ -537,7 +549,6 @@ DocantoWin::Window::Window(HINSTANCE h) {
 		= WS_THICKFRAME   // required for a standard resizeable window
 		| WS_SYSMENU      // Explicitly ask for the titlebar to support snapping via Win + <- / Win + ->
 		| WS_MAXIMIZEBOX  // Add maximize button to support maximizing via mouse dragging
-		// to the top of the screen
 		| WS_MINIMIZEBOX;  // Add minimize button to support minimizing by clicking on the taskbar icon
 
 	m_hwnd = CreateWindowEx(WS_EX_APPWINDOW, wc.lpszClassName, APPLICATION_NAME,
@@ -574,6 +585,43 @@ DocantoWin::Window::Window(HINSTANCE h) {
 	}
 
 	Docanto::Logger::success("Initialized window!");
+}
+
+DocantoWin::Window::Window(HINSTANCE h, const std::wstring& name) {
+	WNDCLASS wc = {};
+	wc.style = CS_HREDRAW | CS_VREDRAW;
+	wc.lpfnWndProc = wndproc;
+	wc.hInstance = h;
+	wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+	wc.hbrBackground = CreateSolidBrush(3289650);
+	wc.lpszClassName = name.c_str();
+	if (!RegisterClass(&wc)) {
+		Docanto::Logger::error("Could not register Window");
+	}
+
+	int window_style
+		= WS_THICKFRAME   // required for a standard resizeable window
+		| WS_MAXIMIZEBOX  // Add maximize button to support maximizing via mouse dragging
+		| WS_MINIMIZEBOX;  // Add minimize button to support minimizing by clicking on the taskbar icon
+
+	m_hwnd = CreateWindowEx(WS_EX_TOOLWINDOW, wc.lpszClassName, APPLICATION_NAME,
+		window_style, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
+		0, 0, h, this);
+
+	if (!m_hwnd) {
+		Docanto::Logger::error("Window creation was not succefull");
+		return;
+	}
+
+	m_hdc = GetDC(m_hwnd);
+	if (!m_hdc) {
+		Docanto::Logger::error("Could not retrieve device m_context");
+		return;
+	}
+
+	auto val = DWMWCP_DONOTROUND;
+	auto result = DwmSetWindowAttribute(m_hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &val, sizeof(val));
+	WIN_ASSERT_OK(result, "Could not make the window rectangular");
 }
 
 DocantoWin::Window::~Window() {
@@ -660,6 +708,10 @@ bool DocantoWin::Window::is_dark_mode_on() {
 	return IsColorLight(foreground);
 }
 
+void DocantoWin::Window::set_min_dims(Docanto::Geometry::Dimension<long> dim) {
+	m_min_window_size = dim;
+}
+
 
 void DocantoWin::Window::dark_mode_callback() {
 	using namespace winrt::Windows::UI::ViewManagement;
@@ -713,8 +765,21 @@ void DocantoWin::Window::set_state(WINDOW_STATE state) {
 	ShowWindow(m_hwnd, nCmdShow);
 }
 
-void DocantoWin::Window::set_window_size(Docanto::Geometry::Rectangle<long> r) {
+void DocantoWin::Window::set_window_rec(Docanto::Geometry::Rectangle<long> r) {
 	SetWindowPos(m_hwnd, HWND_TOP, r.x, r.y, r.width, r.height, SWP_NOZORDER);
+}
+
+void DocantoWin::Window::set_window_dim(Docanto::Geometry::Dimension<long> d) {
+	RECT windowRect = { 0, 0, d.width, d.height };
+
+	AdjustWindowRectExForDpi(&windowRect, WS_OVERLAPPEDWINDOW, false, WS_EX_APPWINDOW, get_dpi());
+	auto ypadding = GetSystemMetricsForDpi(SM_CYCAPTION, get_dpi()) + 2 * GetSystemMetricsForDpi(SM_CXPADDEDBORDER, get_dpi()) /*???*/;
+	SetWindowPos(m_hwnd, HWND_TOP, 0, 0, windowRect.right - windowRect.left, windowRect.bottom - windowRect.top - ypadding, SWP_NOMOVE | SWP_NOZORDER);
+}
+
+void DocantoWin::Window::set_window_pos(Docanto::Geometry::Point<long> d) {
+
+	SetWindowPos(m_hwnd, HWND_TOP, d.x, d.y, 0, 0, SWP_NOZORDER | SWP_NOSIZE);
 }
 
 void DocantoWin::Window::get_window_messages(bool blocking) {

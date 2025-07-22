@@ -16,7 +16,6 @@ namespace DocantoWin {
 
 		static bool g_touchpadGestureInProgress;
 
-
 		Docanto::Timer m_last_paint;
 		bool m_paint_timer_active = false;
 
@@ -202,6 +201,8 @@ namespace DocantoWin {
 			std::function<void(PointerInfo)> m_callback_pointer_up;
 			std::function<void(PointerInfo)> m_callback_pointer_update;
 			std::function<void(short, bool)> m_callback_mousewheel;
+
+			Docanto::Geometry::Dimension<long> m_min_window_size = { 300, 300 };
 	public:
 
 		static LRESULT wndproc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -211,6 +212,7 @@ namespace DocantoWin {
 		static void get_window_messages(bool blocking);
 
 		Window(HINSTANCE h);
+		Window(HINSTANCE h, const std::wstring& name);
 
 		Window(Window&& other) noexcept = delete;
 		Window& operator=(Window&& other) noexcept = delete;
@@ -235,6 +237,8 @@ namespace DocantoWin {
 
 		static Docanto::Color get_accent_color();
 		static bool is_dark_mode_on();
+
+		void set_min_dims(Docanto::Geometry::Dimension<long> dim);
 
 		// TODO maybe add a callback. for now it just calls WM_PAINT upon change of the theme
 		void dark_mode_callback();
@@ -306,7 +310,9 @@ namespace DocantoWin {
 
 		void set_state(WINDOW_STATE state);
 		// Sets a new windowsize
-		void set_window_size(Docanto::Geometry::Rectangle<long> r);
+		void set_window_rec(Docanto::Geometry::Rectangle<long> r);
+		void set_window_dim(Docanto::Geometry::Dimension<long> d);
+		void set_window_pos(Docanto::Geometry::Point<long> d);
 
 		void set_callback_paint(std::function<void()> callback);
 		void set_callback_size(std::function<void(Docanto::Geometry::Dimension<long>)> callback);

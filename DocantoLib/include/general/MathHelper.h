@@ -112,6 +112,7 @@ namespace Docanto {
 			Rectangle() = default;
 			Rectangle(T x, T y, T width, T height) : x(x), y(y), width(width), height(height) {}
 			Rectangle(Point<T> p1, Point<T> p2) : x(p1.x), y(p1.y), width(p2.x - p1.x), height(p2.y - p1.y) {}
+			Rectangle(Point<T> p1, T width, T height) : x(p1.x), y(p1.y), width(width), height(height) {}
 			Rectangle(Point<T> p1, Dimension<T> p2) : x(p1.x), y(p1.y), width(p2.width), height(p2.height) {}
 
 
