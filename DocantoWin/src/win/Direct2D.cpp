@@ -13,7 +13,7 @@
 ID2D1Factory* DocantoWin::Direct2DRender::m_factory = nullptr;
 IDWriteFactory3* DocantoWin::Direct2DRender::m_writeFactory = nullptr;
 
-DocantoWin::Direct2DRender::Direct2DRender(std::shared_ptr<Window> w) : m_window(w) {
+void DocantoWin::Direct2DRender::createD2DResources() {
 	D2D1_FACTORY_OPTIONS option{};
 
 #ifdef _DEBUG
@@ -25,7 +25,7 @@ DocantoWin::Direct2DRender::Direct2DRender(std::shared_ptr<Window> w) : m_window
 	HRESULT result = S_OK;
 	if (m_factory == nullptr) {
 		result = D2D1CreateFactory(D2D1_FACTORY_TYPE_MULTI_THREADED, option, &m_factory);
-		
+
 		if (!WIN_ASSERT_OK(result, "Could not initialize Direct2D")) {
 			return;
 		}
@@ -44,10 +44,15 @@ DocantoWin::Direct2DRender::Direct2DRender(std::shared_ptr<Window> w) : m_window
 	else {
 		m_writeFactory->AddRef();
 	}
+}
+
+DocantoWin::Direct2DRender::Direct2DRender(std::shared_ptr<Window> w) : m_window(w) {
+	createD2DResources();
 
 	auto props = D2D1::HwndRenderTargetProperties(m_window->m_hwnd, DimensionToD2D1(m_window->get_window_size()));
 	props.presentOptions = D2D1_PRESENT_OPTIONS_IMMEDIATELY;
-	result = m_factory->CreateHwndRenderTarget(
+
+	auto result = m_factory->CreateHwndRenderTarget(
 		D2D1::RenderTargetProperties(),
 		props,
 		&m_renderTarget

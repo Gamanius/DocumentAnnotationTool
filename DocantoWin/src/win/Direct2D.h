@@ -28,7 +28,7 @@ namespace DocantoWin {
 		std::atomic<UINT32> m_isRenderinProgress = 0;
 		std::mutex draw_lock;
 
-
+		void createD2DResources();
 	public:
 		template <typename T>
 		struct RenderObject {
