@@ -61,6 +61,15 @@ namespace Docanto {
 
 		void init(std::wostream* buffer = nullptr);
 
+		inline void do_msg(const bool& a) {
+			if (a) {
+				*_msg_buffer << L"True";
+			}
+			else {
+				*_msg_buffer << L"False";
+			}
+		}
+
 		template<Streamable S>
 		void do_msg(const S& a) {
 			*_msg_buffer << a;

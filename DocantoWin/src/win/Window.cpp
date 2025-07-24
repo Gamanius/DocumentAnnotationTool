@@ -284,6 +284,16 @@ LRESULT DocantoWin::Window::parse_message(UINT uMsg, WPARAM wParam, LPARAM lPara
 	}
 	case WM_NCHITTEST:
 	{
+		if (m_override_default_hittest) {
+			auto xPos = GET_X_LPARAM(lParam);
+			auto yPos = GET_Y_LPARAM(lParam);
+			Docanto::Geometry::Point<long> mousepos = { xPos, yPos };
+			mousepos = mousepos - get_window_position();
+
+			auto hit = m_callback_nchittest(PxToDp(mousepos)); 
+			return hit;
+		}
+
 		LRESULT hit = DefWindowProc(m_hwnd, uMsg, wParam, lParam);
 		switch (hit)
 		{
@@ -317,6 +327,14 @@ LRESULT DocantoWin::Window::parse_message(UINT uMsg, WPARAM wParam, LPARAM lPara
 	}
 	case WM_NCLBUTTONDOWN:
 	{
+		if (m_callback_pointer_down_nchittest) {
+			auto xPos = GET_X_LPARAM(lParam);
+			auto yPos = GET_Y_LPARAM(lParam);
+			Docanto::Geometry::Point<long> mousepos = { xPos, yPos };
+			mousepos = mousepos - get_window_position();
+
+			m_callback_pointer_down_nchittest(mousepos, wParam);
+		}
 		switch (wParam) {
 		case HTMINBUTTON:
 		case HTMAXBUTTON:
@@ -480,6 +498,14 @@ LRESULT DocantoWin::Window::parse_message(UINT uMsg, WPARAM wParam, LPARAM lPara
 		}
 		return DefWindowProc(m_hwnd, uMsg, wParam, lParam);
 	}
+	case WM_MOVING:
+	{
+		if (m_callback_moving) {
+			m_callback_moving(get_window_position());
+		}
+		
+		return DefWindowProc(m_hwnd, uMsg, wParam, lParam);
+	}
 	case WM_GETMINMAXINFO:
 	{
 		LPMINMAXINFO lpMMI = (LPMINMAXINFO)lParam;
@@ -587,7 +613,7 @@ DocantoWin::Window::Window(HINSTANCE h) {
 	Docanto::Logger::success("Initialized window!");
 }
 
-DocantoWin::Window::Window(HINSTANCE h, const std::wstring& name) {
+DocantoWin::Window::Window(HINSTANCE h, const std::wstring& name, bool resizable) {
 	WNDCLASS wc = {};
 	wc.style = CS_HREDRAW | CS_VREDRAW;
 	wc.lpfnWndProc = wndproc;
@@ -600,9 +626,9 @@ DocantoWin::Window::Window(HINSTANCE h, const std::wstring& name) {
 	}
 
 	int window_style
-		= WS_THICKFRAME   // required for a standard resizeable window
-		| WS_MAXIMIZEBOX  // Add maximize button to support maximizing via mouse dragging
-		| WS_MINIMIZEBOX;  // Add minimize button to support minimizing by clicking on the taskbar icon
+		=  WS_THICKFRAME * resizable | WS_SYSMENU  // required for a standard resizeable window
+		 | WS_MAXIMIZEBOX  // Add maximize button to support maximizing via mouse dragging
+		 | WS_MINIMIZEBOX;  // Add minimize button to support minimizing by clicking on the taskbar icon
 
 	m_hwnd = CreateWindowEx(WS_EX_TOOLWINDOW, wc.lpszClassName, APPLICATION_NAME,
 		window_style, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
@@ -620,8 +646,8 @@ DocantoWin::Window::Window(HINSTANCE h, const std::wstring& name) {
 	}
 
 	auto val = DWMWCP_DONOTROUND;
-	auto result = DwmSetWindowAttribute(m_hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &val, sizeof(val));
-	WIN_ASSERT_OK(result, "Could not make the window rectangular");
+	//auto result = DwmSetWindowAttribute(m_hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &val, sizeof(val));
+	//WIN_ASSERT_OK(result, "Could not make the window rectangular");
 }
 
 DocantoWin::Window::~Window() {
@@ -642,10 +668,26 @@ void DocantoWin::Window::set_window_title(const std::wstring& s) {
 	SetWindowText(m_hwnd, s.c_str());
 }
 
+void DocantoWin::Window::set_window_style(int style) {
+	SetWindowLongPtr(m_hwnd, GWL_STYLE, style);
+	SetWindowPos(m_hwnd, nullptr, 0, 0, 0, 0, SWP_NOZORDER | SWP_NOMOVE | SWP_NOSIZE | SWP_FRAMECHANGED);
+}
+
+void DocantoWin::Window::override_default_hittest(bool a) {
+	m_override_default_hittest = a;
+}
+
 Docanto::Geometry::Dimension<long> DocantoWin::Window::get_client_size() const {
 	RECT r;
 	GetClientRect(m_hwnd, &r);
 	return Docanto::Geometry::Dimension<long>(r.right, r.bottom);
+}
+
+Docanto::Geometry::Rectangle<long> DocantoWin::Window::get_window_rect() const {
+	RECT r;
+	DwmGetWindowAttribute(m_hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, &r, sizeof(RECT));
+
+	return { r.left ,r.top, r.right - r.left, r.bottom - r.top };
 }
 
 Docanto::Geometry::Dimension<long> DocantoWin::Window::get_window_size() const {
@@ -810,6 +852,10 @@ void DocantoWin::Window::set_callback_size(std::function<void(Docanto::Geometry:
 	m_callback_size = callback;
 }
 
+void DocantoWin::Window::set_callback_moving(std::function<void(Docanto::Geometry::Point<long>)> callback) {
+	m_callback_moving = callback;
+}
+
 void DocantoWin::Window::set_callback_nchittest(std::function<int(Docanto::Geometry::Point<long>)> callback) {
 	m_callback_nchittest = callback;
 }
@@ -832,6 +878,10 @@ void DocantoWin::Window::set_callback_pointer_update(std::function<void(PointerI
 
 void DocantoWin::Window::set_callback_pointer_wheel(std::function<void(short, bool)> callback) {
 	m_callback_mousewheel = callback;
+}
+
+void DocantoWin::Window::set_callback_pointer_down_nchittest(std::function<void(Docanto::Geometry::Point<long>, int)> callback_pointer_down_nchittest) {
+	m_callback_pointer_down_nchittest = callback_pointer_down_nchittest;
 }
 
 DocantoWin::Window::VK winkey_to_vk(int windowsKey) {

@@ -194,6 +194,7 @@ namespace DocantoWin {
 	private:
 			std::function<void()> m_callback_paint;
 			std::function<void(Docanto::Geometry::Dimension<long>)> m_callback_size;
+			std::function<void(Docanto::Geometry::Point<long>)> m_callback_moving;
 			std::function<int(Docanto::Geometry::Point<long>)> m_callback_nchittest;
 			std::function<void(VK, bool)>  m_callback_key;
 
@@ -202,7 +203,11 @@ namespace DocantoWin {
 			std::function<void(PointerInfo)> m_callback_pointer_update;
 			std::function<void(short, bool)> m_callback_mousewheel;
 
+			std::function<void(Docanto::Geometry::Point<long>, int)> m_callback_pointer_down_nchittest;
+
 			Docanto::Geometry::Dimension<long> m_min_window_size = { 300, 300 };
+
+			bool m_override_default_hittest = false;
 	public:
 
 		static LRESULT wndproc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -212,7 +217,7 @@ namespace DocantoWin {
 		static void get_window_messages(bool blocking);
 
 		Window(HINSTANCE h);
-		Window(HINSTANCE h, const std::wstring& name);
+		Window(HINSTANCE h, const std::wstring& name, bool resizable = true);
 
 		Window(Window&& other) noexcept = delete;
 		Window& operator=(Window&& other) noexcept = delete;
@@ -226,9 +231,12 @@ namespace DocantoWin {
 		HWND get_hwnd() const;
 
 		void set_window_title(const std::wstring& s);
+		void set_window_style(int style);
+		void override_default_hittest(bool a = true);
 
 		// Returns the window size
 		Docanto::Geometry::Dimension<long> get_client_size() const;
+		Docanto::Geometry::Rectangle<long> get_window_rect() const;
 		Docanto::Geometry::Dimension<long> get_window_size() const;
 		Docanto::Geometry::Point<long> get_window_position() const;
 		Docanto::Geometry::Point<long> get_mouse_pos()       const;
@@ -316,6 +324,7 @@ namespace DocantoWin {
 
 		void set_callback_paint(std::function<void()> callback);
 		void set_callback_size(std::function<void(Docanto::Geometry::Dimension<long>)> callback);
+		void set_callback_moving(std::function<void(Docanto::Geometry::Point<long>)> callback);
 		void set_callback_nchittest(std::function<int(Docanto::Geometry::Point<long>)> callback);
 		void set_callback_key(std::function<void(VK, bool)> callback);
 
@@ -323,6 +332,8 @@ namespace DocantoWin {
 		void set_callback_pointer_up(std::function<void(PointerInfo)> m_callback_pointer_up);
 		void set_callback_pointer_update(std::function<void(PointerInfo)> m_callback_pointer_update);
 		void set_callback_pointer_wheel(std::function<void(short, bool)> m_callback_mousewheel);
+
+		void set_callback_pointer_down_nchittest(std::function<void(Docanto::Geometry::Point<long>, int)> callback_pointer_down_nchittest);
 
 		friend class Direct2DRender;
 	};
