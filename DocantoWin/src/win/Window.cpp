@@ -333,7 +333,7 @@ LRESULT DocantoWin::Window::parse_message(UINT uMsg, WPARAM wParam, LPARAM lPara
 			Docanto::Geometry::Point<long> mousepos = { xPos, yPos };
 			mousepos = mousepos - get_window_position();
 
-			m_callback_pointer_down_nchittest(mousepos, wParam);
+			m_callback_pointer_down_nchittest(PxToDp(mousepos), wParam);
 		}
 		switch (wParam) {
 		case HTMINBUTTON:
@@ -545,6 +545,13 @@ LRESULT DocantoWin::Window::parse_message(UINT uMsg, WPARAM wParam, LPARAM lPara
 	case WM_ERASEBKGND:
 	{
 		return 0;
+	}
+	case WM_DPICHANGED:
+	{
+		if (m_callback_dpi_changed) {
+			m_callback_dpi_changed(get_dpi());
+		}
+		return DefWindowProc(m_hwnd, uMsg, wParam, lParam);
 	}
 	}
 	return DefWindowProc(m_hwnd, uMsg, wParam, lParam);
@@ -808,19 +815,25 @@ void DocantoWin::Window::set_state(WINDOW_STATE state) {
 }
 
 void DocantoWin::Window::set_window_rec(Docanto::Geometry::Rectangle<long> r) {
-	SetWindowPos(m_hwnd, HWND_TOP, r.x, r.y, r.width, r.height, SWP_NOZORDER);
-}
-
-void DocantoWin::Window::set_window_dim(Docanto::Geometry::Dimension<long> d) {
-	RECT windowRect = { 0, 0, d.width, d.height };
+	RECT windowRect = { 0, 0, DpToPx(r.width), DpToPx(r.height) };
 
 	AdjustWindowRectExForDpi(&windowRect, WS_OVERLAPPEDWINDOW, false, WS_EX_APPWINDOW, get_dpi());
 	auto ypadding = GetSystemMetricsForDpi(SM_CYCAPTION, get_dpi()) + 2 * GetSystemMetricsForDpi(SM_CXPADDEDBORDER, get_dpi()) /*???*/;
+
+
+	SetWindowPos(m_hwnd, HWND_TOP, r.x, r.y, windowRect.right - windowRect.left, windowRect.bottom - windowRect.top - ypadding, SWP_NOZORDER);
+}
+
+void DocantoWin::Window::set_window_dim(Docanto::Geometry::Dimension<long> d) {
+	RECT windowRect = { 0, 0, DpToPx(d.width), DpToPx(d.height)};
+
+	AdjustWindowRectExForDpi(&windowRect, WS_OVERLAPPEDWINDOW, false, WS_EX_APPWINDOW, get_dpi());
+	auto ypadding = GetSystemMetricsForDpi(SM_CYCAPTION, get_dpi()) + 2 * GetSystemMetricsForDpi(SM_CXPADDEDBORDER, get_dpi()) /*???*/;
+	
 	SetWindowPos(m_hwnd, HWND_TOP, 0, 0, windowRect.right - windowRect.left, windowRect.bottom - windowRect.top - ypadding, SWP_NOMOVE | SWP_NOZORDER);
 }
 
 void DocantoWin::Window::set_window_pos(Docanto::Geometry::Point<long> d) {
-
 	SetWindowPos(m_hwnd, HWND_TOP, d.x, d.y, 0, 0, SWP_NOZORDER | SWP_NOSIZE);
 }
 
@@ -882,6 +895,10 @@ void DocantoWin::Window::set_callback_pointer_wheel(std::function<void(short, bo
 
 void DocantoWin::Window::set_callback_pointer_down_nchittest(std::function<void(Docanto::Geometry::Point<long>, int)> callback_pointer_down_nchittest) {
 	m_callback_pointer_down_nchittest = callback_pointer_down_nchittest;
+}
+
+void DocantoWin::Window::set_callback_dpi_changed(std::function<void(unsigned int)> callback_dpi_changed) {
+	m_callback_dpi_changed = callback_dpi_changed;
 }
 
 DocantoWin::Window::VK winkey_to_vk(int windowsKey) {

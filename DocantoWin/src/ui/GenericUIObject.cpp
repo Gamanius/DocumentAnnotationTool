@@ -26,6 +26,10 @@ DocantoWin::GenericUIObject::GenericUIObject(const std::wstring& UIName) {
 		m_caption_delta_mouse = p;
 	});
 
+	m_window->set_callback_dpi_changed([&](unsigned int dpi) {
+		//m_window->set_window_dim(get_bounds());
+	});
+
 	m_window->set_callback_nchittest([&](Docanto::Geometry::Point<long> p) -> int {
 		auto resize = resize_hittest(p);
 		if (resize == HTNOWHERE) {
@@ -78,7 +82,6 @@ bool DocantoWin::GenericUIObject::is_resizable() const {
 
 bool DocantoWin::GenericUIObject::is_inbounds(Docanto::Geometry::Dimension<float> r) {
 	auto other = get_bounds();
-	
 	return get_rec().intersects({{other.width, other.height},
 		Docanto::Geometry::Dimension<float>({r.width - other.width * 2, r.height - other.height * 2}) });
 }
@@ -89,7 +92,7 @@ Docanto::Geometry::Rectangle<float> DocantoWin::GenericUIObject::get_rec() {
 
 void DocantoWin::GenericUIObject::set_pos(Docanto::Geometry::Point<float> where) {
 	if (m_is_floating) {
-		m_window->set_window_pos(m_parent_window->get_window_position() + where);
+		m_window->set_window_rec({ m_parent_window->get_window_position() + m_parent_window->DpToPx(where), get_bounds() });
 	}
 	m_position = where;
 }
@@ -146,10 +149,12 @@ void DocantoWin::GenericUIObject::make_float(bool f) {
 	}
 	m_is_floating = f;
 	if (f) {
+		m_window->set_state(Window::NORMAL);
+		// first put the window mouse so the dpi can be identified
+		set_pos(m_parent_window->get_mouse_pos());
+		set_pos(m_parent_window->get_mouse_pos() - m_caption_delta_mouse);
 		m_window->set_min_dims(get_min_dims());
 		m_window->set_window_dim(get_bounds());
-		set_pos(m_window->get_mouse_pos() - m_caption_delta_mouse);
-		m_window->set_state(Window::NORMAL);
 	}
 	else {
 		m_window->set_state(Window::HIDDEN);

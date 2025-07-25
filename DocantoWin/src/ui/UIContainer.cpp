@@ -1,8 +1,9 @@
 #include "UIContainer.h"
 
 void DocantoWin::UIContainer::draw() {
+	auto window = m_render->get_attached_window();
 	for (auto& ref : m_all_uiobjects) {
-		if (ref->is_inbounds(m_render->get_attached_window()->get_client_size())) {
+		if (ref->is_inbounds(window->PxToDp(window->get_client_size()))) {
 			ref->draw(m_render);
 		}
 		else {
@@ -29,11 +30,12 @@ void DocantoWin::UIContainer::pointer_down(Docanto::Geometry::Point<float> where
 }
 
 void DocantoWin::UIContainer::pointer_update(Docanto::Geometry::Point<float> where) {
+	auto window = m_render->get_attached_window();
 	if (m_hit_uiobject.first == nullptr) {
 		return;
 	}
 	m_hit_uiobject.first->sys_pointer_update(where, m_hit_uiobject.second);
-	if (!m_hit_uiobject.first->is_inbounds(m_render->get_attached_window()->get_client_size())) {
+	if (!m_hit_uiobject.first->is_inbounds(window->PxToDp(window->get_client_size()))) {
 		m_hit_uiobject.first->make_float(true);
 	}
 	else {

@@ -204,6 +204,7 @@ namespace DocantoWin {
 			std::function<void(short, bool)> m_callback_mousewheel;
 
 			std::function<void(Docanto::Geometry::Point<long>, int)> m_callback_pointer_down_nchittest;
+			std::function<void(unsigned int)> m_callback_dpi_changed;
 
 			Docanto::Geometry::Dimension<long> m_min_window_size = { 300, 300 };
 
@@ -267,7 +268,7 @@ namespace DocantoWin {
 		/// <param name="dip">the dip</param>
 		/// <returns>Pixels in screen coordinates</returns>
 		template <typename T>
-		T DptoPx(T dip) const {
+		T DpToPx(T dip) const {
 			return dip * (get_dpi() / 96.0f);
 		}
 
@@ -334,6 +335,7 @@ namespace DocantoWin {
 		void set_callback_pointer_wheel(std::function<void(short, bool)> m_callback_mousewheel);
 
 		void set_callback_pointer_down_nchittest(std::function<void(Docanto::Geometry::Point<long>, int)> callback_pointer_down_nchittest);
+		void set_callback_dpi_changed(std::function<void(unsigned int)> callback_dpi_changed);
 
 		friend class Direct2DRender;
 	};
