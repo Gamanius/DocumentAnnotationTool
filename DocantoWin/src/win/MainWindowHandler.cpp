@@ -71,14 +71,13 @@ void DocantoWin::MainWindowHandler::key(Window::VK key, bool pressed) {
 		Docanto::Logger::log("Got path ", path);
 		if (path.has_value()) {
 			Docanto::Timer t;
-			m_pdfhandler = std::make_shared<PDFHandler>(path.value(), m_render);
+			m_pdfhandler->add_pdf(path.value());
 			Docanto::Logger::log("Loaded PDF in ", t);
 		}
 		else {
 			exit(0);
 		}
 
-		m_pdfhandler->render();
 		m_gesture = std::make_shared<GestureHandler>(m_render, m_pdfhandler);
 		break;
 	}
@@ -92,56 +91,48 @@ void DocantoWin::MainWindowHandler::key(Window::VK key, bool pressed) {
 	case E:
 	{
 		m_render->add_rotation_matrix(10, m_mainwindow->get_mouse_pos());
-		m_pdfhandler->render();
 		m_mainwindow->send_paint_request();
 		break;
 	}
 	case Q:
 	{
 		m_render->add_rotation_matrix(-10, m_mainwindow->get_mouse_pos());
-		m_pdfhandler->render();
 		m_mainwindow->send_paint_request();
 		break;
 	}
 	case DOWNARROW:
 	{
 		m_render->add_translation_matrix({ 0, -100 });
-		m_pdfhandler->render();
 		m_mainwindow->send_paint_request();
 		break;
 	}
 	case UPARROW:
 	{
 		m_render->add_translation_matrix({ 0, 100 });
-		m_pdfhandler->render();
 		m_mainwindow->send_paint_request();
 		break;
 	}
 	case LEFTARROW:
 	{
 		m_render->add_translation_matrix({ 100, 0 });
-		m_pdfhandler->render();
 		m_mainwindow->send_paint_request();
 		break;
 	}
 	case RIGHTARROW:
 	{
 		m_render->add_translation_matrix({ -100, 0 });
-		m_pdfhandler->render();
 		m_mainwindow->send_paint_request();
 		break;
 	}
 	case OEM_PLUS:
 	{
 		m_render->add_scale_matrix(1.05, m_mainwindow->get_mouse_pos());
-		m_pdfhandler->render();
 		m_mainwindow->send_paint_request();
 		break;
 	}
 	case OEM_MINUS:
 	{
 		m_render->add_scale_matrix(0.95, m_mainwindow->get_mouse_pos());
-		m_pdfhandler->render();
 		m_mainwindow->send_paint_request();
 		break;
 	}
@@ -154,7 +145,6 @@ void DocantoWin::MainWindowHandler::key(Window::VK key, bool pressed) {
 	}
 	case SPACE:
 	{
-		m_pdfhandler->render();
 		m_mainwindow->send_paint_request();
 	}
 
@@ -204,7 +194,6 @@ void DocantoWin::MainWindowHandler::pointer_up(Window::PointerInfo p) {
 		m_gesture->end_gesture(p);
 	}
 
-	m_pdfhandler->render();
 	m_mainwindow->send_paint_request();
 }
 
@@ -256,7 +245,6 @@ DocantoWin::MainWindowHandler::MainWindowHandler(HINSTANCE instance) {
 	}
 
 	m_pdfhandler->request();
-	m_pdfhandler->render();
 	m_gesture = std::make_shared<GestureHandler>(m_render, m_pdfhandler);
 
 }

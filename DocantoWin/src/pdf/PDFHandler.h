@@ -7,8 +7,11 @@
 
 namespace DocantoWin {
 	class PDFHandler {
-		std::shared_ptr<Docanto::PDF> m_pdf;
-		std::shared_ptr<Docanto::PDFRenderer> m_pdfrender;
+		struct PDFWrapper {
+			std::shared_ptr<Docanto::PDF> pdf;
+			std::shared_ptr<Docanto::PDFRenderer> render;
+		};
+		std::vector<PDFWrapper> m_pdfobj;
 
 		struct PDFHandlerImageProcessor : public Docanto::IPDFRenderImageProcessor {
 			Docanto::ThreadSafeWrapper<std::map<size_t, Direct2DRender::BitmapObject>> m_all_bitmaps;
@@ -25,17 +28,16 @@ namespace DocantoWin {
 
 		bool m_debug_draw = false;
 
+		void draw(std::shared_ptr<Docanto::PDFRenderer> r);
 	public:
 		PDFHandler(const std::filesystem::path& p, std::shared_ptr<Direct2DRender> render);
 
-		void render();
+		void add_pdf(const std::filesystem::path& p);
+
 		void request();
 		void draw();
 		void set_debug_draw(bool b = true);
 		void toggle_debug_draw();
-
-		std::shared_ptr<Docanto::PDF> get_pdf() const;
-		std::shared_ptr<Docanto::PDFRenderer> get_pdfrender() const;
 	};
 }
 

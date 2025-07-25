@@ -87,6 +87,8 @@ public:
 		std::thread::id render_id;
 	};
 
+	std::atomic_size_t m_last_id = 0;
+
 private:
 	std::vector<std::thread> m_render_worker;
 
@@ -287,7 +289,6 @@ struct Docanto::PDFRenderer::impl {
 	ThreadSafeVector<std::shared_ptr<DisplayListWrapper>> m_page_annotat;
 	std::vector<Geometry::Point<float>> m_page_pos;
 
-	std::atomic_size_t m_last_id = 0;
 	ThreadSafeVector<PDFRenderInfo> m_previewbitmaps;
 	ThreadSafeVector<PDFRenderInfo> m_highDefBitmaps;
 
@@ -501,7 +502,7 @@ void Docanto::PDFRenderer::create_preview(float dpi) {
 	float y = 0;
 	for (size_t i = 0; i < amount_of_pages; i++) {
 		auto dims = pdf_obj->get_page_dimension(i);
-		auto id = pimpl->m_last_id++;
+		auto id = thread_manager->m_last_id.fetch_add(1);
 		m_processor->processImage(id, get_image(i, dpi));
 
 		auto prevs = pimpl->m_previewbitmaps.get_write();
@@ -665,7 +666,7 @@ void Docanto::PDFRenderer::process_chunks(const std::vector<Geometry::Rectangle<
 	for (size_t j = 0; j < chunks.size(); j++) {
 		auto img = get_image_from_list(cont, chunks.at(j), dpi);
 
-		auto id = pimpl->m_last_id++;
+		auto id = thread_manager->m_last_id.fetch_add(1);
 		m_processor->processImage(id, img);
 
 		auto prevs = pimpl->m_highDefBitmaps.get_write();
@@ -748,7 +749,7 @@ void Docanto::PDFRenderer::request(Geometry::Rectangle<float> view, float dpi) {
 			job->status = RenderThreadManager::RenderStatus::WAITING;
 
 			job->info.dpi = dpi;
-			job->info.id = pimpl->m_last_id.fetch_add(1);
+			job->info.id = thread_manager->m_last_id.fetch_add(1);
 			job->info.recs = { positions.at(i) + chunk_rec.upperleft(), chunk_rec.dims()};
 
 			job->job = RenderThreadManager::JobType::RENDER_BITMAP;

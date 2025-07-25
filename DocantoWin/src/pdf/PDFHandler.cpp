@@ -4,28 +4,44 @@ using namespace Docanto;
 
 DocantoWin::PDFHandler::PDFHandler(const std::filesystem::path& p, std::shared_ptr<Direct2DRender> render) : m_render(render) {
 	m_pdfimageprocessor = std::make_shared<PDFHandlerImageProcessor>(render);
-	m_pdf = std::make_shared<PDF>(p);
-	m_pdfrender = std::make_shared<PDFRenderer>(m_pdf, m_pdfimageprocessor);
+	auto pdf = std::make_shared<PDF>(p);
+	auto r = std::make_shared<PDFRenderer>(pdf, m_pdfimageprocessor);
+	m_pdfobj.push_back({ pdf, r });
 
-	m_pdfrender->set_rendercallback([&](size_t) {
+	m_pdfobj.back().render->set_rendercallback([&](size_t i) {
+		PostMessage(m_render->get_attached_window()->get_hwnd(), WM_PAINT, 0, 0);
+		});
+}
+
+void DocantoWin::PDFHandler::add_pdf(const std::filesystem::path& p) {
+	auto pdf = std::make_shared<PDF>(p);
+	auto r = std::make_shared<PDFRenderer>(pdf, m_pdfimageprocessor);
+	m_pdfobj.push_back({ pdf, r });
+	m_pdfobj.back().render->set_rendercallback([&](size_t i) {
 		PostMessage(m_render->get_attached_window()->get_hwnd(), WM_PAINT, 0, 0);
 		});
 }
 
 void DocantoWin::PDFHandler::draw() {
-	auto recs = m_pdfrender->get_clipped_page_recs();
+	for (auto& obj : m_pdfobj) {
+		draw(obj.render);
+	}
+}
+
+void DocantoWin::PDFHandler::draw(std::shared_ptr<Docanto::PDFRenderer> r) {
+	auto recs = r->get_clipped_page_recs();
 	for (const auto& r : recs) {
 		m_render->draw_rect_filled(r, {255, 255, 255});
 	}
 
-	auto& preview_info = m_pdfrender->get_preview();
+	auto& preview_info = r->get_preview();
 	auto bitmaps = m_pdfimageprocessor->m_all_bitmaps.get();
 
 	for (const auto& info : preview_info) {
 		m_render->draw_bitmap(info.recs, bitmaps->at(info.id));
 	}
 
-	auto list = m_pdfrender->draw();
+	auto list = r->draw();
 	auto& highdef = *list;
 
 	for (const auto& info : highdef) {
@@ -39,7 +55,7 @@ void DocantoWin::PDFHandler::draw() {
 		m_render->draw_bitmap(info.recs, bitmaps->at(info.id));
 	}
 
-	if (m_debug_draw) m_pdfrender->debug_draw(m_render);
+	if (m_debug_draw) r->debug_draw(m_render);
 }
 
 void DocantoWin::PDFHandler::set_debug_draw(bool b) {
@@ -50,26 +66,15 @@ void DocantoWin::PDFHandler::toggle_debug_draw() {
 	set_debug_draw(!m_debug_draw);
 }
 
-std::shared_ptr<Docanto::PDF> DocantoWin::PDFHandler::get_pdf() const {
-	return m_pdf;
-}
-
-std::shared_ptr<Docanto::PDFRenderer> DocantoWin::PDFHandler::get_pdfrender() const {
-	return m_pdfrender;
-}
-
-void DocantoWin::PDFHandler::render() {
-	m_pdfrender->render();
-
-}
-
 void DocantoWin::PDFHandler::request() {
 	auto scale = WINDOWS_DEFAULT_DPI / m_render->get_dpi();
 	auto dims = m_render->get_attached_window()->get_client_size();
 	auto local_rec =  m_render->inv_transform({ 0, 0, (float)dims.width * scale, (float)dims.height * scale});
 
 
-	m_pdfrender->request(local_rec, m_render->get_transform_scale() * m_render->get_dpi());
+	for (auto& obj : m_pdfobj) {
+		obj.render->request(local_rec, m_render->get_transform_scale() * m_render->get_dpi());
+	}
 }
 
 DocantoWin::PDFHandler::PDFHandlerImageProcessor::PDFHandlerImageProcessor(std::shared_ptr<Direct2DRender> render) {
