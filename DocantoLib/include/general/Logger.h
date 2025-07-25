@@ -1,6 +1,7 @@
 #include "Common.h"
 
 #include <sstream>
+#include <iostream>
 
 #ifndef _LOGGER_H_
 #define _LOGGER_H_
@@ -56,7 +57,7 @@ namespace Docanto {
 		};
 
 		inline std::shared_ptr<std::wostream> _internal_buffer;
-		inline std::wostream* _msg_buffer;
+		inline std::wostream* _msg_buffer = &std::wcout;
 		inline std::mutex     _msg_mutex;
 
 		void init(std::wostream* buffer = nullptr);

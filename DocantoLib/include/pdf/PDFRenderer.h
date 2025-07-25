@@ -26,6 +26,10 @@ namespace Docanto {
 
 		std::shared_ptr<PDF> pdf_obj;
 
+		// The id that identifies this class (and the pdf)
+		size_t id = 0;
+		static size_t last_id;
+
 		std::shared_ptr<IPDFRenderImageProcessor> m_processor;
 
 		// this function gets called when a bitmaps was processed
@@ -51,7 +55,7 @@ namespace Docanto {
 		std::pair<float, float> get_chunk_dpi_bound();
 
 		void async_render(); 
-
+		void receive_image(PDFRenderInfo info, Image&& i);
 	public:
 		PDFRenderer(std::shared_ptr<PDF> pdf_obj, std::shared_ptr<IPDFRenderImageProcessor> processor);
 		~PDFRenderer();
@@ -71,6 +75,9 @@ namespace Docanto {
 		void update();
 	private:
 		struct impl;
+		class RenderThreadManager;
+		static std::unique_ptr<RenderThreadManager> thread_manager;
+		static size_t tread_manager_count;
 
 		std::unique_ptr<impl> pimpl;
 	};
