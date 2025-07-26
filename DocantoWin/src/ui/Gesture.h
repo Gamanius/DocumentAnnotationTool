@@ -5,6 +5,7 @@
 #include "pdf/PDFHandler.h"
 
 #include "helper/AppVariables.h"
+#include "helper/TabHandler.h"
 
 #include <array>
 
@@ -20,7 +21,7 @@ namespace DocantoWin {
 	class GestureHandler {
 		std::shared_ptr<Direct2DRender> m_render;
 		// used for bounds
-		std::shared_ptr<PDFHandler> m_pdfhandler;
+		std::shared_ptr<TabHandler> m_tabcontext;
 
 		struct GestureFinger {
 			UINT id = 0;
@@ -50,7 +51,7 @@ namespace DocantoWin {
 		void process_two_finger(GestureFinger& finger1, GestureFinger& finger2);
 		void update_local_matrices();
 	public:
-		GestureHandler(std::shared_ptr<Direct2DRender> render, std::shared_ptr<PDFHandler> pdfhandler);
+		GestureHandler(std::shared_ptr<Direct2DRender> render, std::shared_ptr<TabHandler> pdfhandler);
 
 		void start_gesture(const Window::PointerInfo& p);
 		void update_gesture(const Window::PointerInfo& p);

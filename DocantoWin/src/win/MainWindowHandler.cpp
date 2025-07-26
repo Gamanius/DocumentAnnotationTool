@@ -27,13 +27,13 @@ static std::optional<std::wstring> open_file_dialog(const wchar_t* filter, HWND 
 }
 
 void DocantoWin::MainWindowHandler::paint() {
-	m_pdfhandler->request();
+	m_tabs->get_active_tab()->pdfhandler->request();
 
 	m_ctx->render->begin_draw();
 	m_ctx->render->clear();
 
 	m_ctx->render->set_current_transform_active();
-	m_pdfhandler->draw();
+	m_tabs->get_active_tab()->pdfhandler->draw();
 
 	m_ctx->render->set_identity_transform_active();
 	m_ctx->uihandler->draw();
@@ -61,7 +61,7 @@ void DocantoWin::MainWindowHandler::key(Window::VK key, bool pressed) {
 	}
 	case F10:
 	{
-		m_pdfhandler->toggle_debug_draw();
+		m_tabs->get_active_tab()->pdfhandler->toggle_debug_draw();
 		m_ctx->window->send_paint_request();
 		break;
 	}
@@ -71,14 +71,40 @@ void DocantoWin::MainWindowHandler::key(Window::VK key, bool pressed) {
 		Docanto::Logger::log("Got path ", path);
 		if (path.has_value()) {
 			Docanto::Timer t;
-			m_pdfhandler->add_pdf(path.value());
+			m_tabs->get_active_tab()->pdfhandler->add_pdf(path.value());
 			Docanto::Logger::log("Loaded PDF in ", t);
 		}
-		else {
-			exit(0);
-		}
+		break;
+	}
+	case P:
+	{
+		auto path = open_file_dialog(L"PDF\0 * .pdf\0\0", m_ctx->window->get_hwnd());
+		Docanto::Logger::log("Got path ", path);
+		if (path.has_value()) {
+			Docanto::Timer t;
+			auto pdf = std::make_shared<PDFHandler>(path.value(), m_ctx->render);
 
-		m_gesture = std::make_shared<GestureHandler>(m_ctx->render, m_pdfhandler);
+			m_tabs->add(std::make_shared<TabContext>(pdf));
+			Docanto::Logger::log("Loaded PDF in ", t);
+		}
+		break;
+	}
+	case KEY_1:
+	{
+		m_tabs->set_active_tab(0);
+		m_ctx->window->send_paint_request();
+		break;
+	}
+	case KEY_2:
+	{
+		m_tabs->set_active_tab(1);
+		m_ctx->window->send_paint_request();
+		break;
+	}
+	case KEY_3:
+	{
+		m_tabs->set_active_tab(2);
+		m_ctx->window->send_paint_request();
 		break;
 	}
 	case R: 
@@ -207,6 +233,8 @@ DocantoWin::MainWindowHandler::MainWindowHandler(HINSTANCE instance) {
 
 	m_ctx->uihandler->add(std::make_shared<TestElement>(L"test"));
 
+	m_tabs = std::make_shared<TabHandler>();
+
 	m_ctx->window->set_callback_nchittest([&](Docanto::Geometry::Point<long> p) -> int {
 		return m_ctx->caption->hittest(p);
 	});
@@ -239,15 +267,17 @@ DocantoWin::MainWindowHandler::MainWindowHandler(HINSTANCE instance) {
 	Docanto::Logger::log("Got path ", path);
 	if (path.has_value()) {
 		Docanto::Timer t;
-		m_pdfhandler = std::make_shared<PDFHandler>(path.value(), m_ctx->render);
+		auto pdf = std::make_shared<PDFHandler>(path.value(), m_ctx->render);
+		
+		m_tabs->add(std::make_shared<TabContext>(pdf));
 		Docanto::Logger::log("Loaded PDF in ", t);
 	}
 	else {
 		exit(0);
 	}
 
-	m_pdfhandler->request();
-	m_gesture = std::make_shared<GestureHandler>(m_ctx->render, m_pdfhandler);
+	m_tabs->get_active_tab()->pdfhandler->request();
+	m_gesture = std::make_shared<GestureHandler>(m_ctx->render, m_tabs);
 
 }
 

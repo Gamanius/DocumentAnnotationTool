@@ -2,6 +2,7 @@
 #define _DOCANTOWIN_MAINWINDOWHANDLER_H_
 
 #include "helper/Context.h"
+#include "helper/TabHandler.h"
 
 #include "ui/Gesture.h"
 #include "ui/UIHandler.h"
@@ -14,7 +15,7 @@ namespace DocantoWin {
 
 		std::shared_ptr<GestureHandler> m_gesture;
 
-		std::shared_ptr<PDFHandler> m_pdfhandler;
+		std::shared_ptr<TabHandler> m_tabs;
 
 		void paint();
 		void size(Docanto::Geometry::Dimension<long> d);

@@ -4,9 +4,9 @@
 #undef max
 #undef min
 
-DocantoWin::GestureHandler::GestureHandler(std::shared_ptr<Direct2DRender> render, std::shared_ptr<PDFHandler> pdfhandler) {
+DocantoWin::GestureHandler::GestureHandler(std::shared_ptr<Direct2DRender> render, std::shared_ptr<TabHandler> pdfhandler) {
 	m_render = render;
-	m_pdfhandler = pdfhandler;
+	m_tabcontext = pdfhandler;
 }
 
 
