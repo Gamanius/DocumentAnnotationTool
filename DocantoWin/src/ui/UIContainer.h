@@ -7,15 +7,17 @@ namespace DocantoWin {
 		std::vector<std::shared_ptr<GenericUIObject>> m_all_uiobjects;
 		std::pair<std::shared_ptr<GenericUIObject>, int> m_hit_uiobject;
 
-		std::shared_ptr<Direct2DRender> m_render;
+		std::weak_ptr<Context> ctx;
 
 	public:
-		UIContainer(std::shared_ptr<Direct2DRender> render);
+		UIContainer(std::weak_ptr<Context> c);
 
 		void draw();
 		void pointer_down(Docanto::Geometry::Point<float> where);
 		void pointer_update(Docanto::Geometry::Point<float> where);
 		void pointer_up(Docanto::Geometry::Point<float> where);
+
+		void resize(Docanto::Geometry::Dimension<long> new_dim);
 
 		void add(std::shared_ptr<GenericUIObject> obj);
 	};

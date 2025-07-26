@@ -3,14 +3,13 @@
 #ifndef _DOCANTOWIN_UIHANDLER_
 #define _DOCANTOWIN_UIHANDLER_
 
-
-#include "win/Direct2D.h"
+#include "helper/Context.h"
 #include "UIContainer.h"
 
 namespace DocantoWin {
 	class UIHandler : public UIContainer {
 	public:
-		UIHandler(std::shared_ptr<Direct2DRender> render);
+		UIHandler(std::weak_ptr<Context> render);
 	};
 }
 

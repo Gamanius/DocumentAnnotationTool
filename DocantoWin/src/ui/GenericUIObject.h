@@ -3,8 +3,7 @@
 #ifndef _DOCANTOWIN_GENERICUIOBJECT_
 #define _DOCANTOWIN_GENERICUIOBJECT_
 
-#include "win/Direct2D.h"
-
+#include "helper/Context.h"
 
 namespace DocantoWin {
 	class GenericUIObject {
@@ -17,14 +16,14 @@ namespace DocantoWin {
 		std::shared_ptr<Window> m_window;
 		std::shared_ptr<Direct2DRender> m_localrender;
 
-		std::shared_ptr<Window> m_parent_window = nullptr;
+		std::weak_ptr<DocantoWin::Context> ctx;
 		bool m_is_floating = false;
 
 		int resize_hittest(Docanto::Geometry::Point<long> p);
 	public:
 		GenericUIObject(const std::wstring& UIName);
 
-		void set_parent_window(std::shared_ptr<Window> main_window);
+		void set_context(std::weak_ptr<Context> c);
 
 		virtual Docanto::Geometry::Dimension<float> get_bounds() = 0;
 		virtual Docanto::Geometry::Dimension<long> get_min_dims() = 0;
@@ -42,6 +41,7 @@ namespace DocantoWin {
 		virtual void draw(std::shared_ptr<Direct2DRender> render = nullptr) = 0;
 
 		bool is_inbounds(Docanto::Geometry::Dimension<float> r);
+		bool is_inbounds();
 		Docanto::Geometry::Rectangle<float> get_rec();
 
 		virtual void set_pos(Docanto::Geometry::Point<float> where);

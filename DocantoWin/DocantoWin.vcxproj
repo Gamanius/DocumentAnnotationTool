@@ -156,6 +156,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="src\helper\AppVariables.h" />
+    <ClInclude Include="src\helper\Context.h" />
     <ClInclude Include="src\helper\Geometry.h" />
     <ClInclude Include="src\include.h" />
     <ClInclude Include="src\pdf\PDFHandler.h" />
