@@ -81,9 +81,8 @@ bool DocantoWin::GenericUIObject::is_resizable() const {
 
 
 bool DocantoWin::GenericUIObject::is_inbounds(Docanto::Geometry::Dimension<float> r) {
-	auto other = get_bounds();
-	return get_rec().intersects({{other.width, other.height},
-		Docanto::Geometry::Dimension<float>({r.width - other.width * 2, r.height - other.height * 2}) });
+	auto obj = get_rec();
+	return !(obj.x < 0 or obj.y < 0 or obj.y + obj.height > r.height or obj.x + obj.width > r.width);
 }
 
 Docanto::Geometry::Rectangle<float> DocantoWin::GenericUIObject::get_rec() {
@@ -120,6 +119,9 @@ bool DocantoWin::GenericUIObject::sys_pointer_down(Docanto::Geometry::Point<floa
 
 bool DocantoWin::GenericUIObject::sys_pointer_update(Docanto::Geometry::Point<float> where, int hit) {
 	m_local_mouse = where - get_pos();
+	auto window_rec = m_parent_window->PxToDp(Docanto::Geometry::Dimension<float>(m_parent_window->get_client_size()));
+
+	make_float(!is_inbounds(window_rec));
 
 	if (hit != HTCAPTION) {
 		pointer_update(where, hit);

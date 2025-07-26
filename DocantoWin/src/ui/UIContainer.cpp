@@ -2,8 +2,9 @@
 
 void DocantoWin::UIContainer::draw() {
 	auto window = m_render->get_attached_window();
+	auto window_rec = window->PxToDp(Docanto::Geometry::Dimension<float>(window->get_client_size()));
 	for (auto& ref : m_all_uiobjects) {
-		if (ref->is_inbounds(window->PxToDp(window->get_client_size()))) {
+		if (ref->is_inbounds(window_rec)) {
 			ref->draw(m_render);
 		}
 		else {
@@ -35,13 +36,6 @@ void DocantoWin::UIContainer::pointer_update(Docanto::Geometry::Point<float> whe
 		return;
 	}
 	m_hit_uiobject.first->sys_pointer_update(where, m_hit_uiobject.second);
-	if (!m_hit_uiobject.first->is_inbounds(window->PxToDp(window->get_client_size()))) {
-		m_hit_uiobject.first->make_float(true);
-	}
-	else {
-		m_hit_uiobject.first->make_float(false);
-
-	}
 }
 
 void DocantoWin::UIContainer::pointer_up(Docanto::Geometry::Point<float> where) {

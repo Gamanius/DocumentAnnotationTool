@@ -32,9 +32,9 @@ namespace DocantoWin::AppVariables {
 
 		//              Index           Light theme     Dark theme
 		inline std::map<TYPE, std::pair<Docanto::Color, Docanto::Color>> ThemeColors = {
-			{TYPE::BACKGROUND_COLOR, {{247, 255, 244}, {32 , 32 , 32 }}},
+			{TYPE::BACKGROUND_COLOR, {{212, 212, 215}, {32 , 32 , 32 }}},
 			{TYPE::TEXT_COLOR,       {{18 , 18 , 18 }, {255, 249, 241}}},
-			{TYPE::PRIMARY_COLOR,    {{47 , 178, 58 }, {57 , 138, 219}}},
+			{TYPE::PRIMARY_COLOR,    {{235, 235, 239}, {57 , 138, 219}}},
 			{TYPE::SECONDARY_COLOR,  {{59 , 196, 132}, {29 , 89 , 143}}},
 			{TYPE::ACCENT_COLOR,     {{255, 211, 51 }, {200, 0  , 255}}}
 		};
