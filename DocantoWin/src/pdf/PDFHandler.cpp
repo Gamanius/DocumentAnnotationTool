@@ -66,6 +66,10 @@ void DocantoWin::PDFHandler::toggle_debug_draw() {
 	set_debug_draw(!m_debug_draw);
 }
 
+size_t DocantoWin::PDFHandler::get_amount_of_pdfs() const {
+	return m_pdfobj.size();
+}
+
 void DocantoWin::PDFHandler::request() {
 	auto scale = WINDOWS_DEFAULT_DPI / m_render->get_dpi();
 	auto dims = m_render->get_attached_window()->get_client_size();

@@ -120,7 +120,7 @@ void DocantoWin::Direct2DRender::draw_text(const std::wstring& text, Docanto::Ge
 	begin_draw();
 
 	m_renderTarget->DrawTextLayout(
-		m_window->PxToDp(pos),
+		PointToD2D1(pos),
 		layout.m_object,
 		brush.m_object,
 		D2D1_DRAW_TEXT_OPTIONS_NONE);
@@ -262,6 +262,14 @@ void DocantoWin::Direct2DRender::add_rotation_matrix(float angle, Docanto::Geome
 		localPivot);
 
 	set_rotation_matrix(rotAbout * m_transformRotationMatrix);
+}
+
+void DocantoWin::Direct2DRender::set_clipping_rect(Docanto::Geometry::Rectangle<float> clip) {
+	m_renderTarget->PushAxisAlignedClip(RectToD2D1(clip), D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+}
+
+void DocantoWin::Direct2DRender::pop_clipping_rect() {
+	m_renderTarget->PopAxisAlignedClip();
 }
 
 Docanto::Geometry::Point<float> DocantoWin::Direct2DRender::inv_transform(Docanto::Geometry::Point<float> p) {

@@ -38,6 +38,8 @@ namespace DocantoWin {
 		void draw();
 		void set_debug_draw(bool b = true);
 		void toggle_debug_draw();
+
+		size_t get_amount_of_pdfs() const;
 	};
 }
 

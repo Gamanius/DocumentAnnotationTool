@@ -57,6 +57,9 @@
     <ClInclude Include="src\helper\Context.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\ui\UIDebug.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">
@@ -98,10 +101,10 @@
     <ClCompile Include="src\helper\TabHandler.h">
       <Filter>Header Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\helper\TabHanlder.cpp">
+    <ClCompile Include="src\helper\TabHandler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\helper\TabHandler.cpp">
+    <ClCompile Include="src\ui\UIDebug.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

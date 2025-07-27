@@ -6,11 +6,18 @@ void DocantoWin::UIContainer::draw() {
 	auto window_rec = window->PxToDp(Docanto::Geometry::Dimension<float>(window->get_client_size()));
 	for (auto& ref : m_all_uiobjects) {
 		if (ref->is_inbounds(window_rec)) {
+			// add a clip 
+			c->render->set_clipping_rect(ref->get_rec());
 			ref->draw(c->render);
+			c->render->pop_clipping_rect();
 		}
 		else {
 			ref->draw();
 		}
+	}
+
+	if (m_hit_uiobject.first != nullptr) {
+		m_hit_uiobject.first->draw_border(c->render);
 	}
 }
 

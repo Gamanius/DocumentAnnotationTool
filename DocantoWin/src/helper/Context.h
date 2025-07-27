@@ -6,6 +6,8 @@
 #include "win/Direct2D.h"
 #include "ui/Caption.h"
 
+#include "TabHandler.h"
+
 namespace DocantoWin {
 	class UIHandler;
 
@@ -16,9 +18,7 @@ namespace DocantoWin {
 		std::shared_ptr<Caption> caption;
 		std::shared_ptr<UIHandler> uihandler;
 
-		~Context() {
-			Docanto::Logger::log("dewa");
-		}
+		std::shared_ptr<TabHandler> tabs;
 	};
 }
 

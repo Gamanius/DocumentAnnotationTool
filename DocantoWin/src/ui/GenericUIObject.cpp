@@ -1,4 +1,5 @@
 #include "GenericUIObject.h"
+#include "helper/AppVariables.h"
 
 int DocantoWin::GenericUIObject::resize_hittest(Docanto::Geometry::Point<long> p) {
 	auto dpi = m_window->get_dpi();
@@ -150,6 +151,12 @@ bool DocantoWin::GenericUIObject::sys_pointer_release(Docanto::Geometry::Point<f
 
 	return true;
 
+}
+
+void DocantoWin::GenericUIObject::draw_border(std::shared_ptr<Direct2DRender> render) {
+	render->begin_draw();
+	render->draw_rect(get_rec(), AppVariables::Colors::get(AppVariables::Colors::TYPE::PRIMARY_COLOR), 3);
+	render->end_draw();
 }
 
 void DocantoWin::GenericUIObject::make_float(bool f) {

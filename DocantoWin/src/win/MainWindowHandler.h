@@ -15,8 +15,6 @@ namespace DocantoWin {
 
 		std::shared_ptr<GestureHandler> m_gesture;
 
-		std::shared_ptr<TabHandler> m_tabs;
-
 		void paint();
 		void size(Docanto::Geometry::Dimension<long> d);
 		void key(Window::VK key, bool pressed);

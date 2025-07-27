@@ -16,7 +16,7 @@ namespace DocantoWin {
 		std::shared_ptr<Window> m_window;
 		std::shared_ptr<Direct2DRender> m_localrender;
 
-		std::weak_ptr<DocantoWin::Context> ctx;
+		std::weak_ptr<Context> ctx;
 		bool m_is_floating = false;
 
 		int resize_hittest(Docanto::Geometry::Point<long> p);
@@ -38,6 +38,7 @@ namespace DocantoWin {
 		bool sys_pointer_update(Docanto::Geometry::Point<float> where, int hit);
 		bool sys_pointer_release(Docanto::Geometry::Point<float> where, int hit);
 
+		void draw_border(std::shared_ptr<Direct2DRender> render = nullptr);
 		virtual void draw(std::shared_ptr<Direct2DRender> render = nullptr) = 0;
 
 		bool is_inbounds(Docanto::Geometry::Dimension<float> r);

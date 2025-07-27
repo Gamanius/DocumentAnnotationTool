@@ -33,6 +33,7 @@ void DocantoWin::TestElement::pointer_release(Docanto::Geometry::Point<float> wh
 
 void DocantoWin::TestElement::draw(std::shared_ptr<Direct2DRender> render) {
 	if (render) {
+		render->clear({ 0, 255 });
 		render->draw_rect_filled({get_pos(), get_bounds()}, {255});
 	}
 	else {
