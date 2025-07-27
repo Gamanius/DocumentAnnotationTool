@@ -83,8 +83,8 @@ namespace Docanto {
 
 		template <typename T>
 		struct Dimension {
-			T width;
-			T height;
+			T width = 0;
+			T height = 0;
 
 			template <typename W>
 			operator Dimension<W>() const {

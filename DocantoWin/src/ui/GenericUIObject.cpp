@@ -53,7 +53,9 @@ DocantoWin::GenericUIObject::GenericUIObject(const std::wstring& UIName, bool re
 	});
 
 	m_window->set_callback_size([&](Docanto::Geometry::Dimension<long> d) {
-		this->set_bounds(m_window->PxToDp(d));
+		auto f_dim = (Docanto::Geometry::Dimension<float>) d;
+		m_localrender->resize(d);
+		m_dimension = m_window->PxToDp(f_dim);
 	});
 
 	m_window->set_callback_pointer_down([&](DocantoWin::Window::PointerInfo p) {
@@ -88,9 +90,12 @@ Docanto::Geometry::Dimension<float> DocantoWin::GenericUIObject::get_bounds() {
 }
 
 void DocantoWin::GenericUIObject::set_bounds(Docanto::Geometry::Dimension<float> bounds) {
+	if (is_floating()) {
+		m_window->set_window_dim(bounds);
+	}
+
 	m_localrender->resize(m_window->DpToPx(bounds));
 	m_dimension = bounds;
-
 
 	make_float(!is_inbounds());
 }
@@ -133,6 +138,7 @@ Docanto::Geometry::Rectangle<float> DocantoWin::GenericUIObject::get_rec() {
 }
 
 void DocantoWin::GenericUIObject::set_pos(Docanto::Geometry::Point<float> where) {
+	Docanto::Logger::log(where);
 	if (m_is_floating) {
 		auto c = ctx.lock();
 		m_window->set_window_pos({ c->window->get_window_position() + c->window->DpToPx(where) });
@@ -174,7 +180,11 @@ bool DocantoWin::GenericUIObject::sys_pointer_update(Docanto::Geometry::Point<fl
 	}
 	case HTBOTTOMRIGHT:
 	{
+		auto last_pos = get_pos();
 		set_bounds({ m_local_mouse.x, m_local_mouse.y });
+		if (is_floating()) {
+			set_pos(last_pos);
+		}
 		break;
 	}
 	default:
@@ -250,7 +260,7 @@ void DocantoWin::GenericUIObject::make_float(bool f) {
 		set_pos(c->window->get_mouse_pos());
 		set_pos(c->window->get_mouse_pos() - m_caption_delta_mouse);
 		m_window->set_min_dims(get_min_dims());
-		m_window->set_window_dim(last_bound);
+		set_bounds(last_bound);
 	}
 	else {
 		m_window->set_state(Window::HIDDEN);
