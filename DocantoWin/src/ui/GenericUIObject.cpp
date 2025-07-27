@@ -138,7 +138,6 @@ Docanto::Geometry::Rectangle<float> DocantoWin::GenericUIObject::get_rec() {
 }
 
 void DocantoWin::GenericUIObject::set_pos(Docanto::Geometry::Point<float> where) {
-	Docanto::Logger::log(where);
 	if (m_is_floating) {
 		auto c = ctx.lock();
 		m_window->set_window_pos({ c->window->get_window_position() + c->window->DpToPx(where) });

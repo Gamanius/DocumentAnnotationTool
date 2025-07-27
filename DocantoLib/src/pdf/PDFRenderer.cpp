@@ -70,7 +70,6 @@ public:
 
 	struct RenderJob {
 		JobType job = JobType::RENDER_BITMAP;
-		size_t page = 0;
 		size_t callback_id = 0;
 
 		// For rendering jobs these information are needed
@@ -104,11 +103,11 @@ private:
 public:
 	void add_job(size_t id, std::shared_ptr<RenderJob> job) {
 		if (job->job == JobType::LOAD_DISPLAY_LIST ) {
-			m_display_list_cache.insert({ id, job->page });
+			m_display_list_cache.insert({ id, job->info.page });
 		}
 		else if (job->job == JobType::DELETE_DISPLAY_LIST) {
-			if (m_display_list_cache.contains({ id, job->page })) {
-				m_display_list_cache.erase({ id, job->page });
+			if (m_display_list_cache.contains({ id, job->info.page })) {
+				m_display_list_cache.erase({ id, job->info.page });
 			}
 		}
 		std::scoped_lock<std::mutex> lock(m_render_worker_queue_mutex);
@@ -192,7 +191,7 @@ public:
 				auto& job = queue.at(i);
 				
 				if (job->job == JobType::LOAD_DISPLAY_LIST) {
-					if (t_content_list.contains({ job->callback_id, job->page })) {
+					if (t_content_list.contains({ job->callback_id, job->info.page })) {
 						continue;
 					}
 					current_job = job;
@@ -208,7 +207,7 @@ public:
 					}
 
 					// second check if the thread does have the methods to render the bitmap
-					if (!t_content_list.contains({ job->callback_id, job->page })) {
+					if (!t_content_list.contains({ job->callback_id, job->info.page })) {
 						// if it doesnt we continue
 						continue;
 					}
@@ -231,7 +230,7 @@ public:
 			}
 
 			if (current_job->job == JobType::RENDER_BITMAP) {
-				auto list = t_content_list[{current_job->callback_id, current_job->page}];
+				auto list = t_content_list[{current_job->callback_id, current_job->info.page}];
 				auto cont_img = get_image_from_list(ctx, list, current_job->chunk_rec, current_job->info.dpi, &(current_job->cookie));
 						
 				// we have to check if the rendering was aborted
@@ -250,7 +249,7 @@ public:
 			}
 
 			if (current_job->job == JobType::LOAD_DISPLAY_LIST) {
-				t_content_list[{current_job->callback_id, current_job->page}] = copy_list(*(current_job->list->get().get()));
+				t_content_list[{current_job->callback_id, current_job->info.page}] = copy_list(*(current_job->list->get().get()));
 				lock.lock();
 				current_job->threads_already_copied++;
 				lock.unlock();
@@ -535,6 +534,25 @@ std::vector<Docanto::Geometry::Rectangle<double>> Docanto::PDFRenderer::get_clip
 	return recs;
 }
 
+Docanto::Geometry::Point<float> Docanto::PDFRenderer::get_position(size_t page) {
+	return pimpl->m_page_pos.at(page);
+}
+
+void Docanto::PDFRenderer::set_position(size_t page, Geometry::Point<float> pos) {
+	pimpl->m_page_pos.at(page) = pos;
+}
+
+Docanto::Geometry::Dimension<float> Docanto::PDFRenderer::get_max_dimension() {
+	Docanto::Geometry::Dimension<float> dim = { 0, 0 };
+	for (size_t i = 0; i < pdf_obj->get_page_count(); i++) {
+		auto d = pdf_obj->get_page_dimension(i);
+		dim.width = std::max(dim.width, d.width);
+		dim.height = std::max(dim.height, d.height);
+	}
+	return dim;
+}
+
+
 Docanto::ReadWrapper<std::vector<Docanto::PDFRenderer::PDFRenderInfo>> Docanto::PDFRenderer::draw() {
 	return pimpl->m_highDefBitmaps.get_read();
 }
@@ -561,7 +579,7 @@ size_t Docanto::PDFRenderer::cull_bitmaps() {
 
 	for (auto it = vec->rbegin(); it != vec->rend(); it++) {
 		auto& item = *it;
-		bool intersetcts = item.recs.intersects(pimpl->m_current_viewport);
+		bool intersetcts = (item.recs + get_position(item.page)).intersects(pimpl->m_current_viewport);
 		bool del = false;
 
 		if (intersetcts and // intersection test
@@ -619,7 +637,11 @@ size_t Docanto::PDFRenderer::cull_chunks(std::vector<Geometry::Rectangle<float>>
 		for (size_t j = 0; j < bitmaps->size(); j++) {
 			auto bitma = bitmaps->at(j);
 
-			if (FLOAT_EQUAL(chunk.x + position.x, bitma.recs.x) and FLOAT_EQUAL(chunk.y + position.y, bitma.recs.y) and
+			if (bitma.page != page) {
+				continue;
+			}
+
+			if (FLOAT_EQUAL(chunk.x, bitma.recs.x) and FLOAT_EQUAL(chunk.y, bitma.recs.y) and
 				FLOAT_EQUAL(chunk.width, bitma.recs.width) and FLOAT_EQUAL(chunk.width, bitma.recs.width)) {
 				del = true;
 				goto DONE;
@@ -630,7 +652,7 @@ size_t Docanto::PDFRenderer::cull_chunks(std::vector<Geometry::Rectangle<float>>
 			auto queue_item = render_queue->at(j);
 
 			// only consider the queue items which are on the correct page
-			if (queue_item->page != page) {
+			if (queue_item->info.page != page) {
 				continue;
 			}
 
@@ -683,7 +705,7 @@ size_t Docanto::PDFRenderer::abort_queue_item() {
 	for (auto it = queue->begin(); it != queue->end(); it++) {
 		auto& item = *it;
 
-		if (item->info.recs.intersects(pimpl->m_current_viewport) and // intersection test
+		if ((item->info.recs + get_position(item->info.page)).intersects(pimpl->m_current_viewport) and // intersection test
 			(FLOAT_EQUAL(item->info.dpi, dpi)) /*dpi test*/) {
 			continue;
 		}
@@ -730,7 +752,7 @@ void Docanto::PDFRenderer::request(Geometry::Rectangle<float> view, float dpi) {
 		if (!thread_manager->has_display_list(id, i)) {
 			auto job = std::make_shared<RenderThreadManager::RenderJob>();
 			job->job = RenderThreadManager::JobType::LOAD_DISPLAY_LIST;
-			job->page = i;
+			job->info.page = i;
 			job->list = pimpl->m_page_content.get_read()->at(i);
 
 			thread_manager->add_job(id, job);
@@ -745,12 +767,12 @@ void Docanto::PDFRenderer::request(Geometry::Rectangle<float> view, float dpi) {
 
 			auto job = std::make_shared<RenderThreadManager::RenderJob>();
 			job->chunk_rec = chunk_rec;
-			job->page = i;
+			job->info.page = i;
 			job->status = RenderThreadManager::RenderStatus::WAITING;
 
 			job->info.dpi = dpi;
 			job->info.id = thread_manager->m_last_id.fetch_add(1);
-			job->info.recs = { positions.at(i) + chunk_rec.upperleft(), chunk_rec.dims()};
+			job->info.recs = { chunk_rec.upperleft(), chunk_rec.dims()};
 
 			job->job = RenderThreadManager::JobType::RENDER_BITMAP;
 
@@ -915,7 +937,7 @@ void Docanto::PDFRenderer::debug_draw(std::shared_ptr<BasicRender> render) {
 	auto& highdef = *(list);
 
 	for (const auto& info : highdef) {
-		render->draw_rect(info.recs, { 0, 0, 255 });
+		render->draw_rect(info.recs + this->get_position(info.page), {0, 0, 255});
 	}
 
 }

@@ -139,6 +139,11 @@ namespace Docanto {
 				return Rectangle<W>((W)x, (W)y, (W)width, (W)height);
 			}
 
+			template <typename F>
+			Rectangle<T> operator+(const Point<F>& f) const {
+				return Rectangle<T>(x + static_cast<T>(f.x), y + static_cast<T>(f.y), width, height);
+			}
+
 			bool intersects(const Rectangle<T>& other) const {
 				return (x < other.x + other.width &&
 					x + width > other.x &&

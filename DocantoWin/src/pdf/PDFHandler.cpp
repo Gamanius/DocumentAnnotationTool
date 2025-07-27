@@ -19,7 +19,18 @@ void DocantoWin::PDFHandler::add_pdf(const std::filesystem::path& p) {
 	m_pdfobj.push_back({ pdf, r });
 	m_pdfobj.back().render->set_rendercallback([&](size_t i) {
 		PostMessage(m_render->get_attached_window()->get_hwnd(), WM_PAINT, 0, 0);
-		});
+	});
+
+	auto max_width = 0;
+	for (size_t i = 0; i < m_pdfobj.size() - 1; i++) {
+		max_width += m_pdfobj.at(i).render->get_max_dimension().width + 20;
+	}
+
+	for (size_t i = 0; i < m_pdfobj.back().pdf->get_page_count(); i++) {
+		auto r = m_pdfobj.back().render;
+		auto last_pos = r->get_position(i);
+		r->set_position(i, { last_pos.x + max_width, last_pos.y });
+	}
 }
 
 void DocantoWin::PDFHandler::draw() {
@@ -52,7 +63,7 @@ void DocantoWin::PDFHandler::draw(std::shared_ptr<Docanto::PDFRenderer> r) {
 		if (bitmaps->at(info.id).m_object == nullptr) {
 			continue;
 		}
-		m_render->draw_bitmap(info.recs, bitmaps->at(info.id));
+		m_render->draw_bitmap(info.recs + r->get_position(info.page), bitmaps->at(info.id));
 	}
 
 	if (m_debug_draw) r->debug_draw(m_render);

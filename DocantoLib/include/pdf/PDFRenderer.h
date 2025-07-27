@@ -22,6 +22,8 @@ namespace Docanto {
 			size_t id = 0;
 			Geometry::Rectangle<float> recs;
 			float dpi = 0;
+
+			size_t page = 0;
 		};
 
 		std::shared_ptr<PDF> pdf_obj;
@@ -65,6 +67,11 @@ namespace Docanto {
 		const std::vector<PDFRenderInfo>& get_preview();
 		Docanto::ReadWrapper<std::vector<Docanto::PDFRenderer::PDFRenderInfo>> draw();
 		std::vector<Geometry::Rectangle<double>> get_clipped_page_recs();
+
+		Geometry::Point<float> get_position(size_t page);
+		void set_position(size_t page, Geometry::Point<float> pos);
+
+		Geometry::Dimension<float> get_max_dimension();
 
 		void request(Geometry::Rectangle<float> view, float dpi);
 		void render();
