@@ -7,7 +7,6 @@ namespace DocantoWin {
 	public:
 		UIDebugElement(const std::wstring& UIName);
 
-		Docanto::Geometry::Dimension<float> get_bounds() override;
 		Docanto::Geometry::Dimension<long> get_min_dims() override;
 
 		int hit_test(Docanto::Geometry::Point<long> where) override;

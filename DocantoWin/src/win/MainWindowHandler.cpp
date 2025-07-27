@@ -89,6 +89,11 @@ void DocantoWin::MainWindowHandler::key(Window::VK key, bool pressed) {
 		}
 		break;
 	}
+	case F1:
+	{
+		auto& last = m_ctx->uihandler->get_all_uiobjects_ref().back();
+		last->set_resizable(!last->is_resizable());
+	}
 	case KEY_1:
 	{
 		m_ctx->tabs->set_active_tab(0);
@@ -223,7 +228,6 @@ void DocantoWin::MainWindowHandler::pointer_up(Window::PointerInfo p) {
 	m_ctx->window->send_paint_request();
 }
 
-std::shared_ptr<DocantoWin::Window> w;
 DocantoWin::MainWindowHandler::MainWindowHandler(HINSTANCE instance) {
 	m_ctx = std::make_shared<Context>();
 	m_ctx->window = std::make_shared<Window>(instance);

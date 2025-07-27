@@ -9,9 +9,17 @@ namespace DocantoWin {
 	class GenericUIObject {
 	private:
 		Docanto::Geometry::Point<float> m_position;
+		Docanto::Geometry::Dimension<float> m_dimension;
+
+
 		Docanto::Geometry::Point<float> m_local_mouse;
 
 		Docanto::Geometry::Point<float> m_caption_delta_mouse;
+
+		bool resizable = false;
+
+		const float resize_square_size   = 4.0f;
+		const byte  resize_sqaure_amount = 5;
 	protected:
 		std::shared_ptr<Window> m_window;
 		std::shared_ptr<Direct2DRender> m_localrender;
@@ -21,14 +29,20 @@ namespace DocantoWin {
 
 		int resize_hittest(Docanto::Geometry::Point<long> p);
 	public:
-		GenericUIObject(const std::wstring& UIName);
+		GenericUIObject(const std::wstring& UIName, bool resize);
 
 		void set_context(std::weak_ptr<Context> c);
 
-		virtual Docanto::Geometry::Dimension<float> get_bounds() = 0;
+		Docanto::Geometry::Dimension<float> get_bounds();
+		void set_bounds(Docanto::Geometry::Dimension<float> bounds);
+		
 		virtual Docanto::Geometry::Dimension<long> get_min_dims() = 0;
+
+		int sys_hit_test(Docanto::Geometry::Point<long> where);
 		virtual int hit_test(Docanto::Geometry::Point<long> where) = 0;
-		virtual bool is_resizable() const;
+		bool is_resizable() const;
+		void set_resizable(bool resize);
+		
 
 		virtual void pointer_press(Docanto::Geometry::Point<float> where, int hit) = 0;
 		virtual void pointer_update(Docanto::Geometry::Point<float> where, int hit) = 0;
@@ -38,8 +52,9 @@ namespace DocantoWin {
 		bool sys_pointer_update(Docanto::Geometry::Point<float> where, int hit);
 		bool sys_pointer_release(Docanto::Geometry::Point<float> where, int hit);
 
-		void draw_border(std::shared_ptr<Direct2DRender> render = nullptr);
-		virtual void draw(std::shared_ptr<Direct2DRender> render = nullptr) = 0;
+		void draw_border();
+		void sys_draw();
+		virtual void draw(std::shared_ptr<Direct2DRender> render) = 0;
 
 		bool is_inbounds(Docanto::Geometry::Dimension<float> r);
 		bool is_inbounds();

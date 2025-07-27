@@ -2,6 +2,14 @@
 #include "helper/AppVariables.h"
 
 int DocantoWin::GenericUIObject::resize_hittest(Docanto::Geometry::Point<long> p) {
+	auto dims = get_bounds();
+	auto resize_bound = resize_sqaure_amount * resize_square_size;
+	if (Docanto::Geometry::Rectangle<float>({dims.width - resize_bound, dims.height - resize_bound ,
+		resize_bound , resize_bound }).intersects(p)) {
+		
+		return HTBOTTOMRIGHT;
+	}
+
 	auto dpi = m_window->get_dpi();
 
 	int frame_x = GetSystemMetricsForDpi(SM_CXSIZEFRAME, dpi); // Left/Right
@@ -18,8 +26,8 @@ int DocantoWin::GenericUIObject::resize_hittest(Docanto::Geometry::Point<long> p
 	return HTNOWHERE;
 }
 
-DocantoWin::GenericUIObject::GenericUIObject(const std::wstring& UIName) {
-	m_window = std::make_shared<Window>(GetModuleHandle(NULL), UIName);
+DocantoWin::GenericUIObject::GenericUIObject(const std::wstring& UIName, bool resize) : resizable(resize) {
+	m_window = std::make_shared<Window>(GetModuleHandle(NULL), UIName, resize);
 	m_window->override_default_hittest();
 	m_localrender = std::make_shared<Direct2DRender>(m_window);
 
@@ -41,11 +49,11 @@ DocantoWin::GenericUIObject::GenericUIObject(const std::wstring& UIName) {
 	});
 
 	m_window->set_callback_paint([&]() {
-		draw();
+		sys_draw();
 	});
 
 	m_window->set_callback_size([&](Docanto::Geometry::Dimension<long> d) {
-		this->m_localrender->resize(d);
+		this->set_bounds(m_window->PxToDp(d));
 	});
 
 	m_window->set_callback_pointer_down([&](DocantoWin::Window::PointerInfo p) {
@@ -67,7 +75,6 @@ DocantoWin::GenericUIObject::GenericUIObject(const std::wstring& UIName) {
 		}
 		else {
 			make_float(true);
-
 		}
 	});
 }
@@ -76,9 +83,34 @@ void DocantoWin::GenericUIObject::set_context(std::weak_ptr<DocantoWin::Context>
 	ctx = c;
 }
 
+Docanto::Geometry::Dimension<float> DocantoWin::GenericUIObject::get_bounds() {
+	return m_dimension;
+}
+
+void DocantoWin::GenericUIObject::set_bounds(Docanto::Geometry::Dimension<float> bounds) {
+	m_localrender->resize(m_window->DpToPx(bounds));
+	m_dimension = bounds;
+
+
+	make_float(!is_inbounds());
+}
+
+
+int DocantoWin::GenericUIObject::sys_hit_test(Docanto::Geometry::Point<long> where) {
+	auto hit = resize_hittest(where);
+	if (hit == HTNOWHERE) {
+		return hit_test(where);
+	}
+	return hit;
+}
 
 bool DocantoWin::GenericUIObject::is_resizable() const {
-	return true;
+	return resizable;
+}
+
+void DocantoWin::GenericUIObject::set_resizable(bool resize) {
+	resizable = resize;
+	m_window->set_window_resizable(resize);
 }
 
 
@@ -88,6 +120,9 @@ bool DocantoWin::GenericUIObject::is_inbounds(Docanto::Geometry::Dimension<float
 }
 
 bool DocantoWin::GenericUIObject::is_inbounds() {
+	if (ctx.lock() == nullptr) {
+		return true;
+	}
 	auto c = ctx.lock();
 	auto window_rec = c->window->PxToDp(Docanto::Geometry::Dimension<float>(c->window->get_client_size()));
 	return is_inbounds(window_rec);
@@ -100,7 +135,7 @@ Docanto::Geometry::Rectangle<float> DocantoWin::GenericUIObject::get_rec() {
 void DocantoWin::GenericUIObject::set_pos(Docanto::Geometry::Point<float> where) {
 	if (m_is_floating) {
 		auto c = ctx.lock();
-		m_window->set_window_rec({ c->window->get_window_position() + c->window->DpToPx(where), get_bounds() });
+		m_window->set_window_pos({ c->window->get_window_position() + c->window->DpToPx(where) });
 	}
 	m_position = where;
 }
@@ -119,7 +154,7 @@ bool DocantoWin::GenericUIObject::sys_pointer_down(Docanto::Geometry::Point<floa
 	m_caption_delta_mouse = m_local_mouse;
 
 	if (hit != HTCAPTION) {
-		pointer_press(where, hit);
+		pointer_press(m_local_mouse, hit);
 		return false;
 	}
 
@@ -131,12 +166,23 @@ bool DocantoWin::GenericUIObject::sys_pointer_update(Docanto::Geometry::Point<fl
 
 	make_float(!is_inbounds());
 
-	if (hit != HTCAPTION) {
-		pointer_update(where, hit);
+	switch (hit) {
+	case HTCAPTION:
+	{
+		set_pos(where - m_caption_delta_mouse);
+		break;
+	}
+	case HTBOTTOMRIGHT:
+	{
+		set_bounds({ m_local_mouse.x, m_local_mouse.y });
+		break;
+	}
+	default:
+	{
+		pointer_update(m_local_mouse, hit);
 		return false;
 	}
-
-	set_pos(where - m_caption_delta_mouse);
+	}
 
 	return true;
 }
@@ -145,7 +191,7 @@ bool DocantoWin::GenericUIObject::sys_pointer_release(Docanto::Geometry::Point<f
 	m_local_mouse = where - get_pos();
 
 	if (hit != HTCAPTION) {
-		pointer_release(where, hit);
+		pointer_release(m_local_mouse, hit);
 		return false;
 	}
 
@@ -153,10 +199,42 @@ bool DocantoWin::GenericUIObject::sys_pointer_release(Docanto::Geometry::Point<f
 
 }
 
-void DocantoWin::GenericUIObject::draw_border(std::shared_ptr<Direct2DRender> render) {
+void DocantoWin::GenericUIObject::draw_border() {
+	auto render = ctx.lock()->render;
+	
 	render->begin_draw();
-	render->draw_rect(get_rec(), AppVariables::Colors::get(AppVariables::Colors::TYPE::PRIMARY_COLOR), 3);
+	render->draw_rect(get_rec(), AppVariables::Colors::get(AppVariables::Colors::TYPE::ACCENT_COLOR), 3);
 	render->end_draw();
+}
+
+void DocantoWin::GenericUIObject::sys_draw() {
+	auto render = m_localrender;
+	if (!is_floating()) {
+		render = ctx.lock()->render;
+	}
+	this->draw(render);
+
+	if (is_resizable()) {
+		auto a = get_rec();
+		auto dims = a.dims();
+
+		render->begin_draw();
+
+		for (int y = 0; y < resize_sqaure_amount; ++y) {
+			for (int x = 0; x < resize_sqaure_amount; ++x) {
+				// Alternate filled and empty squares
+				if ((x + y) % 2 == 0) {
+					float left = dims.width - resize_sqaure_amount * resize_square_size + x * resize_square_size;
+					float top = dims.height - resize_sqaure_amount * resize_square_size + y * resize_square_size;
+
+					render->draw_rect_filled({ left, top, resize_square_size, resize_square_size },
+						AppVariables::Colors::get(AppVariables::Colors::TYPE::SECONDARY_COLOR));
+				}
+			}
+		}
+
+		render->end_draw();
+	}
 }
 
 void DocantoWin::GenericUIObject::make_float(bool f) {
@@ -166,12 +244,13 @@ void DocantoWin::GenericUIObject::make_float(bool f) {
 	m_is_floating = f;
 	if (f) {
 		auto c = ctx.lock();
-		m_window->set_state(Window::NORMAL);
 		// first put the window mouse so the dpi can be identified
+		auto last_bound = get_bounds();
+		m_window->set_state(Window::NORMAL);
 		set_pos(c->window->get_mouse_pos());
 		set_pos(c->window->get_mouse_pos() - m_caption_delta_mouse);
 		m_window->set_min_dims(get_min_dims());
-		m_window->set_window_dim(get_bounds());
+		m_window->set_window_dim(last_bound);
 	}
 	else {
 		m_window->set_state(Window::HIDDEN);

@@ -19,6 +19,8 @@ namespace DocantoWin {
 
 		void resize(Docanto::Geometry::Dimension<long> new_dim);
 
+		std::vector<std::shared_ptr<GenericUIObject>>& get_all_uiobjects_ref();
+
 		void add(std::shared_ptr<GenericUIObject> obj);
 	};
 }

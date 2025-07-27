@@ -179,6 +179,13 @@ namespace DocantoWin {
 			UNKWON
 		};
 
+		enum CURSOR_TYPE {
+			POINTER,
+			NWSE_RESIZE,
+			NESW_RESIZE,
+			TOPBOTTOM_RESIZE
+		};
+
 		struct PointerInfo {
 			UINT id = 0;
 			POINTER_TYPE type = POINTER_TYPE::UNKNOWN;
@@ -322,6 +329,10 @@ namespace DocantoWin {
 		void set_window_rec(Docanto::Geometry::Rectangle<long> r);
 		void set_window_dim(Docanto::Geometry::Dimension<long> d);
 		void set_window_pos(Docanto::Geometry::Point<long> d);
+
+		void set_window_resizable(bool resize);
+		
+		void set_cursor(CURSOR_TYPE tpye);
 
 		void set_callback_paint(std::function<void()> callback);
 		void set_callback_size(std::function<void(Docanto::Geometry::Dimension<long>)> callback);

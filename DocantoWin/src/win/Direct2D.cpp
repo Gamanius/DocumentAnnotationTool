@@ -268,7 +268,17 @@ void DocantoWin::Direct2DRender::set_clipping_rect(Docanto::Geometry::Rectangle<
 	m_renderTarget->PushAxisAlignedClip(RectToD2D1(clip), D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
 }
 
+void DocantoWin::Direct2DRender::push_clipping_rect_to_origin(Docanto::Geometry::Rectangle<float> clip) {
+	m_renderTarget->SetTransform(D2D1::Matrix3x2F::Translation({ clip.x, clip.y }));
+	m_renderTarget->PushAxisAlignedClip({0,0, clip.width, clip.height}, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+}
+
 void DocantoWin::Direct2DRender::pop_clipping_rect() {
+	m_renderTarget->PopAxisAlignedClip();
+}
+
+void DocantoWin::Direct2DRender::pop_clipping_rect_to_origin() {
+	set_identity_transform_active();
 	m_renderTarget->PopAxisAlignedClip();
 }
 

@@ -128,7 +128,9 @@ namespace DocantoWin {
 		void add_rotation_matrix(float angle, Docanto::Geometry::Point<float> center);
 
 		void set_clipping_rect(Docanto::Geometry::Rectangle<float> clip);
+		void push_clipping_rect_to_origin(Docanto::Geometry::Rectangle<float> clip);
 		void pop_clipping_rect();
+		void pop_clipping_rect_to_origin();
 
 		Docanto::Geometry::Point<float> inv_transform(Docanto::Geometry::Point<float> p);
 		Docanto::Geometry::Point<float> transform(Docanto::Geometry::Point<float> p);

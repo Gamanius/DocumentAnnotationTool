@@ -633,9 +633,10 @@ DocantoWin::Window::Window(HINSTANCE h, const std::wstring& name, bool resizable
 	}
 
 	int window_style
-		=  WS_THICKFRAME * resizable | WS_SYSMENU  // required for a standard resizeable window
+		= (WS_THICKFRAME | WS_SYSMENU) * resizable 
 		 | WS_MAXIMIZEBOX  // Add maximize button to support maximizing via mouse dragging
 		 | WS_MINIMIZEBOX;  // Add minimize button to support minimizing by clicking on the taskbar icon
+
 
 	m_hwnd = CreateWindowEx(WS_EX_TOOLWINDOW, wc.lpszClassName, APPLICATION_NAME,
 		window_style, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
@@ -835,6 +836,48 @@ void DocantoWin::Window::set_window_dim(Docanto::Geometry::Dimension<long> d) {
 
 void DocantoWin::Window::set_window_pos(Docanto::Geometry::Point<long> d) {
 	SetWindowPos(m_hwnd, HWND_TOP, d.x, d.y, 0, 0, SWP_NOZORDER | SWP_NOSIZE);
+}
+
+void DocantoWin::Window::set_window_resizable(bool resize) {
+	LONG_PTR style = GetWindowLongPtr(m_hwnd, GWL_STYLE);
+
+	if (resize) {
+		style |= WS_THICKFRAME | WS_MAXIMIZEBOX;
+	}
+	else {
+		style &= ~(WS_THICKFRAME | WS_MAXIMIZEBOX);
+	}
+
+	SetWindowLongPtr(m_hwnd, GWL_STYLE, style);
+
+	// Apply the changes
+	SetWindowPos(m_hwnd, nullptr, 0, 0, 0, 0,
+		SWP_NOZORDER | SWP_NOMOVE | SWP_NOSIZE | SWP_FRAMECHANGED);
+}
+
+void DocantoWin::Window::set_cursor(CURSOR_TYPE tpye) {
+	switch (tpye) {
+	case POINTER:
+	{
+		SetCursor(LoadCursor(nullptr, IDC_ARROW));
+		return;
+	}
+	case NWSE_RESIZE:
+	{
+		SetCursor(LoadCursor(nullptr, IDC_SIZENWSE));
+		return;
+	}
+	case NESW_RESIZE:
+	{
+		SetCursor(LoadCursor(nullptr, IDC_SIZENESW));
+		return;
+	}
+	case TOPBOTTOM_RESIZE:
+	{
+		SetCursor(LoadCursor(nullptr, IDC_SIZENS));
+		return;
+	}
+	}
 }
 
 void DocantoWin::Window::get_window_messages(bool blocking) {

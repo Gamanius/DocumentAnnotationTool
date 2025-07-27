@@ -1,16 +1,12 @@
 #include "TestElement.h"
 
-DocantoWin::TestElement::TestElement(const std::wstring& UIName) : GenericUIObject(UIName) {
+DocantoWin::TestElement::TestElement(const std::wstring& UIName) : GenericUIObject(UIName, false) {
 	set_pos({ 100, 100 });
 }
 
 
-Docanto::Geometry::Dimension<float> DocantoWin::TestElement::get_bounds() {
-	return { 50.0f, 50.0f };
-}
-
 Docanto::Geometry::Dimension<long> DocantoWin::TestElement::get_min_dims() {
-	return get_bounds();
+	return { 50, 50 };
 }
 
 int DocantoWin::TestElement::hit_test(Docanto::Geometry::Point<long> where) {
