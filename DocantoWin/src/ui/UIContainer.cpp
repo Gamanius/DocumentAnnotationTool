@@ -10,7 +10,7 @@ void DocantoWin::UIContainer::draw() {
 			c->render->pop_clipping_rect_to_origin();
 		}
 		else {
-			ref->sys_draw();
+			//ref->sys_draw();
 		}
 	}
 

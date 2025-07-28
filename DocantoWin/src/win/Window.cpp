@@ -389,7 +389,7 @@ LRESULT DocantoWin::Window::parse_message(UINT uMsg, WPARAM wParam, LPARAM lPara
 			break;
 		}
 		// only generate touchpad data if we have more than two touchpoints. If its just one point it should be handled by pointer msg
-		if (touch.value().size() <= 1) { 
+		if (touch.value().size() <= 1 or is_key_pressed(VK::LEFT_MB) or is_key_pressed(VK::RIGHT_MB)) { 
 			break;
 		}
 
