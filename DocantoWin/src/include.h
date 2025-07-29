@@ -29,10 +29,10 @@
 #define EPSILON 0.00001f
 #define FLOAT_EQUAL(a, b) (abs(a - b) < EPSILON)
 
-constexpr auto PI = 3.14159265359;
-constexpr auto RAD_TO_DEG = 180 / PI;
+inline constexpr auto PI = 3.14159265359;
+inline constexpr auto RAD_TO_DEG = 180 / PI;
 
-constexpr auto WINDOWS_DEFAULT_DPI = 96.0f;
+inline constexpr auto WINDOWS_DEFAULT_DPI = 96.0f;
 
 inline Docanto::Geometry::Rectangle<long> RectToRectangle(const RECT& r) {
 	return Docanto::Geometry::Rectangle<long>(r.left, r.top, r.right - r.left, r.bottom - r.top);

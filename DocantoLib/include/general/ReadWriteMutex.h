@@ -71,7 +71,7 @@ namespace Docanto {
 			if (thread_list.find(id) == thread_list.end()) { return; }
 
 			thread_list[id].write_locks--;
-			
+
 			// if there are no lock remaining we can remove it
 			if (thread_list[id].write_locks == 0 and thread_list[id].read_locks == 0) {
 				thread_list.erase(id);
@@ -179,6 +179,7 @@ namespace Docanto {
 		ReadWrapper& operator=(const ReadWrapper& other) = delete;
 
 		ReadWrapper(ReadWrapper&& other) noexcept {
+			this->wrapper->remove_read(std::this_thread::get_id());
 			this->wrapper = other.wrapper;
 			other.wrapper = nullptr;
 
@@ -188,6 +189,7 @@ namespace Docanto {
 
 		ReadWrapper& operator=(ReadWrapper&& other) noexcept {
 			if (this != &other) {
+				this->wrapper->remove_read(std::this_thread::get_id());
 				this->wrapper = other.wrapper;
 				other.wrapper = nullptr;
 
@@ -261,6 +263,7 @@ namespace Docanto {
 		WriteWrapper& operator=(const WriteWrapper& other) = delete;
 
 		WriteWrapper(WriteWrapper&& other) noexcept {
+			this->wrapper->remove_write(std::this_thread::get_id());
 			this->wrapper = other.wrapper;
 			other.wrapper = nullptr;
 
@@ -270,7 +273,7 @@ namespace Docanto {
 
 		WriteWrapper& operator=(WriteWrapper&& other) noexcept {
 			if (this != &other) {
-
+				this->wrapper->remove_write(std::this_thread::get_id());
 				this->wrapper = other.wrapper;
 				other.wrapper = nullptr;
 

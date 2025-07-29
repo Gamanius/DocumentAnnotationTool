@@ -4,7 +4,7 @@
 #include "../general/Common.h"
 #include "../general/ThreadSafeWrapper.h"
 
-constexpr float MUPDF_DEFAULT_DPI = 72.0f;
+inline constexpr float MUPDF_DEFAULT_DPI = 72.0f;
 
 struct fz_context;
 

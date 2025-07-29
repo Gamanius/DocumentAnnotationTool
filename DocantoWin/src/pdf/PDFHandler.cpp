@@ -66,6 +66,20 @@ void DocantoWin::PDFHandler::draw(std::shared_ptr<Docanto::PDFRenderer> r) {
 		m_render->draw_bitmap(info.recs + r->get_position(info.page), bitmaps->at(info.id));
 	}
 
+	auto annot_list = r->annot();
+	auto& anottation = *annot_list;
+
+	for (const auto& info : anottation) {
+		if (bitmaps->find(info.id) == bitmaps->end()) {
+			Docanto::Logger::warn("Couldnt find ", info.id);
+			continue;
+		}
+		if (bitmaps->at(info.id).m_object == nullptr) {
+			continue;
+		}
+		m_render->draw_bitmap(info.recs + r->get_position(info.page), bitmaps->at(info.id));
+	}
+
 	if (m_debug_draw) r->debug_draw(m_render);
 }
 

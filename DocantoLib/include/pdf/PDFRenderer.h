@@ -46,8 +46,8 @@ namespace Docanto {
 
 		size_t remove_finished_queue_item();
 		size_t abort_queue_item();
-		size_t cull_bitmaps();
-		size_t cull_chunks(std::vector<Geometry::Rectangle<float>>& chunks, size_t pagee);
+		size_t cull_bitmaps(ThreadSafeVector<PDFRenderInfo>& info);
+		size_t cull_chunks(std::vector<Geometry::Rectangle<float>>& chunks, size_t pagee, ThreadSafeVector<PDFRenderInfo>& info);
 
 		void process_chunks(const std::vector<Geometry::Rectangle<float>>& chunks, size_t page);
 		void create_preview(float dpi = MUPDF_DEFAULT_DPI);
@@ -66,6 +66,8 @@ namespace Docanto {
 
 		const std::vector<PDFRenderInfo>& get_preview();
 		Docanto::ReadWrapper<std::vector<Docanto::PDFRenderer::PDFRenderInfo>> draw();
+		Docanto::ReadWrapper<std::vector<Docanto::PDFRenderer::PDFRenderInfo>> annot();
+
 		std::vector<Geometry::Rectangle<double>> get_clipped_page_recs();
 
 		Geometry::Point<float> get_position(size_t page);
