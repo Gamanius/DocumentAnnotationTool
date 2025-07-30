@@ -49,12 +49,11 @@ namespace Docanto {
 		size_t cull_bitmaps(ThreadSafeVector<PDFRenderInfo>& info);
 		size_t cull_chunks(std::vector<Geometry::Rectangle<float>>& chunks, size_t pagee, ThreadSafeVector<PDFRenderInfo>& info);
 
-		void process_chunks(const std::vector<Geometry::Rectangle<float>>& chunks, size_t page);
-		void create_preview(float dpi = MUPDF_DEFAULT_DPI);
 		void position_pdfs();
 
 		std::pair<std::vector<Geometry::Rectangle<float>>, float> get_chunks(size_t page);
-		std::pair<float, float> get_chunk_dpi_bound();
+		float get_chunk_scale() const;
+		float get_chunk_dpi() const;
 
 		void async_render(); 
 		void receive_image(PDFRenderInfo info, Image&& i);
@@ -68,15 +67,33 @@ namespace Docanto {
 		Docanto::ReadWrapper<std::vector<Docanto::PDFRenderer::PDFRenderInfo>> draw();
 		Docanto::ReadWrapper<std::vector<Docanto::PDFRenderer::PDFRenderInfo>> annot();
 
+		/// <summary>
+		/// Will calculate the overlap of all pdf pages
+		/// </summary>
+		/// <returns>An array containig the boundig rectangles of all pages which are intersecting the viewport</returns>
 		std::vector<Geometry::Rectangle<double>> get_clipped_page_recs();
 
+		/// <summary>
+		/// 
+		/// </summary>
+		/// <param name="page">Number of the page</param>
+		/// <returns>The top left position of the pdf page</returns>
 		Geometry::Point<float> get_position(size_t page);
+
+		/// <summary>
+		/// Will reposition the pdf to the given point
+		/// </summary>
+		/// <param name="page">the page to move</param>
+		/// <param name="pos">the new position of the page</param>
 		void set_position(size_t page, Geometry::Point<float> pos);
 
+		/// <summary>
+		/// Will calculate the minimal bounding box which would enclose all pdf pages
+		/// </summary>
+		/// <returns></returns>
 		Geometry::Dimension<float> get_max_dimension();
 
 		void request(Geometry::Rectangle<float> view, float dpi);
-		void render();
 		void set_rendercallback(std::function<void(size_t)> fun);
 				
 		void debug_draw(std::shared_ptr<BasicRender> render);

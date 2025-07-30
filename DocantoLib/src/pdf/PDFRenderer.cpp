@@ -403,30 +403,34 @@ Docanto::Image get_image_from_list(DisplayListWrapper* wrap, Docanto::Geometry::
 	return get_image_from_list(*(Docanto::GlobalPDFContext::get_instance().get()), *(wrap->get().get()), scissor, dpi);
 }
 
-std::pair<float, float> Docanto::PDFRenderer::get_chunk_dpi_bound() {
-	size_t scale = std::floor(pimpl->m_current_dpi / MUPDF_DEFAULT_DPI);
-	return { scale * MUPDF_DEFAULT_DPI, (scale + 1) * MUPDF_DEFAULT_DPI };
+float Docanto::PDFRenderer::get_chunk_scale() const {
+	return std::floor(pimpl->m_current_dpi / MUPDF_DEFAULT_DPI);
+}
+
+float Docanto::PDFRenderer::get_chunk_dpi() const {
+	return (get_chunk_scale() + 1) * MUPDF_DEFAULT_DPI;
 }
 
 std::pair<std::vector<Docanto::Geometry::Rectangle<float>>, float> Docanto::PDFRenderer::get_chunks(size_t page) {
 	auto dims = pdf_obj->get_page_dimension(page);
 	auto  pos = pimpl->m_page_pos.at(page);
 
-	size_t scale = std::floor(pimpl->m_current_dpi / MUPDF_DEFAULT_DPI);
-	size_t amount_cells = 3 * scale + 1;
-	Geometry::Dimension<float> cell_dim = { dims.width / amount_cells, dims.height / amount_cells };
-	
+	float scale = std::max(get_chunk_scale(), 0.0001f); // to avoid negative values
+	size_t amount_cells = std::max<size_t>(static_cast<size_t>(std::max<float>(std::log(scale) * 5, 1.0f)), 1);
+	auto amount_cells_w = std::max<size_t>(amount_cells * dims.width  / 600.0, 1);
+	auto amount_cells_h = std::max<size_t>(amount_cells * dims.height / 850.0, 1);
+	Geometry::Dimension<float> cell_dim = { dims.width / amount_cells_w, dims.height / amount_cells_h };
 	// transform the viewport to docspace
 	auto doc_space_screen = Docanto::Geometry::Rectangle<float>(pimpl->m_current_viewport.upperleft() - pos, pimpl->m_current_viewport.lowerright() - pos);
 
 	Geometry::Point<size_t> topleft = {
-		(size_t)std::clamp(std::floor(doc_space_screen.upperleft().x /  dims.width * amount_cells), 0.0f, (float)amount_cells),
-		(size_t)std::clamp(std::floor(doc_space_screen.upperleft().y / dims.height * amount_cells), 0.0f, (float)amount_cells),
+		(size_t)std::clamp(std::floor(doc_space_screen.upperleft().x /  dims.width * amount_cells_w), 0.0f, (float)amount_cells_w),
+		(size_t)std::clamp(std::floor(doc_space_screen.upperleft().y / dims.height * amount_cells_h), 0.0f, (float)amount_cells_h),
 	};
 
 	Geometry::Point<size_t> bottomright = {
-		(size_t)std::clamp(std::ceil(doc_space_screen.lowerright().x / dims.width * amount_cells), 0.0f, (float)amount_cells),
-		(size_t)std::clamp(std::ceil(doc_space_screen.lowerright().y / dims.height * amount_cells), 0.0f, (float)amount_cells),
+		(size_t)std::clamp(std::ceil(doc_space_screen.lowerright().x / dims.width * amount_cells_w), 0.0f, (float)amount_cells_w),
+		(size_t)std::clamp(std::ceil(doc_space_screen.lowerright().y / dims.height * amount_cells_h), 0.0f, (float)amount_cells_h),
 	};
 
 	auto chunks = std::vector<Docanto::Geometry::Rectangle<float>>();
@@ -445,7 +449,7 @@ std::pair<std::vector<Docanto::Geometry::Rectangle<float>>, float> Docanto::PDFR
 		}
 	}
 
-	return { chunks, get_chunk_dpi_bound().second };
+	return { chunks, get_chunk_dpi() };
 }
 
 Docanto::Image Docanto::PDFRenderer::get_image(size_t page, float dpi) {
@@ -507,25 +511,6 @@ void Docanto::PDFRenderer::position_pdfs() {
 	}
 }
 
-void Docanto::PDFRenderer::create_preview(float dpi) {
-	Docanto::Logger::log("Creating preview");
-	Timer t;
-	size_t amount_of_pages = pdf_obj->get_page_count();
-	auto&  positions       = pimpl->m_page_pos;
-
-	float y = 0;
-	for (size_t i = 0; i < amount_of_pages; i++) {
-		auto dims = pdf_obj->get_page_dimension(i);
-		auto id = thread_manager->m_last_id.fetch_add(1);
-		m_processor->processImage(id, get_image(i, dpi));
-
-		auto prevs = pimpl->m_previewbitmaps.get_write();
-		prevs->push_back({ id, {positions.at(i), dims}, dpi });
-
-		y += dims.height + 10;
-	}
-	Docanto::Logger::log("Preview generation and processing took ", t);
-}
 
 const std::vector<Docanto::PDFRenderer::PDFRenderInfo>& Docanto::PDFRenderer::get_preview() {
 	auto d =  pimpl->m_previewbitmaps.get_read();
@@ -599,7 +584,7 @@ size_t Docanto::PDFRenderer::cull_bitmaps(ThreadSafeVector<PDFRenderInfo>& info)
 	auto vec = info.get_write();
 	std::vector<size_t> ids_to_delete;
 	size_t amount = 0;
-	auto [ lower_dpi, higher_dpi ] = get_chunk_dpi_bound();
+	auto higher_dpi  = get_chunk_dpi();
 
 	for (auto it = vec->rbegin(); it != vec->rend(); it++) {
 		auto& item = *it;
@@ -702,29 +687,11 @@ size_t Docanto::PDFRenderer::cull_chunks(std::vector<Geometry::Rectangle<float>>
 	return amount;
 }
 
-
-void Docanto::PDFRenderer::process_chunks(const std::vector<Geometry::Rectangle<float>>& chunks, size_t page) {
-	auto [_, dpi] = get_chunk_dpi_bound();
-
-	auto cont = pimpl->m_page_content.get_read()->at(page).get();
-	auto position = pimpl->m_page_pos.at(page);
-
-	for (size_t j = 0; j < chunks.size(); j++) {
-		auto img = get_image_from_list(cont, chunks.at(j), dpi);
-
-		auto id = thread_manager->m_last_id.fetch_add(1);
-		m_processor->processImage(id, img);
-
-		auto prevs = pimpl->m_highDefBitmaps.get_write();
-		prevs->push_back({ id, {position + chunks.at(j).upperleft(),chunks.at(j).dims()}, dpi });
-	}
-}
-
 size_t Docanto::PDFRenderer::abort_queue_item() {
 	auto queue = pimpl->m_jobs.get();
 	size_t amount = 0;
 
-	auto [_, dpi] = get_chunk_dpi_bound();
+	auto dpi = get_chunk_dpi();
 
 	for (auto it = queue->begin(); it != queue->end(); it++) {
 		auto& item = *it;
@@ -863,20 +830,6 @@ void Docanto::PDFRenderer::receive_image(PDFRenderInfo info, Image&& i) {
 	// call the callback
 	if (m_render_callback)
 		m_render_callback(info.id);
-}
-
-void Docanto::PDFRenderer::render() {
-	//auto queue = pimpl->m_jobs.get_write();
-	//auto job = queue->back();
-	//queue->pop_back();
-
-	//job.status = impl::RenderStatus::PROCESSING;
-
-	//auto& cont = pimpl->m_page_content.get_read()->at(job.page);
-	//auto img = get_image_from_list(cont.get(), job.chunk_rec, job.info.dpi);
-
-	//m_processor->processImage(job.info.id, img);
-	//pimpl->m_highDefBitmaps.get_write()->push_back(job.info);	
 }
 
 void Docanto::PDFRenderer::debug_draw(std::shared_ptr<BasicRender> render) {
