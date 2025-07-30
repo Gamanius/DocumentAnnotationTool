@@ -29,7 +29,8 @@ namespace Docanto {
 		};
 
 		struct InkAnnotationInfo : public AnnotationInfo {
-
+			std::shared_ptr<std::vector<Geometry::Point<float>>> points;
+			float stroke_width = 1.0f;
 		};
 
 		PDFAnnotation(std::shared_ptr<PDF> pdf_obj);

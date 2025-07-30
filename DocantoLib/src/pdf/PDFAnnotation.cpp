@@ -83,7 +83,22 @@ std::shared_ptr<Docanto::PDFAnnotation::AnnotationInfo> do_general_annot(pdf_ann
 
 std::shared_ptr<Docanto::PDFAnnotation::AnnotationInfo> do_ink_annot(pdf_annot* a) {
 	auto info = std::make_shared<Docanto::PDFAnnotation::InkAnnotationInfo>();
-	
+	auto ctx = Docanto::GlobalPDFContext::get_instance().get();
+
+	// width
+	info->stroke_width = pdf_annot_border_width(*ctx, a);
+
+	// points
+	info->points = std::make_shared< std::vector<Docanto::Geometry::Point<float>>>();
+	auto list_count = pdf_annot_ink_list_count(*ctx, a);
+	for (int i = 0; i < list_count; i++) {
+		auto vertex_count = pdf_annot_ink_list_stroke_count(*ctx, a, i);
+		for (size_t k = 0; k < vertex_count; k++) {
+			auto point = pdf_annot_ink_list_stroke_vertex(*ctx, a, i, k);
+			info->points->push_back({ point.x, point.y });
+		}
+	}
+
 
 	return info;
 }
