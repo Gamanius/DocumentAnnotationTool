@@ -83,8 +83,9 @@ void DocantoWin::MainWindowHandler::key(Window::VK key, bool pressed) {
 		if (path.has_value()) {
 			Docanto::Timer t;
 			auto pdf = std::make_shared<PDFHandler>(path.value(), m_ctx->render);
+			auto tool = std::make_shared<ToolHandler>(pdf);
 
-			m_ctx->tabs->add(std::make_shared<TabContext>(pdf));
+			m_ctx->tabs->add(std::make_shared<TabContext>(pdf, tool));
 			Docanto::Logger::log("Loaded PDF in ", t);
 		}
 		break;
@@ -229,6 +230,11 @@ void DocantoWin::MainWindowHandler::pointer_up(Window::PointerInfo p) {
 }
 
 DocantoWin::MainWindowHandler::MainWindowHandler(HINSTANCE instance) {
+	HRSRC resHandle = FindResource(NULL, MAKEINTRESOURCE(IDR_SVG_PEN_TOOL), L"SVG");
+	HGLOBAL resData = LoadResource(NULL, resHandle);
+	DWORD size = SizeofResource(NULL, resHandle);
+	void* ptr = LockResource(resData);
+
 	m_ctx = std::make_shared<Context>();
 	m_ctx->window = std::make_shared<Window>(instance);
 	m_ctx->render = std::make_shared<Direct2DRender>(m_ctx->window);
@@ -272,8 +278,9 @@ DocantoWin::MainWindowHandler::MainWindowHandler(HINSTANCE instance) {
 	if (path.has_value()) {
 		Docanto::Timer t;
 		auto pdf = std::make_shared<PDFHandler>(path.value(), m_ctx->render);
+		auto tool = std::make_shared<ToolHandler>(pdf);
 		
-		m_ctx->tabs->add(std::make_shared<TabContext>(pdf));
+		m_ctx->tabs->add(std::make_shared<TabContext>(pdf, tool));
 		Docanto::Logger::log("Loaded PDF in ", t);
 	}
 	else {

@@ -8,6 +8,9 @@
 #include "ui/UIHandler.h"
 
 #include "pdf/PDFHandler.h"
+#include "pdf/ToolHandler.h"
+
+#include "../../rsc/resource.h"
 
 namespace DocantoWin {
 	class MainWindowHandler {

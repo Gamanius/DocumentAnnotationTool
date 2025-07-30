@@ -5,9 +5,11 @@
 
 namespace DocantoWin {
 	class PDFHandler;
+	class ToolHandler;
 
 	struct TabContext {
 		std::shared_ptr<PDFHandler> pdfhandler;
+		std::shared_ptr<ToolHandler> toolhandler;
 	};
 
 	class TabHandler {
