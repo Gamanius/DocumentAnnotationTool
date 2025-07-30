@@ -36,6 +36,9 @@
     <ClCompile Include="src\pdf\PDFRenderer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\pdf\PDFAnnotation.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\pdf\PDF.h">
@@ -75,6 +78,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include\general\BasicRender.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\pdf\PDFAnnotation.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

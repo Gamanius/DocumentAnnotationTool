@@ -10,6 +10,7 @@ namespace DocantoWin {
 		struct PDFWrapper {
 			std::shared_ptr<Docanto::PDF> pdf;
 			std::shared_ptr<Docanto::PDFRenderer> render;
+			std::shared_ptr<Docanto::PDFAnnotation> annotation;
 		};
 		std::vector<PDFWrapper> m_pdfobj;
 

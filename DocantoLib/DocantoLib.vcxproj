@@ -184,6 +184,7 @@
     <ClCompile Include="src\general\Logger.cpp" />
     <ClCompile Include="src\general\Timer.cpp" />
     <ClCompile Include="src\pdf\PDF.cpp" />
+    <ClCompile Include="src\pdf\PDFAnnotation.cpp" />
     <ClCompile Include="src\pdf\PDFContext.cpp" />
     <ClCompile Include="src\pdf\PDFRenderer.cpp" />
   </ItemGroup>
@@ -199,6 +200,7 @@
     <ClInclude Include="include\general\ThreadSafeWrapper.h" />
     <ClInclude Include="include\general\Timer.h" />
     <ClInclude Include="include\pdf\PDF.h" />
+    <ClInclude Include="include\pdf\PDFAnnotation.h" />
     <ClInclude Include="include\pdf\PDFContext.h" />
     <ClInclude Include="include\pdf\PDFRenderer.h" />
   </ItemGroup>

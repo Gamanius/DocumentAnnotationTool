@@ -6,7 +6,8 @@ DocantoWin::PDFHandler::PDFHandler(const std::filesystem::path& p, std::shared_p
 	m_pdfimageprocessor = std::make_shared<PDFHandlerImageProcessor>(render);
 	auto pdf = std::make_shared<PDF>(p);
 	auto r = std::make_shared<PDFRenderer>(pdf, m_pdfimageprocessor);
-	m_pdfobj.push_back({ pdf, r });
+	auto a = std::make_shared<PDFAnnotation>(pdf);
+	m_pdfobj.push_back({ pdf, r, a });
 
 	m_pdfobj.back().render->set_rendercallback([&](size_t i) {
 		PostMessage(m_render->get_attached_window()->get_hwnd(), WM_PAINT, 0, 0);
@@ -16,7 +17,8 @@ DocantoWin::PDFHandler::PDFHandler(const std::filesystem::path& p, std::shared_p
 void DocantoWin::PDFHandler::add_pdf(const std::filesystem::path& p) {
 	auto pdf = std::make_shared<PDF>(p);
 	auto r = std::make_shared<PDFRenderer>(pdf, m_pdfimageprocessor);
-	m_pdfobj.push_back({ pdf, r });
+	auto a = std::make_shared<PDFAnnotation>(pdf);
+	m_pdfobj.push_back({ pdf, r, a});
 	m_pdfobj.back().render->set_rendercallback([&](size_t i) {
 		PostMessage(m_render->get_attached_window()->get_hwnd(), WM_PAINT, 0, 0);
 	});

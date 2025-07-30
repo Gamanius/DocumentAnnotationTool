@@ -13,3 +13,4 @@
 #include "pdf/PDF.h"
 #include "pdf/PDFContext.h"
 #include "pdf/PDFRenderer.h"
+#include "pdf/PDFAnnotation.h"
