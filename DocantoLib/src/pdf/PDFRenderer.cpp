@@ -369,7 +369,7 @@ Docanto::Image get_image_from_list(fz_context* ctx, fz_display_list* wrap, const
 		// create draw device
 		drawdevice = fz_new_draw_device(ctx, fz_identity, pixmap);
 		// render to draw device
-		fz_clear_pixmap_with_value(ctx, pixmap, 0xff); // for the white background
+		fz_clear_pixmap(ctx, pixmap); // for transparent background
 		fz_run_display_list(ctx, wrap, drawdevice, ctm, bound, cookie);
 
 		fz_close_device(ctx, drawdevice);
