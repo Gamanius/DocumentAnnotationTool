@@ -35,6 +35,7 @@ void DocantoWin::MainWindowHandler::paint() {
 
 	m_ctx->render->set_current_transform_active();
 	m_ctx->tabs->get_active_tab()->pdfhandler->draw();
+	m_ctx->tabs->get_active_tab()->toolhandler->draw();
 
 	m_ctx->render->set_identity_transform_active();
 	m_ctx->uihandler->draw();
@@ -84,7 +85,7 @@ void DocantoWin::MainWindowHandler::key(Window::VK key, bool pressed) {
 		if (path.has_value()) {
 			Docanto::Timer t;
 			auto pdf = std::make_shared<PDFHandler>(path.value(), m_ctx->render);
-			auto tool = std::make_shared<ToolHandler>(pdf);
+			auto tool = std::make_shared<ToolHandler>(pdf, m_ctx->render);
 
 			m_ctx->tabs->add(std::make_shared<TabContext>(pdf, tool));
 			Docanto::Logger::log("Loaded PDF in ", t);
@@ -199,9 +200,15 @@ void DocantoWin::MainWindowHandler::pointer_down(Window::PointerInfo p) {
 		m_ctx->window->set_global_cursor(Window::CURSOR_TYPE::HAND_GRABBING);
 	}
 
+
+
 	// there will never be a touchpad pointer down event since we cant track them
 	if (p.type == Window::POINTER_TYPE::TOUCH or p.type == Window::POINTER_TYPE::TOUCHPAD or tool_hand_is_on) {
 		m_gesture->start_gesture(p);
+	}
+
+	if (m_ctx->tabs->get_active_tab()->toolhandler->get_current_tool().type == ToolHandler::ToolType::PEN and p.type == Window::POINTER_TYPE::MOUSE) {
+		m_ctx->tabs->get_active_tab()->toolhandler->start_ink(p.pos);
 	}
 
 	m_ctx->window->send_paint_request();
@@ -223,6 +230,9 @@ void DocantoWin::MainWindowHandler::pointer_update(Window::PointerInfo p) {
 		m_ctx->window->send_paint_request();
 	}
 
+	if (m_ctx->tabs->get_active_tab()->toolhandler->get_current_tool().type == ToolHandler::ToolType::PEN and p.type == Window::POINTER_TYPE::MOUSE) {
+		m_ctx->tabs->get_active_tab()->toolhandler->update_ink(p.pos);
+	}
 
 	m_ctx->window->send_paint_request();
 }
@@ -244,6 +254,10 @@ void DocantoWin::MainWindowHandler::pointer_up(Window::PointerInfo p) {
 
 	if (p.type == Window::POINTER_TYPE::TOUCH or p.type == Window::POINTER_TYPE::TOUCHPAD or tool_hand_is_on) {
 		m_gesture->end_gesture(p);
+	}
+
+	if (m_ctx->tabs->get_active_tab()->toolhandler->get_current_tool().type == ToolHandler::ToolType::PEN and p.type == Window::POINTER_TYPE::MOUSE) {
+		m_ctx->tabs->get_active_tab()->toolhandler->end_ink(p.pos);
 	}
 
 	m_ctx->window->send_paint_request();
@@ -294,7 +308,7 @@ DocantoWin::MainWindowHandler::MainWindowHandler(HINSTANCE instance) {
 	if (path.has_value()) {
 		Docanto::Timer t;
 		auto pdf = std::make_shared<PDFHandler>(path.value(), m_ctx->render);
-		auto tool = std::make_shared<ToolHandler>(pdf);
+		auto tool = std::make_shared<ToolHandler>(pdf, m_ctx->render);
 		
 		m_ctx->tabs->add(std::make_shared<TabContext>(pdf, tool));
 		Docanto::Logger::log("Loaded PDF in ", t);

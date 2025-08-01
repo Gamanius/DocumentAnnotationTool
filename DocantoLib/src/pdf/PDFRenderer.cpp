@@ -534,6 +534,21 @@ std::vector<Docanto::Geometry::Rectangle<double>> Docanto::PDFRenderer::get_clip
 	return recs;
 }
 
+std::vector<Docanto::Geometry::Rectangle<double>> Docanto::PDFRenderer::get_page_recs() {
+	size_t amount_of_pages = pdf_obj->get_page_count();
+	auto& positions = pimpl->m_page_pos;
+	std::vector<Docanto::Geometry::Rectangle<double>> recs;
+
+	float y = 0;
+	for (size_t i = 0; i < amount_of_pages; i++) {
+		auto dims = pdf_obj->get_page_dimension(i);
+		Docanto::Geometry::Rectangle<double> rec = { positions[i], dims };
+		recs.push_back(rec);
+	}
+
+	return recs;
+}
+
 Docanto::Geometry::Point<float> Docanto::PDFRenderer::get_position(size_t page) {
 	return pimpl->m_page_pos.at(page);
 }

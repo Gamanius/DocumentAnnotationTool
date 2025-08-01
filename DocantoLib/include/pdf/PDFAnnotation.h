@@ -36,6 +36,8 @@ namespace Docanto {
 		PDFAnnotation(std::shared_ptr<PDF> pdf_obj);
 		~PDFAnnotation();
 
+		void add_annotation(size_t page, const std::vector<Geometry::Point<float>>& all_ponts, Color c = {}, float width = 1);
+
 	private:
 		struct impl;
 

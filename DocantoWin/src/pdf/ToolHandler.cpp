@@ -1,13 +1,14 @@
 #include "ToolHandler.h"
 
-DocantoWin::ToolHandler::ToolHandler(std::shared_ptr<DocantoWin::PDFHandler> pdf) : m_pdfhandler(pdf) {
+DocantoWin::ToolHandler::ToolHandler(std::shared_ptr<DocantoWin::PDFHandler> pdf, std::shared_ptr<Direct2DRender> r) : m_pdfhandler(pdf), m_render(r) {
 	m_all_tools.push_back({ ToolType::HAND_MOVEMENT });
 	m_all_tools.push_back({ ToolType::SQUARE_SELECTION });
 	m_all_tools.push_back({ ToolType::ERASEER });
 	m_all_tools.push_back({ ToolType::PEN, {255, 0, 0} });
-	m_all_tools.push_back({ ToolType::PEN, {0, 255, 0} });
+	m_all_tools.push_back({ ToolType::PEN, {0, 255, 0}, 4 });
 	m_all_tools.push_back({ ToolType::PEN, {0, 0, 255} });
 }
+
 
 const std::vector<DocantoWin::ToolHandler::Tool>& DocantoWin::ToolHandler::get_all_tools() const {
 	return m_all_tools;
@@ -26,4 +27,48 @@ void DocantoWin::ToolHandler::set_current_tool_index(size_t id) {
 		return;
 	}
 	m_current_tool_index = id;
+}
+
+void DocantoWin::ToolHandler::start_ink(Docanto::Geometry::Point<float> p) {
+	m_current_ink.clear();
+	m_ink_target = m_pdfhandler->get_pdf_at_point(p);
+
+	if (m_ink_target.first == nullptr) {
+		return;
+	}
+
+	m_current_ink.push_back(m_render->inv_transform(p));
+}
+
+void DocantoWin::ToolHandler::update_ink(Docanto::Geometry::Point<float> p) {
+	if (m_current_ink.size() == 0) {
+		return;
+	}
+	auto check_target = m_pdfhandler->get_pdf_at_point(p);
+	if (check_target.first == nullptr) {
+		end_ink(p);
+		return;
+	}
+
+	m_current_ink.push_back(m_render->inv_transform(p));
+}
+
+void DocantoWin::ToolHandler::end_ink(Docanto::Geometry::Point<float> p) {
+	m_current_ink.push_back(m_render->inv_transform(p));
+	m_current_ink.clear();
+}
+
+void DocantoWin::ToolHandler::draw() {
+	if (m_current_ink.size() <= 2) {
+		return;
+	}
+
+	m_render->begin_draw();
+
+
+	for (size_t i = 1; i < m_current_ink.size(); i++) {
+		m_render->draw_line(m_current_ink[i - 1], m_current_ink[i], get_current_tool().col, get_current_tool().width);
+	}
+
+	m_render->end_draw();
 }

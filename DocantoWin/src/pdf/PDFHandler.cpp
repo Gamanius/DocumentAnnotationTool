@@ -93,6 +93,20 @@ void DocantoWin::PDFHandler::toggle_debug_draw() {
 	set_debug_draw(!m_debug_draw);
 }
 
+std::pair<std::shared_ptr<Docanto::PDF>, size_t> DocantoWin::PDFHandler::get_pdf_at_point(Docanto::Geometry::Point<float> p) {
+	for (auto& obj : m_pdfobj) {
+		auto all_recs = obj.render->get_page_recs();
+
+		for (size_t i = 0; i < all_recs.size(); i++) {
+			auto transformed_rect = m_render->transform(all_recs[i]);
+			if (transformed_rect.intersects(p)) {
+				return  { obj.pdf, i };
+			}
+		}
+	}
+	return { nullptr, ~0 };
+}
+
 size_t DocantoWin::PDFHandler::get_amount_of_pdfs() const {
 	return m_pdfobj.size();
 }

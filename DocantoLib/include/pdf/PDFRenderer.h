@@ -73,6 +73,8 @@ namespace Docanto {
 		/// <returns>An array containig the boundig rectangles of all pages which are intersecting the viewport</returns>
 		std::vector<Geometry::Rectangle<double>> get_clipped_page_recs();
 
+		std::vector<Geometry::Rectangle<double>> get_page_recs();
+
 		/// <summary>
 		/// 
 		/// </summary>

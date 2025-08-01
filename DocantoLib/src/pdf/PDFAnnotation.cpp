@@ -146,6 +146,20 @@ Docanto::PDFAnnotation::PDFAnnotation(std::shared_ptr<PDF> pdf_obj) : pdf_obj(pd
 Docanto::PDFAnnotation::~PDFAnnotation() {
 }
 
+void Docanto::PDFAnnotation::add_annotation(size_t page, const std::vector<Geometry::Point<float>>& all_ponts, Color c, float width) {
+	auto fzpage = pdf_obj->get_page(page).get();
+	auto ctx = Docanto::GlobalPDFContext::get_instance().get();
+
+
+	pdf_annot* annot = pdf_create_annot(*ctx, reinterpret_cast<pdf_page*>(*fzpage), PDF_ANNOT_INK);
+	int count[1] = { all_ponts.size() };
+	// the reason we can just put in the all points vector is that Point
+	pdf_set_annot_ink_list(*ctx, annot, 1, count, reinterpret_cast<const fz_point*>(all_ponts.data()));
+
+
+}
+
+
 
 Docanto::PDFAnnotation::AnnotationType to_annot_type(enum pdf_annot_type t) {
 	switch (t) {

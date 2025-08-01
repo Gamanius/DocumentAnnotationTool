@@ -40,8 +40,22 @@ Docanto::Geometry::Dimension<long> DocantoWin::UIToolbar::get_min_dims() {
 }
 
 int DocantoWin::UIToolbar::hit_test(Docanto::Geometry::Point<long> where) {
-	const auto& all_tools = ctx.lock()->tabs->get_active_tab()->toolhandler->get_all_tools();
 	auto recs = get_toolbar_recs();
+
+	for (size_t i = 0; i < recs.size(); i++) {
+		auto r = recs[i];
+
+		if (r.intersects(where)) {
+
+			return HTCLIENT;
+		}
+	}
+	return HTCAPTION;
+}
+
+void DocantoWin::UIToolbar::pointer_press(Docanto::Geometry::Point<float> where, int hit) {
+	auto recs = get_toolbar_recs();
+	const auto& all_tools = ctx.lock()->tabs->get_active_tab()->toolhandler->get_all_tools();
 
 	for (size_t i = 0; i < recs.size(); i++) {
 		auto r = recs[i];
@@ -53,21 +67,9 @@ int DocantoWin::UIToolbar::hit_test(Docanto::Geometry::Point<long> where) {
 			else {
 				this->ctx.lock()->window->set_default_cursor();
 			}
-			return HTCLIENT;
-		}
-	}
-	return HTCAPTION;
-}
 
-void DocantoWin::UIToolbar::pointer_press(Docanto::Geometry::Point<float> where, int hit) {
-	auto recs = get_toolbar_recs();
-
-	for (size_t i = 0; i < recs.size(); i++) {
-		auto r = recs[i];
-
-		if (r.intersects(where)) {
 			ctx.lock()->tabs->get_active_tab()->toolhandler->set_current_tool_index(i);
-			sys_draw();
+			ctx.lock()->window->send_paint_request();
 			break;
 		}
 	}

@@ -40,6 +40,8 @@ namespace DocantoWin {
 		void set_debug_draw(bool b = true);
 		void toggle_debug_draw();
 
+		std::pair<std::shared_ptr<Docanto::PDF>, size_t> get_pdf_at_point(Docanto::Geometry::Point<float> p);
+
 		size_t get_amount_of_pdfs() const;
 	};
 }
