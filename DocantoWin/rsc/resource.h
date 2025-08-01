@@ -2,7 +2,10 @@
 // Microsoft Visual C++ generated include file.
 // Used by Resource.rc
 //
-#define IDR_SVG_PEN_TOOL                        101
+#define IDR_SVG_PEN_TOOL                         101
+#define IDR_SVG_MOVE_TOOL                        102
+#define IDR_SVG_ERASE_TOOL                       103
+#define IDR_SVG_SELECT_TOOL                      104
 
 // Next default values for new objects
 // 

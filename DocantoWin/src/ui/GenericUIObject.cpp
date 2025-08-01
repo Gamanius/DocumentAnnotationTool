@@ -90,6 +90,10 @@ Docanto::Geometry::Dimension<float> DocantoWin::GenericUIObject::get_bounds() {
 }
 
 void DocantoWin::GenericUIObject::set_bounds(Docanto::Geometry::Dimension<float> bounds) {
+	// update bounds so it always respect the min dims
+	auto min_dim = get_min_dims();
+	bounds = { max(bounds.width, min_dim.width), max(bounds.height, min_dim.height) };
+
 	if (is_floating()) {
 		m_window->set_window_dim(bounds);
 	}

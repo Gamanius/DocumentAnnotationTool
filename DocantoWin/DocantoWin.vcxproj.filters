@@ -128,6 +128,9 @@
     <None Include="rsc\svg1.bin">
       <Filter>Resource Files</Filter>
     </None>
+    <None Include="rsc\move-tool.svg" />
+    <None Include="rsc\erase-tool.svg" />
+    <None Include="rsc\select-tool.svg" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="rsc\Resource.rc">

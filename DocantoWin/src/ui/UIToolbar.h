@@ -4,6 +4,7 @@
 
 namespace DocantoWin {
 	class UIToolbar : public GenericUIObject {
+		Direct2DRender::SVGDocument pen_tool;
 	public:
 		UIToolbar(const std::wstring& UIName = L"Toolbar");
 

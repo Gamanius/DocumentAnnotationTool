@@ -57,7 +57,8 @@ DocantoWin::Direct2DRender::Direct2DRender(std::shared_ptr<Window> w) : m_window
 	};
 
 	// Create the DX11 API device object, and get a corresponding context.
-	ComPtr<ID3D11DeviceContext> d3d11context;
+	ComPtr<ID3D11DeviceContext> d3d11context; 
+	ComPtr<IDXGIDevice> dxdevice;
 
 	auto res = D3D11CreateDevice(
 		nullptr,                    // specify null to use the default adapter
@@ -77,13 +78,13 @@ DocantoWin::Direct2DRender::Direct2DRender(std::shared_ptr<Window> w) : m_window
 		return;
 	}
 
-	res = m_d3d11device.As(&m_dxdevice);
+	res = m_d3d11device.As(&dxdevice);
 	if (res != S_OK) {
 		Docanto::Logger::error("Couldn't get DX Adapter");
 		return;
 	}
 
-	res = m_factory->CreateDevice(m_dxdevice.Get(), &m_device);
+	res = m_factory->CreateDevice(dxdevice.Get(), &m_device);
 	if (res != S_OK) {
 		Docanto::Logger::error("Couldn't get Direct2D Device");
 		return;
@@ -109,7 +110,7 @@ DocantoWin::Direct2DRender::Direct2DRender(std::shared_ptr<Window> w) : m_window
 	swapChainDesc.Flags = 0;
 
 	ComPtr<IDXGIAdapter> dxgiAdapter;
-	m_dxdevice->GetAdapter(&dxgiAdapter);
+	dxdevice->GetAdapter(&dxgiAdapter);
 	ComPtr<IDXGIFactory2> dxgiFactory;
 	dxgiAdapter->GetParent(IID_PPV_ARGS(&dxgiFactory));
 
@@ -273,6 +274,40 @@ void DocantoWin::Direct2DRender::draw_bitmap(Docanto::Geometry::Point<float> whe
 	begin_draw();
 	auto size = obj.m_object->GetSize();
 	m_devicecontext->DrawBitmap(obj.m_object, D2D1::RectF(where.x, where.y, size.width * scale + where.x, size.height * scale + where.y));
+	end_draw();
+}
+
+void DocantoWin::Direct2DRender::draw_svg(int id, Docanto::Geometry::Point<float> where, Docanto::Color c, Docanto::Geometry::Dimension<float> size) {
+	const size_t svg_default_size = 800; //px
+	if (!m_cached_svgs.contains(id)) {
+		m_cached_svgs[id] = create_svg(id);
+	}
+
+	auto& svg = m_cached_svgs[id];
+	float scale_x = size.width / svg_default_size;
+	float scale_y = size.height / svg_default_size;
+
+	ComPtr<ID2D1SvgElement> root;
+	svg->GetRoot(&root);
+	auto col = ColorToD2D1(c);
+	root->SetAttributeValue(L"stroke", col);
+
+	begin_draw();
+	D2D1_MATRIX_3X2_F last_transform;
+	m_devicecontext->GetTransform(&last_transform);
+
+	// this code will break so damn fast if the last transform isnt guaranteed to be a transformation
+	// i'm keeping it this way since drawing svg is only for UI elements which do not get scaled (for now)
+	D2D1_MATRIX_3X2_F transform =
+		D2D1::Matrix3x2F::Scale(scale_x, scale_y) *
+		last_transform *
+		D2D1::Matrix3x2F::Translation(where.x, where.y);
+	m_devicecontext->SetTransform(transform);
+
+	m_devicecontext->DrawSvgDocument(svg);
+
+	m_devicecontext->SetTransform(last_transform);
+
 	end_draw();
 }
 
@@ -545,8 +580,33 @@ DocantoWin::Direct2DRender::SVGDocument DocantoWin::Direct2DRender::create_svg(i
 	DWORD size = SizeofResource(NULL, res);
 	void* ptr = LockResource(resData);
 
-	
-	return SVGDocument();
+	ComPtr<IStream> stream;
+	HRESULT hr = CreateStreamOnHGlobal(nullptr, TRUE, &stream);
+	if (FAILED(hr)) {
+		Docanto::Logger::error("Failed to create stream for SVG id ", id);
+		return SVGDocument();
+	}
+
+	// Write the resource data to the stream
+	ULONG written;
+	hr = stream->Write(ptr, size, &written);
+	if (FAILED(hr) || written != size) {
+		Docanto::Logger::error("Failed to write SVG data to stream for id ", id);
+		return SVGDocument();
+	}
+
+	// Reset stream position
+	LARGE_INTEGER li = {};
+	stream->Seek(li, STREAM_SEEK_SET, nullptr);
+
+	SVGDocument svg;
+	hr = m_devicecontext->CreateSvgDocument(stream.Get(), D2D1::SizeF(1, 1), &svg.m_object);
+	if (FAILED(hr)) {
+		Docanto::Logger::error("Failed to create SVG document for id ", id);
+		return SVGDocument();
+	}
+
+	return svg;
 }
 
 DocantoWin::Direct2DRender::BrushObject DocantoWin::Direct2DRender::create_brush(Docanto::Color c) {

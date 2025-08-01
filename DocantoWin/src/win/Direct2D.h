@@ -22,10 +22,11 @@ namespace DocantoWin {
 		static ID2D1Factory6* m_factory;
 		static IDWriteFactory3* m_writeFactory;
 		
+		ComPtr<ID3D11Device> m_d3d11device;
+
 		ComPtr<ID2D1Device5> m_device = nullptr;
 		ComPtr<ID2D1DeviceContext5> m_devicecontext = nullptr;
-		ComPtr<ID3D11Device> m_d3d11device;
-		ComPtr<IDXGIDevice> m_dxdevice;
+
 		ComPtr<ID2D1Bitmap1> m_targetBitmap; 
 		ComPtr<IDXGISwapChain1> m_swapChain;
 
@@ -35,6 +36,7 @@ namespace DocantoWin {
 
 		std::atomic<UINT32> m_isRenderinProgress = 0;
 		std::mutex draw_lock;
+
 
 		void createD2DResources();
 	public:
@@ -93,6 +95,8 @@ namespace DocantoWin {
 		// GPU resources
 		BrushObject m_solid_brush;
 
+		std::map<int, SVGDocument> m_cached_svgs;
+
 	public:
 
 		Direct2DRender(std::shared_ptr<Window> w);
@@ -120,6 +124,8 @@ namespace DocantoWin {
 		void draw_bitmap(Docanto::Geometry::Point<float> where, BitmapObject& obj);
 		void draw_bitmap(Docanto::Geometry::Rectangle<float> rec, BitmapObject& obj);
 		void draw_bitmap(Docanto::Geometry::Point<float> where, BitmapObject& obj, float dpi);
+
+		void draw_svg(int id, Docanto::Geometry::Point<float> where, Docanto::Color c = {}, Docanto::Geometry::Dimension<float> size = { 32, 32 });
 
 		void set_current_transform_active();
 		void set_identity_transform_active();

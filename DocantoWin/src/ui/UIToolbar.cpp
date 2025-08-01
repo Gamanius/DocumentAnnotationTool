@@ -3,14 +3,16 @@
 #include "pdf/PDFHandler.h"
 #include <format>
 
+#include "../../rsc/resource.h"
+
 DocantoWin::UIToolbar::UIToolbar(const std::wstring& UIName) : GenericUIObject(UIName, true) {
-	this->set_bounds({ 100, 100 });
+	this->set_bounds({ 100, 32 });
 	this->set_pos({ 100, 50 });
 }
 
 
 Docanto::Geometry::Dimension<long> DocantoWin::UIToolbar::get_min_dims() {
-	return Docanto::Geometry::Dimension<long>({ 50, 50 });
+	return Docanto::Geometry::Dimension<long>({ 30, 30 });
 }
 
 int DocantoWin::UIToolbar::hit_test(Docanto::Geometry::Point<long> where) {
@@ -27,15 +29,20 @@ void DocantoWin::UIToolbar::pointer_release(Docanto::Geometry::Point<float> wher
 }
 
 void DocantoWin::UIToolbar::draw(std::shared_ptr<Direct2DRender> render) {
-	float size = 18;
-	float padding = 5;
+	namespace Vars = AppVariables::Colors;
 
-	Docanto::Geometry::Point<float> offset = {};
+	auto bound = get_bounds();
+	Docanto::Geometry::Dimension<float> dims = { bound.height, bound.height };
+	size_t amount_element = 5;
+	auto offset = (bound.width - amount_element * dims.width) / 2.0f;
 
 	render->begin_draw();
-	render->clear(AppVariables::Colors::get(AppVariables::Colors::TYPE::PRIMARY_COLOR));
-	render->draw_text(L"Toolbar:", offset, AppVariables::Colors::get(AppVariables::Colors::TYPE::TEXT_COLOR), size);
-	
+	render->clear(Vars::get(Vars::TYPE::PRIMARY_COLOR));
+	render->draw_svg(IDR_SVG_MOVE_TOOL  , { offset + dims.width * 0, 0 }, Vars::get(Vars::TYPE::TEXT_COLOR), dims);
+	render->draw_svg(IDR_SVG_SELECT_TOOL, { offset + dims.width * 1, 0 }, Vars::get(Vars::TYPE::TEXT_COLOR), dims);
+	render->draw_svg(IDR_SVG_ERASE_TOOL , { offset + dims.width * 2, 0 }, Vars::get(Vars::TYPE::TEXT_COLOR), dims);
+	render->draw_svg(IDR_SVG_PEN_TOOL   , { offset + dims.width * 3, 0 }, {255, 0, 0}, dims);
+	render->draw_svg(IDR_SVG_PEN_TOOL   , { offset + dims.width * 4, 0 }, {255, 255, 0}, dims);
 	
 	render->end_draw();
 }

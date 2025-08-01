@@ -199,7 +199,10 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <None Include="rsc\erase-tool.svg" />
+    <None Include="rsc\move-tool.svg" />
     <None Include="rsc\pen-tool.svg" />
+    <None Include="rsc\select-tool.svg" />
     <None Include="rsc\svg1.bin" />
   </ItemGroup>
   <ItemGroup>
