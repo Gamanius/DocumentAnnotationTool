@@ -183,7 +183,9 @@ namespace DocantoWin {
 			POINTER,
 			NWSE_RESIZE,
 			NESW_RESIZE,
-			TOPBOTTOM_RESIZE
+			TOPBOTTOM_RESIZE,
+			HAND,
+			HAND_GRABBING,
 		};
 
 		struct PointerInfo {
@@ -216,6 +218,9 @@ namespace DocantoWin {
 			Docanto::Geometry::Dimension<long> m_min_window_size = { 300, 300 };
 
 			bool m_override_default_hittest = false;
+
+			std::optional<CURSOR_TYPE> m_globalcursor;
+
 	public:
 
 		static LRESULT wndproc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -333,6 +338,8 @@ namespace DocantoWin {
 		void set_window_resizable(bool resize);
 		
 		void set_cursor(CURSOR_TYPE tpye);
+		void set_global_cursor(CURSOR_TYPE tpye);
+		void set_default_cursor();
 
 		void set_callback_paint(std::function<void()> callback);
 		void set_callback_size(std::function<void(Docanto::Geometry::Dimension<long>)> callback);

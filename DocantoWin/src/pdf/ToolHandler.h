@@ -10,6 +10,7 @@ namespace DocantoWin {
 		enum class ToolType {
 			SQUARE_SELECTION,
 			HAND_MOVEMENT,
+			ERASEER,
 			PEN,
 		};
 
@@ -22,11 +23,14 @@ namespace DocantoWin {
 	private:
 		std::shared_ptr<PDFHandler> m_pdfhandler;
 		std::vector<Tool> m_all_tools;
-
+		size_t m_current_tool_index = 0;
 	public:
 
 		ToolHandler(std::shared_ptr<PDFHandler> pdf);
-		const std::vector<Tool>& get_all_tools();
+		const std::vector<Tool>& get_all_tools() const;
+		const Tool& get_current_tool() const;
+		const size_t get_current_tool_index() const;
+		void set_current_tool_index(size_t id);
 	};
 
 }

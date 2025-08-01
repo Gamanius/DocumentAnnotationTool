@@ -13,9 +13,9 @@ namespace DocantoWin {
 		UIContainer(std::weak_ptr<Context> c);
 
 		void draw();
-		void pointer_down(Docanto::Geometry::Point<float> where);
-		void pointer_update(Docanto::Geometry::Point<float> where);
-		void pointer_up(Docanto::Geometry::Point<float> where);
+		bool pointer_down(Docanto::Geometry::Point<float> where);
+		bool pointer_update(Docanto::Geometry::Point<float> where);
+		bool pointer_up(Docanto::Geometry::Point<float> where);
 
 		void resize(Docanto::Geometry::Dimension<long> new_dim);
 

@@ -131,6 +131,12 @@
     <None Include="rsc\move-tool.svg" />
     <None Include="rsc\erase-tool.svg" />
     <None Include="rsc\select-tool.svg" />
+    <None Include="rsc\grabbing-cursor.cur">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="rsc\grab-cursor.cur">
+      <Filter>Resource Files</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="rsc\Resource.rc">

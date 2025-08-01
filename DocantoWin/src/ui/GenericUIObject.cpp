@@ -60,6 +60,7 @@ DocantoWin::GenericUIObject::GenericUIObject(const std::wstring& UIName, bool re
 
 	m_window->set_callback_pointer_down([&](DocantoWin::Window::PointerInfo p) {
 		m_local_mouse = p.pos;
+		this->pointer_press(p.pos, hit_test(p.pos));
 	});
 
 	m_window->set_callback_moving([&](Docanto::Geometry::Point<long> p) {

@@ -189,11 +189,18 @@ void DocantoWin::MainWindowHandler::pointer_down(Window::PointerInfo p) {
 		return;
 	}
 
+	if (m_ctx->uihandler->pointer_down(p.pos)) {
+		m_ctx->window->send_paint_request();
+		return;
+	}
 
-	m_ctx->uihandler->pointer_down(p.pos);
+	auto tool_hand_is_on = m_ctx->tabs->get_active_tab()->toolhandler->get_current_tool().type == ToolHandler::ToolType::HAND_MOVEMENT;
+	if (tool_hand_is_on) {
+		m_ctx->window->set_global_cursor(Window::CURSOR_TYPE::HAND_GRABBING);
+	}
 
 	// there will never be a touchpad pointer down event since we cant track them
-	if (p.type == Window::POINTER_TYPE::TOUCH or p.type == Window::POINTER_TYPE::TOUCHPAD) {
+	if (p.type == Window::POINTER_TYPE::TOUCH or p.type == Window::POINTER_TYPE::TOUCHPAD or tool_hand_is_on) {
 		m_gesture->start_gesture(p);
 	}
 
@@ -205,9 +212,13 @@ void DocantoWin::MainWindowHandler::pointer_update(Window::PointerInfo p) {
 		return;
 	}
 
-	m_ctx->uihandler->pointer_update(p.pos);
+	if (m_ctx->uihandler->pointer_update(p.pos)) {
+		m_ctx->window->send_paint_request();
+		return;
+	}
 
-	if (p.type == Window::POINTER_TYPE::TOUCH or p.type == Window::POINTER_TYPE::TOUCHPAD) {
+	if (p.type == Window::POINTER_TYPE::TOUCH or p.type == Window::POINTER_TYPE::TOUCHPAD or
+		m_ctx->tabs->get_active_tab()->toolhandler->get_current_tool().type == ToolHandler::ToolType::HAND_MOVEMENT) {
 		m_gesture->update_gesture(p);
 		m_ctx->window->send_paint_request();
 	}
@@ -221,9 +232,17 @@ void DocantoWin::MainWindowHandler::pointer_up(Window::PointerInfo p) {
 		return;
 	}
 
-	m_ctx->uihandler->pointer_up(p.pos);
+	if (m_ctx->uihandler->pointer_up(p.pos)) {
+		m_ctx->window->send_paint_request();
+		return;
+	}
 
-	if (p.type == Window::POINTER_TYPE::TOUCH or p.type == Window::POINTER_TYPE::TOUCHPAD) {
+	auto tool_hand_is_on = m_ctx->tabs->get_active_tab()->toolhandler->get_current_tool().type == ToolHandler::ToolType::HAND_MOVEMENT;
+	if (tool_hand_is_on) {
+		m_ctx->window->set_global_cursor(Window::CURSOR_TYPE::HAND);
+	}
+
+	if (p.type == Window::POINTER_TYPE::TOUCH or p.type == Window::POINTER_TYPE::TOUCHPAD or tool_hand_is_on) {
 		m_gesture->end_gesture(p);
 	}
 
@@ -231,8 +250,6 @@ void DocantoWin::MainWindowHandler::pointer_up(Window::PointerInfo p) {
 }
 
 DocantoWin::MainWindowHandler::MainWindowHandler(HINSTANCE instance) {
-
-
 	m_ctx = std::make_shared<Context>();
 	m_ctx->window = std::make_shared<Window>(instance);
 	m_ctx->render = std::make_shared<Direct2DRender>(m_ctx->window);

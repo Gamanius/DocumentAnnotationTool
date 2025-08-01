@@ -23,7 +23,7 @@ DocantoWin::UIContainer::UIContainer(std::weak_ptr<Context> c) {
 	ctx = c;
 }
 
-void DocantoWin::UIContainer::pointer_down(Docanto::Geometry::Point<float> where) {
+bool DocantoWin::UIContainer::pointer_down(Docanto::Geometry::Point<float> where) {
 	for (auto& ref : m_all_uiobjects) {
 		if (!ref->get_rec().intersects(where)) {
 			continue;
@@ -32,11 +32,12 @@ void DocantoWin::UIContainer::pointer_down(Docanto::Geometry::Point<float> where
 		m_hit_uiobject = { ref, ref->sys_hit_test(where - ref->get_pos()) };
 
 		m_hit_uiobject.first->sys_pointer_down(where, m_hit_uiobject.second);
-		break;
+		return true;
 	}
+	return false;
 }
 
-void DocantoWin::UIContainer::pointer_update(Docanto::Geometry::Point<float> where) {
+bool DocantoWin::UIContainer::pointer_update(Docanto::Geometry::Point<float> where) {
 	int hit = HTNOWHERE;
 	for (auto& ref : m_all_uiobjects) {
 		hit = ref->sys_hit_test(where - ref->get_pos());
@@ -46,24 +47,26 @@ void DocantoWin::UIContainer::pointer_update(Docanto::Geometry::Point<float> whe
 		}
 	}
 	if (hit != HTBOTTOMRIGHT) {
-		ctx.lock()->window->set_cursor(Window::CURSOR_TYPE::POINTER);
+		//ctx.lock()->window->set_cursor(Window::CURSOR_TYPE::POINTER);
 	}
 
 	auto window = ctx.lock()->render->get_attached_window();
 	if (m_hit_uiobject.first == nullptr) {
-		return;
+		return false;
 	}
 	m_hit_uiobject.first->sys_pointer_update(where, m_hit_uiobject.second);
+	return true;
 }
 
-void DocantoWin::UIContainer::pointer_up(Docanto::Geometry::Point<float> where) {
+bool DocantoWin::UIContainer::pointer_up(Docanto::Geometry::Point<float> where) {
 	if (m_hit_uiobject.first == nullptr) {
-		return;
+		return false;
 	}
 
 	m_hit_uiobject.first->sys_pointer_release(where, m_hit_uiobject.second);
 
 	m_hit_uiobject = {};
+	return true;
 }
 
 

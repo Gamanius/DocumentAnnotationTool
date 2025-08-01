@@ -200,6 +200,8 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="rsc\erase-tool.svg" />
+    <None Include="rsc\grab-cursor.cur" />
+    <None Include="rsc\grabbing-cursor.cur" />
     <None Include="rsc\move-tool.svg" />
     <None Include="rsc\pen-tool.svg" />
     <None Include="rsc\select-tool.svg" />

@@ -12,6 +12,8 @@
 #include <winrt/Windows.UI.ViewManagement.h>
 #include <winrt/Windows.Foundation.Collections.h>
 
+#include "../../rsc/resource.h"
+
 #define CHECK_BIT(var,pos) ((var) & (1<<(pos)))
 
 bool DocantoWin::Window::g_touchpadGestureInProgress = false;
@@ -355,6 +357,14 @@ LRESULT DocantoWin::Window::parse_message(UINT uMsg, WPARAM wParam, LPARAM lPara
 		case HTCLOSE:
 			SendMessage(m_hwnd, WM_CLOSE, 0, 0);
 			return 0;
+		}
+		break;
+	}
+	case WM_SETCURSOR:
+	{
+		if (m_globalcursor.has_value()) {
+			this->set_cursor(m_globalcursor.value());
+			return true;
 		}
 		break;
 	}
@@ -877,7 +887,25 @@ void DocantoWin::Window::set_cursor(CURSOR_TYPE tpye) {
 		SetCursor(LoadCursor(nullptr, IDC_SIZENS));
 		return;
 	}
+	case HAND:
+	{
+		SetCursor(LoadCursor(GetModuleHandle(NULL), MAKEINTRESOURCE(IDC_CURSOR_GRAB)));
+		return;
 	}
+	case HAND_GRABBING:
+	{
+		SetCursor(LoadCursor(GetModuleHandle(NULL), MAKEINTRESOURCE(IDC_CURSOR_GRABBING)));
+		return;
+	}
+	}
+}
+
+void DocantoWin::Window::set_global_cursor(CURSOR_TYPE tpye) {
+	m_globalcursor = tpye;
+}
+
+void DocantoWin::Window::set_default_cursor() {
+	m_globalcursor = std::nullopt;
 }
 
 void DocantoWin::Window::get_window_messages(bool blocking) {

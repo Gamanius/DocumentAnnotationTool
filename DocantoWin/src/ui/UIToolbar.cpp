@@ -3,7 +3,25 @@
 #include "pdf/PDFHandler.h"
 #include <format>
 
+#include "pdf/ToolHandler.h"
+
 #include "../../rsc/resource.h"
+
+std::vector<Docanto::Geometry::Rectangle<float>> DocantoWin::UIToolbar::get_toolbar_recs() {
+	const auto& all_tools = ctx.lock()->tabs->get_active_tab()->toolhandler->get_all_tools();
+	size_t amount_element = all_tools.size();
+	auto bound = get_bounds(); 
+	
+	Docanto::Geometry::Dimension<float> dims = { bound.height, bound.height };
+	auto offset = (bound.width - amount_element * dims.width) / 2.0f;
+
+	std::vector<Docanto::Geometry::Rectangle<float>> recs(amount_element);
+	for (size_t i = 0; i < amount_element; i++) {
+		recs[i] = { offset + dims.width * i, 0, dims };
+	}
+
+	return recs;
+}
 
 DocantoWin::UIToolbar::UIToolbar(const std::wstring& UIName) : GenericUIObject(UIName, true) {
 	this->set_bounds({ 100, 32 });
@@ -12,14 +30,47 @@ DocantoWin::UIToolbar::UIToolbar(const std::wstring& UIName) : GenericUIObject(U
 
 
 Docanto::Geometry::Dimension<long> DocantoWin::UIToolbar::get_min_dims() {
-	return Docanto::Geometry::Dimension<long>({ 30, 30 });
+	if (ctx.lock()  == nullptr) {
+		return Docanto::Geometry::Dimension<long>({ 30 * 4, 30 });
+	}
+	const auto& all_tools = ctx.lock()->tabs->get_active_tab()->toolhandler->get_all_tools();
+	long amount_element = all_tools.size();
+
+	return Docanto::Geometry::Dimension<long>({ 30 * (amount_element + 2), 30 });
 }
 
 int DocantoWin::UIToolbar::hit_test(Docanto::Geometry::Point<long> where) {
+	const auto& all_tools = ctx.lock()->tabs->get_active_tab()->toolhandler->get_all_tools();
+	auto recs = get_toolbar_recs();
+
+	for (size_t i = 0; i < recs.size(); i++) {
+		auto r = recs[i];
+
+		if (r.intersects(where)) {
+			if (all_tools[i].type == ToolHandler::ToolType::HAND_MOVEMENT) {
+				this->ctx.lock()->window->set_global_cursor(Window::CURSOR_TYPE::HAND);
+			}
+			else {
+				this->ctx.lock()->window->set_default_cursor();
+			}
+			return HTCLIENT;
+		}
+	}
 	return HTCAPTION;
 }
 
 void DocantoWin::UIToolbar::pointer_press(Docanto::Geometry::Point<float> where, int hit) {
+	auto recs = get_toolbar_recs();
+
+	for (size_t i = 0; i < recs.size(); i++) {
+		auto r = recs[i];
+
+		if (r.intersects(where)) {
+			ctx.lock()->tabs->get_active_tab()->toolhandler->set_current_tool_index(i);
+			sys_draw();
+			break;
+		}
+	}
 }
 
 void DocantoWin::UIToolbar::pointer_update(Docanto::Geometry::Point<float> where, int hit) {
@@ -31,18 +82,51 @@ void DocantoWin::UIToolbar::pointer_release(Docanto::Geometry::Point<float> wher
 void DocantoWin::UIToolbar::draw(std::shared_ptr<Direct2DRender> render) {
 	namespace Vars = AppVariables::Colors;
 
-	auto bound = get_bounds();
-	Docanto::Geometry::Dimension<float> dims = { bound.height, bound.height };
-	size_t amount_element = 5;
-	auto offset = (bound.width - amount_element * dims.width) / 2.0f;
+	const auto& all_tools = ctx.lock()->tabs->get_active_tab()->toolhandler->get_all_tools();
+	auto recs = get_toolbar_recs();
+
 
 	render->begin_draw();
 	render->clear(Vars::get(Vars::TYPE::PRIMARY_COLOR));
-	render->draw_svg(IDR_SVG_MOVE_TOOL  , { offset + dims.width * 0, 0 }, Vars::get(Vars::TYPE::TEXT_COLOR), dims);
-	render->draw_svg(IDR_SVG_SELECT_TOOL, { offset + dims.width * 1, 0 }, Vars::get(Vars::TYPE::TEXT_COLOR), dims);
-	render->draw_svg(IDR_SVG_ERASE_TOOL , { offset + dims.width * 2, 0 }, Vars::get(Vars::TYPE::TEXT_COLOR), dims);
-	render->draw_svg(IDR_SVG_PEN_TOOL   , { offset + dims.width * 3, 0 }, {255, 0, 0}, dims);
-	render->draw_svg(IDR_SVG_PEN_TOOL   , { offset + dims.width * 4, 0 }, {255, 255, 0}, dims);
+
+	for (size_t i = 0; i < recs.size(); i++) {
+		auto r = recs[i];
+		auto tool = all_tools[i];
+
+		size_t id_to_draw = IDR_SVG_MOVE_TOOL;
+		Docanto::Color c = Vars::get(Vars::TYPE::TEXT_COLOR);
+
+		switch (tool.type) {
+		case ToolHandler::ToolType::HAND_MOVEMENT:
+		{
+			id_to_draw = IDR_SVG_MOVE_TOOL;
+			break;
+		}
+		case ToolHandler::ToolType::ERASEER:
+		{
+			id_to_draw = IDR_SVG_ERASE_TOOL;
+			break;
+		}
+		case ToolHandler::ToolType::PEN:
+		{
+			id_to_draw = IDR_SVG_PEN_TOOL;
+			c = tool.col;
+			break;
+		}
+		case ToolHandler::ToolType::SQUARE_SELECTION:
+		{
+			id_to_draw = IDR_SVG_SELECT_TOOL;
+			break;
+		}
+		}
+		
+		if (i == ctx.lock()->tabs->get_active_tab()->toolhandler->get_current_tool_index()) {
+			render->draw_rect_filled(r, Vars::get(Vars::TYPE::ACCENT_COLOR));
+		}
+		render->draw_svg(id_to_draw, r.upperleft(), c, r.dims());
+
+	}
+
 	
 	render->end_draw();
 }
