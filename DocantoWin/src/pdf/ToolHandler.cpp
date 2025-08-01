@@ -33,7 +33,7 @@ void DocantoWin::ToolHandler::start_ink(Docanto::Geometry::Point<float> p) {
 	m_current_ink.clear();
 	m_ink_target = m_pdfhandler->get_pdf_at_point(p);
 
-	if (m_ink_target.first == nullptr) {
+	if (m_ink_target.first.pdf == nullptr) {
 		return;
 	}
 
@@ -45,7 +45,7 @@ void DocantoWin::ToolHandler::update_ink(Docanto::Geometry::Point<float> p) {
 		return;
 	}
 	auto check_target = m_pdfhandler->get_pdf_at_point(p);
-	if (check_target.first == nullptr) {
+	if (check_target.first.pdf == nullptr) {
 		end_ink(p);
 		return;
 	}
@@ -55,6 +55,16 @@ void DocantoWin::ToolHandler::update_ink(Docanto::Geometry::Point<float> p) {
 
 void DocantoWin::ToolHandler::end_ink(Docanto::Geometry::Point<float> p) {
 	m_current_ink.push_back(m_render->inv_transform(p));
+
+	if (m_ink_target.first.annotation != nullptr) {
+		m_ink_target.first.annotation->add_annotation(m_ink_target.second, 
+			m_current_ink, get_current_tool().col, get_current_tool().width);
+
+		m_ink_target.first.render->reload_annotations_page(m_ink_target.second);
+
+		m_render->get_attached_window()->send_paint_request();
+	}
+
 	m_current_ink.clear();
 }
 

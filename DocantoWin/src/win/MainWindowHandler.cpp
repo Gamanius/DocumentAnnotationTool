@@ -96,6 +96,11 @@ void DocantoWin::MainWindowHandler::key(Window::VK key, bool pressed) {
 	{
 		auto& last = m_ctx->uihandler->get_all_uiobjects_ref().back();
 		last->set_resizable(!last->is_resizable());
+		break;
+	}
+	case F5:
+	{
+		m_ctx->tabs->get_active_tab()->pdfhandler->reload();
 	}
 	case KEY_1:
 	{

@@ -27,7 +27,7 @@ namespace DocantoWin {
 		size_t m_current_tool_index = 0;
 
 		std::vector<Docanto::Geometry::Point<float>> m_current_ink;
-		std::pair<std::shared_ptr<Docanto::PDF>, size_t> m_ink_target;
+		std::pair<PDFHandler::PDFWrapper, size_t> m_ink_target;
 	public:
 
 		ToolHandler(std::shared_ptr<PDFHandler> pdf, std::shared_ptr<Direct2DRender>r);

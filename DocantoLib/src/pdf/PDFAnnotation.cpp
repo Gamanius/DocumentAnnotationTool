@@ -8,8 +8,6 @@ struct AnnotationWrapper {
 	pdf_annot* obj = nullptr;
 
 	AnnotationWrapper(pdf_annot* a) : obj(a) {
-		auto ctx = Docanto::GlobalPDFContext::get_instance().get();
-		pdf_keep_annot(*ctx, a);
 	}
 
 	AnnotationWrapper(const AnnotationWrapper&) = delete;
@@ -130,7 +128,7 @@ void Docanto::PDFAnnotation::parse_annotation() {
 			}
 			info = do_general_annot(annot, info);
 
-			pimpl->all_annotations.back().push_back({ info, AnnotationWrapper(annot) });
+			pimpl->all_annotations.back().push_back({ info, pdf_keep_annot(*ctx, annot)});
 
 			annot = pdf_next_annot(*ctx, annot);
 		} 
@@ -150,13 +148,25 @@ void Docanto::PDFAnnotation::add_annotation(size_t page, const std::vector<Geome
 	auto fzpage = pdf_obj->get_page(page).get();
 	auto ctx = Docanto::GlobalPDFContext::get_instance().get();
 
-
 	pdf_annot* annot = pdf_create_annot(*ctx, reinterpret_cast<pdf_page*>(*fzpage), PDF_ANNOT_INK);
 	int count[1] = { all_ponts.size() };
 	// the reason we can just put in the all points vector is that Point
 	pdf_set_annot_ink_list(*ctx, annot, 1, count, reinterpret_cast<const fz_point*>(all_ponts.data()));
 
+	pdf_set_annot_border_width(*ctx, annot, width);
+	float fzcolor[3] = { c.r / 255.0f, c.g / 255.0f, c.b / 255.0f };
+	pdf_set_annot_color(*ctx, annot, 3, fzcolor);
 
+	auto info = std::make_shared<Docanto::PDFAnnotation::InkAnnotationInfo>();
+	// bounding box
+	auto rec = pdf_bound_annot(*ctx, annot);
+	info->bounding_box = { rec.x0, rec.y0, rec.x1 - rec.x0, rec.y1 - rec.y0 };
+
+	info->col = c;
+	info->stroke_width = width;
+	info->type = PDFAnnotation::AnnotationType::INK_ANNOTATION;
+	
+	pimpl->all_annotations[page].push_back({ info, annot });
 }
 
 

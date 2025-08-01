@@ -101,6 +101,11 @@ namespace Docanto {
 		void debug_draw(std::shared_ptr<BasicRender> render);
 
 		void update();
+		void update_page_annotations(size_t page);
+
+		void reload();
+
+		void reload_annotations_page(size_t page);
 	private:
 		struct impl;
 		class RenderThreadManager;

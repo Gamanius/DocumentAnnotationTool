@@ -10,9 +10,6 @@
 
 #define FLOAT_EQUAL(a, b) (std::abs(a - b) < 0.001)
 
-
-
-
 typedef struct {
 	unsigned int cmd : 5;
 	unsigned int size : 9;
@@ -123,6 +120,15 @@ public:
 			if (m_display_list_cache.contains({ id, job->info.page, job->type })) {
 				m_display_list_cache.erase({ id, job->info.page, job->type });
 			}
+			else {
+				return;
+			}
+		}
+		else if (job->job == JobType::DELETE_DISPLAY_LIST) {
+			if (m_display_list_cache.contains({ id, job->info.page, job->type })) {
+				m_display_list_cache.erase({ id, job->info.page, job->type });
+			}
+
 		}
 		std::scoped_lock<std::mutex> lock(m_render_worker_queue_mutex);
 		job->callback_id = id;
@@ -212,6 +218,14 @@ public:
 					break;
 				}
 
+				if (job->job == JobType::DELETE_DISPLAY_LIST) {
+					if (!t_content_list.contains({ job->callback_id, job->info.page, job->type })) {
+						continue;
+					}
+					current_job = job;
+					break;
+				}
+
 				// accept any jobs that are currently in the queue
 				if (job->job == JobType::RENDER_BITMAP and job->status == RenderStatus::WAITING) {
 					// first check if the job was aborted
@@ -268,6 +282,18 @@ public:
 				current_job->threads_already_copied++;
 				lock.unlock();
 				continue;
+			}
+
+			if (current_job->job == JobType::DELETE_DISPLAY_LIST) {
+				if (!t_content_list.contains({ current_job->callback_id, current_job->info.page, current_job->type }))
+					continue;
+
+				delete_list(t_content_list[{current_job->callback_id, current_job->info.page, current_job->type}]);
+				t_content_list.erase({ current_job->callback_id, current_job->info.page, current_job->type });
+
+				lock.lock();
+				current_job->threads_already_copied++;
+				lock.unlock();
 			}
 			
 		}
@@ -661,7 +687,7 @@ size_t Docanto::PDFRenderer::cull_chunks(std::vector<Geometry::Rectangle<float>>
 		for (size_t j = 0; j < bitmaps->size(); j++) {
 			auto bitma = bitmaps->at(j);
 
-			if (bitma.page != page) {
+			if (bitma.page != page or bitma.dpi == 0.0f) {
 				continue;
 			}
 
@@ -784,31 +810,37 @@ void Docanto::PDFRenderer::request(Geometry::Rectangle<float> view, float dpi) {
 			thread_manager->add_job(id, job);
 		}
 
-		auto [chunks, dpi] = get_chunks(i);
-		cull_chunks(chunks, i, pimpl->m_highDefBitmaps);
-		cull_chunks(chunks, i, pimpl->m_annotationBitmaps);
+		auto [content_chunks, dpi] = get_chunks(i);
+		auto [anntoation_chunks, _] = get_chunks(i);
+		cull_chunks(content_chunks, i, pimpl->m_highDefBitmaps);
+		cull_chunks(anntoation_chunks, i, pimpl->m_annotationBitmaps);
+		Docanto::Logger::log(anntoation_chunks.size());
 
-		for (auto& chunk_rec : chunks) {
+		auto queue = pimpl->m_jobs.get();
+		auto add_job = [&](RenderThreadManager::ContentType type, Geometry::Rectangle<float> r) -> void {
+			auto job = std::make_shared<RenderThreadManager::RenderJob>();
+			job->chunk_rec = r;
+			job->info.page = i;
+			job->status = RenderThreadManager::RenderStatus::WAITING;
+			job->type = type;
+
+			job->info.dpi = dpi;
+			job->info.id = thread_manager->m_last_id.fetch_add(1);
+			job->info.recs = { r.upperleft(), r.dims()};
+
+			job->job = RenderThreadManager::JobType::RENDER_BITMAP;
+			queue->push_front(job);
+			thread_manager->add_job(id, job);
+		};
+
+		for (auto& chunk_rec : content_chunks) {
 			// add the new chunks to the queue
-			auto queue = pimpl->m_jobs.get();
-			auto add_job = [&](RenderThreadManager::ContentType type) -> void {
-				auto job = std::make_shared<RenderThreadManager::RenderJob>();
-				job->chunk_rec = chunk_rec;
-				job->info.page = i;
-				job->status = RenderThreadManager::RenderStatus::WAITING;
-				job->type = type;
+			add_job(RenderThreadManager::ContentType::CONTENT, chunk_rec);
+		}
 
-				job->info.dpi = dpi;
-				job->info.id = thread_manager->m_last_id.fetch_add(1);
-				job->info.recs = { chunk_rec.upperleft(), chunk_rec.dims()};
-
-				job->job = RenderThreadManager::JobType::RENDER_BITMAP;
-				queue->push_front(job);
-				thread_manager->add_job(id, job);
-			};
-			add_job(RenderThreadManager::ContentType::CONTENT);
-			add_job(RenderThreadManager::ContentType::ANNOTATION);
-
+		for (auto& chunk_rec : anntoation_chunks) {
+			// add the new chunks to the queue
+			add_job(RenderThreadManager::ContentType::ANNOTATION, chunk_rec);
 		}
 	}
 }
@@ -891,6 +923,7 @@ void Docanto::PDFRenderer::update() {
 	fz_device* dev_widget = nullptr;
 	fz_device* dev_content = nullptr;
 
+
 	auto ctx = GlobalPDFContext::get_instance().get();
 
 	size_t amount_of_pages = pdf_obj->get_page_count();
@@ -902,7 +935,8 @@ void Docanto::PDFRenderer::update() {
 		// we have to do a fz call since we want to use the ctx.
 		// we can't use any other calls (like m_pdf->get_page()) since we would need to create a ctx
 		// wrapper which would be overkill for this scenario.
-		auto p = fz_load_page(*ctx, *doc, static_cast<int>(i));
+		fz_page* p = fz_load_page(*ctx, *doc, static_cast<int>(i));
+		pdf_update_page(*ctx, reinterpret_cast<pdf_page*>(p));
 		fz_try(*ctx) {
 			// create a display list with all the draw calls and so on
 			list_annot = fz_new_display_list(*ctx, fz_bound_page(*ctx, p));
@@ -953,4 +987,113 @@ void Docanto::PDFRenderer::update() {
 	}
 
 	Logger::log(L"Finished Displaylist in ", time);
+}
+
+void Docanto::PDFRenderer::update_page_annotations(size_t page) {
+	// clear the list and copy all again
+	Docanto::Timer time;
+	// for each rec create a display list
+	fz_display_list* list_annot = nullptr;
+	fz_device* dev_annot = nullptr;
+
+	auto ctx = GlobalPDFContext::get_instance().get();
+
+	// get the page that will be rendered
+	auto doc = pdf_obj->get();
+	// we have to do a fz call since we want to use the ctx.
+	// we can't use any other calls (like m_pdf->get_page()) since we would need to create a ctx
+	// wrapper which would be overkill for this scenario.
+	fz_page* p = fz_load_page(*ctx, *doc, static_cast<int>(page));
+	pdf_update_page(*ctx, reinterpret_cast<pdf_page*>(p));
+	fz_try(*ctx) {
+		// create a display list with all the draw calls and so on
+		list_annot = fz_new_display_list(*ctx, fz_bound_page(*ctx, p));
+		dev_annot = fz_new_list_device(*ctx, list_annot);
+
+		// run all three devices
+		Timer time2;
+		fz_run_page_annots(*ctx, p, dev_annot, fz_identity, nullptr);
+		Logger::log("Page ", page + 1, " Annots Rendered in ", time2);
+
+		// get the list and add the lists
+		auto annotat = pimpl->m_page_annotat.get_write();
+		annotat->at(page) = std::make_unique<DisplayListWrapper>(std::move(list_annot));
+	} fz_always(*ctx) {
+		// flush the device
+		fz_close_device(*ctx, dev_annot);
+		fz_drop_device(*ctx, dev_annot);
+	} fz_catch(*ctx) {
+		Docanto::Logger::error("Could not process the PDF page");
+	}
+	// always drop page at the end
+	fz_drop_page(*ctx, p);
+
+}
+
+void Docanto::PDFRenderer::reload() {
+	// first remove all lists
+	size_t amount_of_pages = pdf_obj->get_page_count();
+
+	for (size_t i = 0; i < amount_of_pages; i++) {
+		auto job1 = std::make_shared<RenderThreadManager::RenderJob>();
+		job1->job = RenderThreadManager::JobType::DELETE_DISPLAY_LIST;
+		job1->info.page = i;
+
+		job1->type = RenderThreadManager::ContentType::ANNOTATION;
+
+		auto job2 = std::make_shared<RenderThreadManager::RenderJob>();
+		job2->job = RenderThreadManager::JobType::DELETE_DISPLAY_LIST;
+		job2->info.page = i;
+
+		job2->type = RenderThreadManager::ContentType::CONTENT;
+
+		thread_manager->add_job(id, job1);
+		thread_manager->add_job(id, job2);
+	}
+
+	// remove the display lists
+	pimpl->m_page_annotat.get_write()->clear();
+	pimpl->m_page_content.get_write()->clear();
+	pimpl->m_page_widgets.get_write()->clear();
+
+
+	// remove any bitmaps
+	auto content_bitmaps = pimpl->m_highDefBitmaps.get_write();
+	for (size_t i = 0; i < content_bitmaps->size(); i++) {
+		auto& d = content_bitmaps->at(i);
+		remove_from_processor(d.id);
+	}
+
+	auto annota_bitmaps = pimpl->m_annotationBitmaps.get_write();
+	for (size_t i = 0; i < annota_bitmaps->size(); i++) {
+		auto& d = annota_bitmaps->at(i);
+		remove_from_processor(d.id);
+	}
+
+	content_bitmaps->clear();
+	annota_bitmaps->clear();
+
+	// redo them
+	update();
+}
+
+void Docanto::PDFRenderer::reload_annotations_page(size_t page) {
+	auto job2 = std::make_shared<RenderThreadManager::RenderJob>();
+	job2->job = RenderThreadManager::JobType::DELETE_DISPLAY_LIST;
+	job2->info.page = page;
+
+	job2->type = RenderThreadManager::ContentType::ANNOTATION;
+
+	thread_manager->add_job(id, job2);
+
+	update_page_annotations(page);
+
+	auto annota_bitmaps = pimpl->m_annotationBitmaps.get_write();
+	for (size_t i = 0; i < annota_bitmaps->size(); i++) {
+		auto& d = annota_bitmaps->at(i);
+		if (d.page != page) {
+			continue;
+		}
+		d.dpi = 0.0f;
+	}
 }

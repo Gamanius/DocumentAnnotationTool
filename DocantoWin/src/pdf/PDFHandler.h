@@ -7,11 +7,13 @@
 
 namespace DocantoWin {
 	class PDFHandler {
+	public:
 		struct PDFWrapper {
 			std::shared_ptr<Docanto::PDF> pdf;
 			std::shared_ptr<Docanto::PDFRenderer> render;
 			std::shared_ptr<Docanto::PDFAnnotation> annotation;
 		};
+	private:
 		std::vector<PDFWrapper> m_pdfobj;
 
 		struct PDFHandlerImageProcessor : public Docanto::IPDFRenderImageProcessor {
@@ -40,7 +42,9 @@ namespace DocantoWin {
 		void set_debug_draw(bool b = true);
 		void toggle_debug_draw();
 
-		std::pair<std::shared_ptr<Docanto::PDF>, size_t> get_pdf_at_point(Docanto::Geometry::Point<float> p);
+		void reload();
+
+		std::pair<PDFWrapper, size_t> get_pdf_at_point(Docanto::Geometry::Point<float> p);
 
 		size_t get_amount_of_pdfs() const;
 	};
