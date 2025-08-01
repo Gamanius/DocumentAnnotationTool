@@ -54,6 +54,9 @@ void DocantoWin::ToolHandler::update_ink(Docanto::Geometry::Point<float> p) {
 }
 
 void DocantoWin::ToolHandler::end_ink(Docanto::Geometry::Point<float> p) {
+	if (m_ink_target.first.pdf == nullptr) {
+		return;
+	}
 	m_current_ink.push_back(m_render->inv_transform(p) - m_ink_target.first.render->get_position(m_ink_target.second));
 
 	if (m_ink_target.first.annotation != nullptr) {
