@@ -221,6 +221,7 @@ void DocantoWin::GenericUIObject::sys_draw() {
 	if (!is_floating()) {
 		render = ctx.lock()->render;
 	}
+	render->begin_draw();
 	this->draw(render);
 
 	if (is_resizable()) {
@@ -243,7 +244,9 @@ void DocantoWin::GenericUIObject::sys_draw() {
 		}
 
 		render->end_draw();
+	
 	}
+	render->end_draw();
 }
 
 void DocantoWin::GenericUIObject::make_float(bool f) {

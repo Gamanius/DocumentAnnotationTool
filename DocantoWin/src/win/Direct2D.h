@@ -1,11 +1,14 @@
 #include "helper/Geometry.h"
 #include "Window.h"
+#include <wrl/client.h>
 
 #ifndef _DOCANTOWIN_DIRECT2D_H_
 #define _DOCANTOWIN_DIRECT2D_H_
 
 
 namespace DocantoWin {
+	using namespace Microsoft::WRL;
+
 	inline void SafeRelease(IUnknown* ptr) {
 		if (ptr) {
 			ptr->Release();
@@ -16,10 +19,15 @@ namespace DocantoWin {
 	class Direct2DRender : public Docanto::BasicRender {
 		std::shared_ptr<Window> m_window;
 
-		static ID2D1Factory* m_factory;
+		static ID2D1Factory6* m_factory;
 		static IDWriteFactory3* m_writeFactory;
-
-		ID2D1HwndRenderTarget* m_renderTarget = nullptr;
+		
+		ComPtr<ID2D1Device5> m_device = nullptr;
+		ComPtr<ID2D1DeviceContext5> m_devicecontext = nullptr;
+		ComPtr<ID3D11Device> m_d3d11device;
+		ComPtr<IDXGIDevice> m_dxdevice;
+		ComPtr<ID2D1Bitmap1> m_targetBitmap; 
+		ComPtr<IDXGISwapChain1> m_swapChain;
 
 		D2D1::Matrix3x2F m_transformTranslationMatrix = D2D1::Matrix3x2F::Identity();
 		D2D1::Matrix3x2F m_transformScaleMatrix = D2D1::Matrix3x2F::Identity();
@@ -80,6 +88,7 @@ namespace DocantoWin {
 		typedef RenderObject<IDWriteTextFormat> TextFormatObject;
 		typedef RenderObject<IDWriteTextLayout> TextLayoutObject;
 		typedef RenderObject<ID2D1PathGeometry> PathObject;
+		typedef RenderObject<ID2D1SvgDocument> SVGDocument;
 	private:
 		// GPU resources
 		BrushObject m_solid_brush;
@@ -154,6 +163,7 @@ namespace DocantoWin {
 		TextFormatObject create_text_format(std::wstring font, float size);
 		TextLayoutObject create_text_layout(const std::wstring& text, TextFormatObject& format);
 		BitmapObject create_bitmap(const Docanto::Image& i);
+		SVGDocument create_svg(int id, const std::wstring& type = L"SVG");
 	};
 
 }

@@ -22,6 +22,8 @@ namespace DocantoWin {
 
 		std::shared_ptr<TabContext> get_active_tab() const;
 		void set_active_tab(size_t id);
+
+		const std::vector<std::shared_ptr<TabContext>>& get_all_tabs() const;
 	};
 }
 

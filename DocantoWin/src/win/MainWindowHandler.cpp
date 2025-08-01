@@ -1,6 +1,7 @@
 #include "MainWindowHandler.h"
 
 #include "ui/UIDebug.h"
+#include "ui/UIToolbar.h"
 
 static std::optional<std::wstring> open_file_dialog(const wchar_t* filter, HWND windowhandle = nullptr) {
 	OPENFILENAME ofn;
@@ -230,10 +231,7 @@ void DocantoWin::MainWindowHandler::pointer_up(Window::PointerInfo p) {
 }
 
 DocantoWin::MainWindowHandler::MainWindowHandler(HINSTANCE instance) {
-	HRSRC resHandle = FindResource(NULL, MAKEINTRESOURCE(IDR_SVG_PEN_TOOL), L"SVG");
-	HGLOBAL resData = LoadResource(NULL, resHandle);
-	DWORD size = SizeofResource(NULL, resHandle);
-	void* ptr = LockResource(resData);
+
 
 	m_ctx = std::make_shared<Context>();
 	m_ctx->window = std::make_shared<Window>(instance);
@@ -242,6 +240,7 @@ DocantoWin::MainWindowHandler::MainWindowHandler(HINSTANCE instance) {
 	m_ctx->uihandler = std::make_shared<UIHandler>(m_ctx);
 
 	m_ctx->uihandler->add(std::make_shared<UIDebugElement>(L"test"));
+	m_ctx->uihandler->add(std::make_shared<UIToolbar>());
 
 	m_ctx->tabs = std::make_shared<TabHandler>();
 

@@ -5,6 +5,7 @@
 
 DocantoWin::UIDebugElement::UIDebugElement(const std::wstring& UIName) : GenericUIObject(UIName, true) {
 	this->set_bounds({ 100, 100 });
+	this->set_pos({ 50, 50 });
 }
 
 
@@ -39,11 +40,9 @@ void DocantoWin::UIDebugElement::draw(std::shared_ptr<Direct2DRender> render) {
 	
 	render->draw_text(std::format(L"Amount of PDF open {:d}", this->ctx.lock()->tabs->get_active_tab()->pdfhandler->get_amount_of_pdfs()),
 		{ offset.x, offset.y + (padding + size) * 2 }, AppVariables::Colors::get(AppVariables::Colors::TYPE::TEXT_COLOR), size);
-
 	
-	render->draw_text(std::format(L"Is resizable {0}", this->is_resizable()),
+	render->draw_text(std::format(L"Amount of Tabs {:d}", this->ctx.lock()->tabs->get_all_tabs().size()),
 		{ offset.x, offset.y + (padding + size) * 3 }, AppVariables::Colors::get(AppVariables::Colors::TYPE::TEXT_COLOR), size);
-
 	
 	render->end_draw();
 }

@@ -14,3 +14,7 @@ void DocantoWin::TabHandler::set_active_tab(size_t id) {
 	}
 	current_tab = id;
 }
+
+const std::vector<std::shared_ptr<DocantoWin::TabContext>>& DocantoWin::TabHandler::get_all_tabs() const {
+	return m_all_tabs;
+}

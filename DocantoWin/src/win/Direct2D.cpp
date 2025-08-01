@@ -1,16 +1,12 @@
 #include "Direct2D.h"
 #include <wincodec.h>
-#include <d2d1.h>
 
 #include "helper/AppVariables.h"
-
-#pragma comment(lib, "d2d1.lib")
-#pragma comment(lib, "dwrite.lib")
 
 #undef min
 #undef max
 
-ID2D1Factory* DocantoWin::Direct2DRender::m_factory = nullptr;
+ID2D1Factory6* DocantoWin::Direct2DRender::m_factory = nullptr;
 IDWriteFactory3* DocantoWin::Direct2DRender::m_writeFactory = nullptr;
 
 void DocantoWin::Direct2DRender::createD2DResources() {
@@ -48,52 +44,137 @@ void DocantoWin::Direct2DRender::createD2DResources() {
 
 DocantoWin::Direct2DRender::Direct2DRender(std::shared_ptr<Window> w) : m_window(w) {
 	createD2DResources();
+	
+	D3D_FEATURE_LEVEL featureLevels[] =
+	{
+		D3D_FEATURE_LEVEL_11_1,
+		D3D_FEATURE_LEVEL_11_0,
+		D3D_FEATURE_LEVEL_10_1,
+		D3D_FEATURE_LEVEL_10_0,
+		D3D_FEATURE_LEVEL_9_3,
+		D3D_FEATURE_LEVEL_9_2,
+		D3D_FEATURE_LEVEL_9_1
+	};
 
-	auto props = D2D1::HwndRenderTargetProperties(m_window->m_hwnd, DimensionToD2D1(m_window->get_window_size()));
-	props.presentOptions = D2D1_PRESENT_OPTIONS_IMMEDIATELY;
+	// Create the DX11 API device object, and get a corresponding context.
+	ComPtr<ID3D11DeviceContext> d3d11context;
 
-	auto result = m_factory->CreateHwndRenderTarget(
-		D2D1::RenderTargetProperties(),
-		props,
-		&m_renderTarget
+	auto res = D3D11CreateDevice(
+		nullptr,                    // specify null to use the default adapter
+		D3D_DRIVER_TYPE_HARDWARE,
+		0,
+		D3D11_CREATE_DEVICE_BGRA_SUPPORT,              // optionally set debug and Direct2D compatibility flags
+		featureLevels,              // list of feature levels this app can support
+		ARRAYSIZE(featureLevels),   // number of possible feature levels
+		D3D11_SDK_VERSION,
+		&m_d3d11device,                    // returns the Direct3D device created
+		nullptr,            // returns feature level of device created
+		&d3d11context                    // returns the device immediate context
 	);
 
-	m_renderTarget->SetAntialiasMode(D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+	if (res != S_OK) {
+		Docanto::Logger::error("Couldn't init D3D11");
+		return;
+	}
 
-	if (result != S_OK) {
-		Docanto::Logger::error("Could not initilaize HWND rendering");
-	}	
+	res = m_d3d11device.As(&m_dxdevice);
+	if (res != S_OK) {
+		Docanto::Logger::error("Couldn't get DX Adapter");
+		return;
+	}
+
+	res = m_factory->CreateDevice(m_dxdevice.Get(), &m_device);
+	if (res != S_OK) {
+		Docanto::Logger::error("Couldn't get Direct2D Device");
+		return;
+	}
+
+	res = m_device->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_ENABLE_MULTITHREADED_OPTIMIZATIONS, &m_devicecontext);
+	if (res != S_OK) {
+		Docanto::Logger::error("Couldn't get Direct2D device context");
+		return;
+	}
+
+	DXGI_SWAP_CHAIN_DESC1 swapChainDesc = { 0 };
+	swapChainDesc.Width = 0;                           // dont need to set these since they are computed automatically
+	swapChainDesc.Height = 0;
+	swapChainDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM; // this is the most common swapchain format
+	swapChainDesc.Stereo = false;
+	swapChainDesc.SampleDesc.Count = 1;                // don't use multi-sampling
+	swapChainDesc.SampleDesc.Quality = 0;
+	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+	swapChainDesc.BufferCount = 2;                     // use double buffering to enable flip
+	swapChainDesc.Scaling = DXGI_SCALING_NONE;
+	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL; // all apps must use this SwapEffect
+	swapChainDesc.Flags = 0;
+
+	ComPtr<IDXGIAdapter> dxgiAdapter;
+	m_dxdevice->GetAdapter(&dxgiAdapter);
+	ComPtr<IDXGIFactory2> dxgiFactory;
+	dxgiAdapter->GetParent(IID_PPV_ARGS(&dxgiFactory));
+
+	res = dxgiFactory->CreateSwapChainForHwnd(
+		m_d3d11device.Get(), m_window->get_hwnd(), &swapChainDesc, nullptr, nullptr, &m_swapChain);
+	if (res != S_OK) {
+		Docanto::Logger::error("Couldn't create swap chain");
+		return;
+	}
+
+	auto dpi = m_window->get_dpi();
+	D2D1_BITMAP_PROPERTIES1 bmpProps = {};
+	bmpProps.pixelFormat = { DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED };
+	bmpProps.dpiX = dpi;
+	bmpProps.dpiY = dpi;
+	bmpProps.bitmapOptions = D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW;
+
+	ComPtr<IDXGISurface> backBuffer;
+	res = m_swapChain->GetBuffer(0, IID_PPV_ARGS(&backBuffer));
+	if (res != S_OK) {
+		Docanto::Logger::error("Couldn't get buffer");
+		return;
+	}
+	res = m_devicecontext->CreateBitmapFromDxgiSurface(backBuffer.Get(), &bmpProps, &m_targetBitmap	);
+	if (res != S_OK) {
+		Docanto::Logger::error("Couldn't create Direct2D drawing surface");
+		return;
+	}
+
+	m_devicecontext->SetTarget(m_targetBitmap.Get());
 
 	// create gpu rsc
 	m_solid_brush = create_brush({});
 
 	// set dpi and size of the target
-	resize(m_window->get_client_size());
+	//resize(m_window->get_client_size());
+	m_devicecontext->SetDpi(static_cast<float>(dpi), static_cast<float>(dpi));
 }
 
 DocantoWin::Direct2DRender::~Direct2DRender() {
 	SafeRelease(m_factory);
-	SafeRelease(m_renderTarget);
 	SafeRelease(m_writeFactory);
 }
 
 void DocantoWin::Direct2DRender::begin_draw() {
 	std::lock_guard lock(draw_lock);
 	if (m_isRenderinProgress == 0)
-		m_renderTarget->BeginDraw();
+		m_devicecontext->BeginDraw();
 	m_isRenderinProgress++;
 }
 
 void DocantoWin::Direct2DRender::end_draw() {
 	std::lock_guard lock(draw_lock);
 	m_isRenderinProgress--;
-	if (m_isRenderinProgress == 0)
-		m_renderTarget->EndDraw();
+	if (m_isRenderinProgress == 0) {
+		m_devicecontext->EndDraw();
+
+		DXGI_PRESENT_PARAMETERS params = { 0 };
+		m_swapChain->Present1(1, 0, &params);
+	}
 }
 
 void DocantoWin::Direct2DRender::clear(Docanto::Color c) {
 	begin_draw();
-	m_renderTarget->Clear(ColorToD2D1(c));
+	m_devicecontext->Clear(ColorToD2D1(c));
 	end_draw();
 }
 
@@ -106,12 +187,28 @@ std::shared_ptr<DocantoWin::Window> DocantoWin::Direct2DRender::get_attached_win
 }
 
 void DocantoWin::Direct2DRender::resize(Docanto::Geometry::Dimension<long> r) {
-	m_renderTarget->Resize(DimensionToD2D1(r));
+	m_devicecontext->SetTarget(nullptr);
+	m_targetBitmap.Reset();
+	m_swapChain->ResizeBuffers(0, r.width, r.height, DXGI_FORMAT_UNKNOWN, 0);
+	ComPtr<IDXGISurface> dxgiSurface;
+	m_swapChain->GetBuffer(0, IID_PPV_ARGS(&dxgiSurface));
+
+
+	auto dpi = m_window->get_dpi();
+	D2D1_BITMAP_PROPERTIES1 props = {
+	{ DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED },
+	dpi, dpi,
+	D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW
+	};
+
+	m_devicecontext->CreateBitmapFromDxgiSurface(dxgiSurface.Get(), &props, &m_targetBitmap);
+
+	// 5. Set the new target
+	m_devicecontext->SetTarget(m_targetBitmap.Get());
+	//m_device->Resize(DimensionToD2D1(r));
 
 	// we should also check if the dpi changed
-	UINT dpiX, dpiY;
-	dpiX = dpiY = GetDpiForWindow(m_window->m_hwnd);
-	m_renderTarget->SetDpi(static_cast<float>(dpiX), static_cast<float>(dpiY));
+	m_devicecontext->SetDpi(static_cast<float>(dpi), static_cast<float>(dpi));
 }
 
 void DocantoWin::Direct2DRender::draw_text(const std::wstring& text, Docanto::Geometry::Point<float> pos, TextFormatObject& format, BrushObject& brush) {
@@ -119,7 +216,7 @@ void DocantoWin::Direct2DRender::draw_text(const std::wstring& text, Docanto::Ge
 
 	begin_draw();
 
-	m_renderTarget->DrawTextLayout(
+	m_devicecontext->DrawTextLayout(
 		PointToD2D1(pos),
 		layout.m_object,
 		brush.m_object,
@@ -144,27 +241,27 @@ void DocantoWin::Direct2DRender::draw_rect(Docanto::Geometry::Rectangle<float> r
 }
 
 void DocantoWin::Direct2DRender::draw_rect(Docanto::Geometry::Rectangle<float> r, BrushObject& brush, float thic) {
-	m_renderTarget->DrawRectangle(RectToD2D1(r), brush.m_object, thic);
+	m_devicecontext->DrawRectangle(RectToD2D1(r), brush.m_object, thic);
 }
 void DocantoWin::Direct2DRender::draw_rect_filled(Docanto::Geometry::Rectangle<float> r, BrushObject& brush) {
-	m_renderTarget->FillRectangle(RectToD2D1(r), brush.m_object);
+	m_devicecontext->FillRectangle(RectToD2D1(r), brush.m_object);
 }
 
 void DocantoWin::Direct2DRender::draw_rect_filled(Docanto::Geometry::Rectangle<float> r, Docanto::Color c) {
 	m_solid_brush->SetColor(ColorToD2D1(c));
-	m_renderTarget->FillRectangle(RectToD2D1(r), m_solid_brush);
+	m_devicecontext->FillRectangle(RectToD2D1(r), m_solid_brush);
 }
 
 void DocantoWin::Direct2DRender::draw_bitmap(Docanto::Geometry::Point<float> where, BitmapObject& obj) {
 	begin_draw();
 	auto size = obj.m_object->GetSize();
-	m_renderTarget->DrawBitmap(obj.m_object, D2D1::RectF(where.x, where.y, size.width + where.x , size.height + where.y));
+	m_devicecontext->DrawBitmap(obj.m_object, D2D1::RectF(where.x, where.y, size.width + where.x , size.height + where.y));
 	end_draw();
 }
 
 void DocantoWin::Direct2DRender::draw_bitmap(Docanto::Geometry::Rectangle<float> rec, BitmapObject& obj) {
 	begin_draw();
-	m_renderTarget->DrawBitmap(obj.m_object, RectToD2D1(rec));
+	m_devicecontext->DrawBitmap(obj.m_object, RectToD2D1(rec));
 	end_draw();
 }
 
@@ -175,13 +272,13 @@ void DocantoWin::Direct2DRender::draw_bitmap(Docanto::Geometry::Point<float> whe
 
 	begin_draw();
 	auto size = obj.m_object->GetSize();
-	m_renderTarget->DrawBitmap(obj.m_object, D2D1::RectF(where.x, where.y, size.width * scale + where.x, size.height * scale + where.y));
+	m_devicecontext->DrawBitmap(obj.m_object, D2D1::RectF(where.x, where.y, size.width * scale + where.x, size.height * scale + where.y));
 	end_draw();
 }
 
 void DocantoWin::Direct2DRender::draw_line(Docanto::Geometry::Point<float> p1, Docanto::Geometry::Point<float> p2, BrushObject& brush, float thick) {
 	begin_draw();
-	m_renderTarget->DrawLine(PointToD2D1(p1), PointToD2D1(p2), brush.m_object, thick);
+	m_devicecontext->DrawLine(PointToD2D1(p1), PointToD2D1(p2), brush.m_object, thick);
 	end_draw();
 }
 
@@ -194,11 +291,11 @@ void DocantoWin::Direct2DRender::draw_line(Docanto::Geometry::Point<float> p1, D
 
 
 void DocantoWin::Direct2DRender::set_current_transform_active() {
-	m_renderTarget->SetTransform(m_transformTranslationMatrix * m_transformRotationMatrix * m_transformScaleMatrix);
+	m_devicecontext->SetTransform(m_transformTranslationMatrix * m_transformRotationMatrix * m_transformScaleMatrix);
 }
 
 void DocantoWin::Direct2DRender::set_identity_transform_active() {
-	m_renderTarget->SetTransform(D2D1::Matrix3x2F::Identity());
+	m_devicecontext->SetTransform(D2D1::Matrix3x2F::Identity());
 }
 
 void DocantoWin::Direct2DRender::set_translation_matrix(Docanto::Geometry::Point<float> p) {
@@ -265,21 +362,21 @@ void DocantoWin::Direct2DRender::add_rotation_matrix(float angle, Docanto::Geome
 }
 
 void DocantoWin::Direct2DRender::set_clipping_rect(Docanto::Geometry::Rectangle<float> clip) {
-	m_renderTarget->PushAxisAlignedClip(RectToD2D1(clip), D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+	m_devicecontext->PushAxisAlignedClip(RectToD2D1(clip), D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
 }
 
 void DocantoWin::Direct2DRender::push_clipping_rect_to_origin(Docanto::Geometry::Rectangle<float> clip) {
-	m_renderTarget->SetTransform(D2D1::Matrix3x2F::Translation({ clip.x, clip.y }));
-	m_renderTarget->PushAxisAlignedClip({0,0, clip.width, clip.height}, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+	m_devicecontext->SetTransform(D2D1::Matrix3x2F::Translation({ clip.x, clip.y }));
+	m_devicecontext->PushAxisAlignedClip({0,0, clip.width, clip.height}, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
 }
 
 void DocantoWin::Direct2DRender::pop_clipping_rect() {
-	m_renderTarget->PopAxisAlignedClip();
+	m_devicecontext->PopAxisAlignedClip();
 }
 
 void DocantoWin::Direct2DRender::pop_clipping_rect_to_origin() {
 	set_identity_transform_active();
-	m_renderTarget->PopAxisAlignedClip();
+	m_devicecontext->PopAxisAlignedClip();
 }
 
 Docanto::Geometry::Point<float> DocantoWin::Direct2DRender::inv_transform(Docanto::Geometry::Point<float> p) {
@@ -422,7 +519,7 @@ DocantoWin::Direct2DRender::BitmapObject DocantoWin::Direct2DRender::create_bitm
 	prop.dpiY = static_cast<float>(i.dpi);
 	prop.pixelFormat.alphaMode = D2D1_ALPHA_MODE_PREMULTIPLIED;
 	prop.pixelFormat.format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	HRESULT res = m_renderTarget->CreateBitmap(DimensionToD2D1(i.dims), i.data.get(), i.stride, prop, &pBitmap);
+	HRESULT res = m_devicecontext->CreateBitmap(DimensionToD2D1(i.dims), i.data.get(), i.stride, prop, &pBitmap);
 	if (res != S_OK) {
 		Docanto::Logger::error("Could not create bitmap");
 	}
@@ -433,10 +530,29 @@ DocantoWin::Direct2DRender::BitmapObject DocantoWin::Direct2DRender::create_bitm
 	return std::move(obj);
 }
 
+DocantoWin::Direct2DRender::SVGDocument DocantoWin::Direct2DRender::create_svg(int id, const std::wstring& type) {
+	HRSRC res = FindResource(NULL, MAKEINTRESOURCE(id), type.c_str());
+	if (res == nullptr) {
+		Docanto::Logger::error("Couln't find SVG with id ", id); 
+		return SVGDocument();
+	}
+	HGLOBAL resData = LoadResource(NULL, res);
+	if (resData == nullptr) {
+		Docanto::Logger::error("Couldn't load resource with id ", id); 
+		return SVGDocument();
+	}
+
+	DWORD size = SizeofResource(NULL, res);
+	void* ptr = LockResource(resData);
+
+	
+	return SVGDocument();
+}
+
 DocantoWin::Direct2DRender::BrushObject DocantoWin::Direct2DRender::create_brush(Docanto::Color c) {
 	BrushObject obj;
 	ID2D1SolidColorBrush* brush = nullptr;
-	auto result = m_renderTarget->CreateSolidColorBrush(ColorToD2D1(c), &brush);
+	auto result = m_devicecontext->CreateSolidColorBrush(ColorToD2D1(c), &brush);
 	if (result != S_OK) {
 		Docanto::Logger::error("Could not create D2D1 brush");
 	}
