@@ -814,7 +814,6 @@ void Docanto::PDFRenderer::request(Geometry::Rectangle<float> view, float dpi) {
 		auto [anntoation_chunks, _] = get_chunks(i);
 		cull_chunks(content_chunks, i, pimpl->m_highDefBitmaps);
 		cull_chunks(anntoation_chunks, i, pimpl->m_annotationBitmaps);
-		Docanto::Logger::log(anntoation_chunks.size());
 
 		auto queue = pimpl->m_jobs.get();
 		auto add_job = [&](RenderThreadManager::ContentType type, Geometry::Rectangle<float> r) -> void {

@@ -37,7 +37,7 @@ void DocantoWin::ToolHandler::start_ink(Docanto::Geometry::Point<float> p) {
 		return;
 	}
 
-	m_current_ink.push_back(m_render->inv_transform(p));
+	m_current_ink.push_back(m_render->inv_transform(p) - m_ink_target.first.render->get_position(m_ink_target.second));
 }
 
 void DocantoWin::ToolHandler::update_ink(Docanto::Geometry::Point<float> p) {
@@ -50,11 +50,11 @@ void DocantoWin::ToolHandler::update_ink(Docanto::Geometry::Point<float> p) {
 		return;
 	}
 
-	m_current_ink.push_back(m_render->inv_transform(p));
+	m_current_ink.push_back(m_render->inv_transform(p) - m_ink_target.first.render->get_position(m_ink_target.second));
 }
 
 void DocantoWin::ToolHandler::end_ink(Docanto::Geometry::Point<float> p) {
-	m_current_ink.push_back(m_render->inv_transform(p));
+	m_current_ink.push_back(m_render->inv_transform(p) - m_ink_target.first.render->get_position(m_ink_target.second));
 
 	if (m_ink_target.first.annotation != nullptr) {
 		m_ink_target.first.annotation->add_annotation(m_ink_target.second, 
@@ -73,11 +73,15 @@ void DocantoWin::ToolHandler::draw() {
 		return;
 	}
 
+	if (m_ink_target.first.render == nullptr) {
+		return;
+	}
+
 	m_render->begin_draw();
 
 
 	for (size_t i = 1; i < m_current_ink.size(); i++) {
-		m_render->draw_line(m_current_ink[i - 1], m_current_ink[i], get_current_tool().col, get_current_tool().width);
+		m_render->draw_line(m_current_ink[i - 1] + m_ink_target.first.render->get_position(m_ink_target.second), m_current_ink[i] + m_ink_target.first.render->get_position(m_ink_target.second), get_current_tool().col, get_current_tool().width);
 	}
 
 	m_render->end_draw();
