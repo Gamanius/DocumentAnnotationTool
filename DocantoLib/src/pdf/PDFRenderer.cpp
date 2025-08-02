@@ -81,7 +81,7 @@ public:
 
 		// The list to copy
 		std::shared_ptr<DisplayListWrapper> list = nullptr;
-		size_t threads_already_copied = 0;
+		std::vector<std::thread::id> threads_already_copied;
 
 		// for debug only
 		std::thread::id render_id;
@@ -113,8 +113,12 @@ private:
 
 public:
 	void add_job(size_t id, std::shared_ptr<RenderJob> job) {
+		std::scoped_lock<std::mutex> lock(m_render_worker_queue_mutex);
+		job->callback_id = id;
+
 		if (job->job == JobType::LOAD_DISPLAY_LIST ) {
 			m_display_list_cache.insert({ id, job->info.page, job->type });
+			m_jobs.push_back(job);
 		}
 		else if (job->job == JobType::DELETE_DISPLAY_LIST) {
 			if (m_display_list_cache.contains({ id, job->info.page, job->type })) {
@@ -123,16 +127,12 @@ public:
 			else {
 				return;
 			}
+			m_jobs.push_front(job);
 		}
-		else if (job->job == JobType::DELETE_DISPLAY_LIST) {
-			if (m_display_list_cache.contains({ id, job->info.page, job->type })) {
-				m_display_list_cache.erase({ id, job->info.page, job->type });
-			}
-
+		else {
+			m_jobs.push_back(job);
 		}
-		std::scoped_lock<std::mutex> lock(m_render_worker_queue_mutex);
-		job->callback_id = id;
-		m_jobs.push_front(job);
+		
 		m_render_worker_queue_condition_var.notify_one();
 	}
 
@@ -154,7 +154,7 @@ public:
 		size_t amount = 0;
 
 		for (auto it = queue.begin(); it != queue.end();) {
-			if ((*it)->status == RenderStatus::DONE or (*it)->threads_already_copied == get_amount_threads()) {
+			if ((*it)->status == RenderStatus::DONE or (*it)->threads_already_copied.size() == get_amount_threads()) {
 				(*it)->status = RenderStatus::DONE;
 				queue.erase(it);
 				amount++;
@@ -196,6 +196,7 @@ public:
 		std::map<std::tuple<size_t, size_t, ContentType>, fz_display_list*> t_content_list;
 		
 		Docanto::Logger::log("Initialized render thread in ", start);
+		auto local_thread_id = std::this_thread::get_id();
 
 		while (!m_should_worker_die) {
 			// wait until a signal is received
@@ -211,18 +212,26 @@ public:
 				auto& job = queue.at(i);
 				
 				if (job->job == JobType::LOAD_DISPLAY_LIST) {
-					if (t_content_list.contains({ job->callback_id, job->info.page, job->type })) {
+					// check if the job was once completed by this thread
+					if (std::find(job->threads_already_copied.begin(), job->threads_already_copied.end(), local_thread_id) != job->threads_already_copied.end()
+						// or check if the display list already exist
+						or t_content_list.contains({ job->callback_id, job->info.page, job->type })) {
 						continue;
 					}
+					//Docanto::Logger::log("Loading list page ", job->info.page);
 					current_job = job;
 					break;
 				}
 
 				if (job->job == JobType::DELETE_DISPLAY_LIST) {
-					if (!t_content_list.contains({ job->callback_id, job->info.page, job->type })) {
+					// check if the thread already handled it
+					if (std::find(job->threads_already_copied.begin(), job->threads_already_copied.end(), local_thread_id) != job->threads_already_copied.end() 
+						// or the list was already deleted at sometime. we cannot delete the same list twice
+						or !t_content_list.contains({ job->callback_id, job->info.page, job->type })) {
 						continue;
 					}
 					current_job = job;
+					//Docanto::Logger::log("Deleting list page ", job->info.page);
 					break;
 				}
 
@@ -244,6 +253,7 @@ public:
 					job->render_id = std::this_thread::get_id();
 					// we need to safe the pointer since we cannot retrieve it later without being const
 					current_job = job;
+					//Docanto::Logger::log("Accepting job ", job->info.id);
 					break;
 				}
 			}
@@ -279,7 +289,7 @@ public:
 			if (current_job->job == JobType::LOAD_DISPLAY_LIST) {
 				t_content_list[{current_job->callback_id, current_job->info.page, current_job->type}] = copy_list(*(current_job->list->get().get()));
 				lock.lock();
-				current_job->threads_already_copied++;
+				current_job->threads_already_copied.push_back(local_thread_id);;
 				lock.unlock();
 				continue;
 			}
@@ -292,7 +302,7 @@ public:
 				t_content_list.erase({ current_job->callback_id, current_job->info.page, current_job->type });
 
 				lock.lock();
-				current_job->threads_already_copied++;
+				current_job->threads_already_copied.push_back(local_thread_id);
 				lock.unlock();
 			}
 			
@@ -728,6 +738,14 @@ size_t Docanto::PDFRenderer::cull_chunks(std::vector<Geometry::Rectangle<float>>
 	return amount;
 }
 
+void Docanto::PDFRenderer::abort_all_items() {
+	auto queue = pimpl->m_jobs.get();
+	for (auto& q : *queue) {
+		q->cookie.abort = 1;
+	}
+
+}
+
 size_t Docanto::PDFRenderer::abort_queue_item() {
 	auto queue = pimpl->m_jobs.get();
 	size_t amount = 0;
@@ -743,6 +761,7 @@ size_t Docanto::PDFRenderer::abort_queue_item() {
 		}
 
 		amount++;
+
 		item->cookie.abort = 1;
 	}
 
@@ -1012,7 +1031,7 @@ void Docanto::PDFRenderer::update_page_annotations(size_t page) {
 		// run all three devices
 		Timer time2;
 		fz_run_page_annots(*ctx, p, dev_annot, fz_identity, nullptr);
-		Logger::log("Page ", page + 1, " Annots Rendered in ", time2);
+		//Logger::log("Page ", page + 1, " Annots Rendered in ", time2);
 
 		// get the list and add the lists
 		auto annotat = pimpl->m_page_annotat.get_write();
@@ -1077,6 +1096,8 @@ void Docanto::PDFRenderer::reload() {
 }
 
 void Docanto::PDFRenderer::reload_annotations_page(size_t page) {
+	//Docanto::Logger::log("-- Reloading Annotations --");
+	//abort_all_items();
 	auto job2 = std::make_shared<RenderThreadManager::RenderJob>();
 	job2->job = RenderThreadManager::JobType::DELETE_DISPLAY_LIST;
 	job2->info.page = page;

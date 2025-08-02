@@ -59,7 +59,7 @@ void DocantoWin::ToolHandler::end_ink(Docanto::Geometry::Point<float> p) {
 	}
 	m_current_ink.push_back(m_render->inv_transform(p) - m_ink_target.first.render->get_position(m_ink_target.second));
 
-	if (m_ink_target.first.annotation != nullptr) {
+	if (m_ink_target.first.annotation != nullptr and m_current_ink.size() > 2) {
 		m_ink_target.first.annotation->add_annotation(m_ink_target.second, 
 			m_current_ink, get_current_tool().col, get_current_tool().width);
 

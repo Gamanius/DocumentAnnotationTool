@@ -49,6 +49,8 @@ namespace Docanto {
 		size_t cull_bitmaps(ThreadSafeVector<PDFRenderInfo>& info);
 		size_t cull_chunks(std::vector<Geometry::Rectangle<float>>& chunks, size_t pagee, ThreadSafeVector<PDFRenderInfo>& info);
 
+		void abort_all_items();
+
 		void position_pdfs();
 
 		std::pair<std::vector<Geometry::Rectangle<float>>, float> get_chunks(size_t page);
