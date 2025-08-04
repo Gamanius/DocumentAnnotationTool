@@ -22,6 +22,8 @@ namespace Docanto {
 		size_t get_page_count();
 		PageWrapper& get_page(size_t page);
 		Geometry::Dimension<float> get_page_dimension(size_t page, float dpi = MUPDF_DEFAULT_DPI);
+
+		void save(std::filesystem::path p = {});
 	};
 }
 

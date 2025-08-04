@@ -45,6 +45,7 @@ namespace DocantoWin {
 		void reload();
 
 		std::pair<PDFWrapper, size_t> get_pdf_at_point(Docanto::Geometry::Point<float> p);
+		PDFWrapper get_pdf_at_index(size_t id);
 
 		size_t get_amount_of_pdfs() const;
 	};

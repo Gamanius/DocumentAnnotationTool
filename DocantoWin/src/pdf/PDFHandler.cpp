@@ -107,6 +107,10 @@ std::pair<DocantoWin::PDFHandler::PDFWrapper, size_t> DocantoWin::PDFHandler::ge
 	return {{} , ~static_cast<size_t>(0)};
 }
 
+DocantoWin::PDFHandler::PDFWrapper DocantoWin::PDFHandler::get_pdf_at_index(size_t id) {
+	return m_pdfobj.at(id);
+}
+
 void DocantoWin::PDFHandler::reload() {
 	for (auto& pdf : m_pdfobj) {
 		pdf.render->reload();

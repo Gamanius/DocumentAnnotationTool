@@ -27,6 +27,30 @@ static std::optional<std::wstring> open_file_dialog(const wchar_t* filter, HWND 
 	return std::nullopt;
 }
 
+std::optional<std::wstring> save_file_dialog(const wchar_t* filter, HWND windowhandle = nullptr) {
+	OPENFILENAME ofn;
+	WCHAR szFile[MAX_PATH] = { 0 };
+
+	ZeroMemory(&ofn, sizeof(ofn));
+	ofn.lStructSize = sizeof(ofn);
+	ofn.hwndOwner = windowhandle; // If you have a window handle, specify it here.
+	ofn.lpstrFile = szFile;
+	ofn.nMaxFile = MAX_PATH;
+	ofn.lpstrFilter = filter;
+	ofn.nFilterIndex = 1;
+	ofn.lpstrFileTitle = NULL;
+	ofn.nMaxFileTitle = 0;
+	ofn.lpstrInitialDir = NULL;
+	ofn.Flags = OFN_PATHMUSTEXIST | OFN_ENABLESIZING | OFN_OVERWRITEPROMPT;
+
+	if (GetSaveFileName(&ofn)) {
+		return std::wstring(ofn.lpstrFile);
+	}
+	auto error = CommDlgExtendedError();
+	return std::nullopt;
+}
+
+
 void DocantoWin::MainWindowHandler::paint() {
 	m_ctx->tabs->get_active_tab()->pdfhandler->request();
 
@@ -75,6 +99,14 @@ void DocantoWin::MainWindowHandler::key(Window::VK key, bool pressed) {
 			Docanto::Timer t;
 			m_ctx->tabs->get_active_tab()->pdfhandler->add_pdf(path.value());
 			Docanto::Logger::log("Loaded PDF in ", t);
+		}
+		break;
+	}
+	case S:
+	{
+		auto path = save_file_dialog(L"PDF\0*.pdf\0\0", m_ctx->window->get_hwnd());
+		if (path.has_value()) {
+			m_ctx->tabs->get_active_tab()->pdfhandler->get_pdf_at_index(0).pdf->save(path.value());
 		}
 		break;
 	}

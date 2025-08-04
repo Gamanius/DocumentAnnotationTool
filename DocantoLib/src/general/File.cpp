@@ -62,3 +62,21 @@ std::optional<Docanto::File> Docanto::File::load(const std::filesystem::path& p)
 	return std::move(file);
 }
 
+void Docanto::File::write(const std::filesystem::path& p, const byte* data, size_t len) {
+	if (std::filesystem::is_directory(p)) {
+		Logger::error("Wanted to save a file at a directory: ", p);
+		return;
+	}
+
+	std::ofstream stream(p, std::ios::binary);
+
+	if (!stream.is_open()) {
+		// Log error: failed to open file
+		Logger::error("Failed to open stream to path: ", p);
+		return;
+	}
+
+	stream.write(reinterpret_cast<const char*>(data), len);
+	stream.close();
+}
+

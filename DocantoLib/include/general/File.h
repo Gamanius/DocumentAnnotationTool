@@ -20,7 +20,7 @@ namespace Docanto {
 		~File() = default;
 
 		static std::optional<File> load(const std::filesystem::path& p);
-		
+		static void write(const std::filesystem::path& p, const byte* data, size_t len);
 	};
 }
 
