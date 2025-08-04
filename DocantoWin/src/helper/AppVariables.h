@@ -43,6 +43,9 @@ namespace DocantoWin::AppVariables {
 	}
 
 	inline size_t WINDOW_PAINT_REFRESH_TIME_MS = 16;
+
+	inline float RENDER_MAX_SCALE = 150;
+	inline float RENDER_MIN_SCALE = 0.01;
 }
 
 #endif // !_DOCANTOWIN_APPVARS_H_

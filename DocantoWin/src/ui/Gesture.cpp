@@ -46,6 +46,13 @@ void DocantoWin::GestureHandler::process_two_finger(GestureFinger& firstfinger, 
 	auto scale =  (first_last_pos_local - second_last_pos_local).distance() / (second_init_pos_local - first_init_pos_local).distance();
 	auto pivot = (first_init_pos_local + second_init_pos_local) / 2.0f;
 
+	if (m_initialScaleMatrix._11 * scale > AppVariables::RENDER_MAX_SCALE) {
+		scale = AppVariables::RENDER_MAX_SCALE / m_initialScaleMatrix._11;
+	} 
+	else if (m_initialScaleMatrix._11 * scale < AppVariables::RENDER_MIN_SCALE) {
+		scale = AppVariables::RENDER_MIN_SCALE / m_initialScaleMatrix._11;
+	}
+
 	auto new_scale_mat = D2D1::Matrix3x2F::Scale(scale, scale, PointToD2D1(pivot));
 
 	m_render->set_scale_matrix(new_scale_mat * m_initialScaleMatrix);

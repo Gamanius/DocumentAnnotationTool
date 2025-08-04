@@ -364,6 +364,13 @@ void DocantoWin::Direct2DRender::set_scale_matrix(D2D1::Matrix3x2F m) {
 }
 
 void DocantoWin::Direct2DRender::add_scale_matrix(float scale, Docanto::Geometry::Point<float> center) {
+	if (get_transform_scale() >= AppVariables::RENDER_MAX_SCALE and scale > 1) {
+		return;
+	}
+	if (get_transform_scale() <= AppVariables::RENDER_MIN_SCALE and scale < 1) {
+		return;
+	}
+
 	auto full = m_transformScaleMatrix;
 	full.Invert();
 
