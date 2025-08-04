@@ -69,6 +69,9 @@
     <ClInclude Include="src\ui\UIToolbar.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\ui\UIPDFManager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">
@@ -122,6 +125,9 @@
     <ClCompile Include="src\ui\UIToolbar.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\ui\UIPDFManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="rsc\pen-tool.svg" />
@@ -137,6 +143,7 @@
     <None Include="rsc\grab-cursor.cur">
       <Filter>Resource Files</Filter>
     </None>
+    <None Include="rsc\save-symbol.svg" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="rsc\Resource.rc">

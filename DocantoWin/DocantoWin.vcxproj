@@ -167,6 +167,7 @@
     <ClInclude Include="src\ui\TestElement.h" />
     <ClInclude Include="src\ui\UIContainer.h" />
     <ClInclude Include="src\ui\UIDebug.h" />
+    <ClInclude Include="src\ui\UIPDFManager.h" />
     <ClInclude Include="src\ui\UIToolbar.h" />
     <ClInclude Include="src\win\Direct2D.h" />
     <ClInclude Include="src\win\MainWindowHandler.h" />
@@ -186,6 +187,7 @@
     <ClCompile Include="src\ui\TestElement.cpp" />
     <ClCompile Include="src\ui\UIContainer.cpp" />
     <ClCompile Include="src\ui\UIDebug.cpp" />
+    <ClCompile Include="src\ui\UIPDFManager.cpp" />
     <ClCompile Include="src\ui\UIToolbar.cpp" />
     <ClCompile Include="src\win\Direct2D.cpp" />
     <ClCompile Include="src\win\MainWindowHandler.cpp" />
@@ -204,6 +206,7 @@
     <None Include="rsc\grabbing-cursor.cur" />
     <None Include="rsc\move-tool.svg" />
     <None Include="rsc\pen-tool.svg" />
+    <None Include="rsc\save-symbol.svg" />
     <None Include="rsc\select-tool.svg" />
     <None Include="rsc\svg1.bin" />
   </ItemGroup>

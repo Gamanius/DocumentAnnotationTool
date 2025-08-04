@@ -111,6 +111,10 @@ DocantoWin::PDFHandler::PDFWrapper DocantoWin::PDFHandler::get_pdf_at_index(size
 	return m_pdfobj.at(id);
 }
 
+const std::vector<DocantoWin::PDFHandler::PDFWrapper>& DocantoWin::PDFHandler::get_all_pdfs() const {
+	return m_pdfobj;
+}
+
 void DocantoWin::PDFHandler::reload() {
 	for (auto& pdf : m_pdfobj) {
 		pdf.render->reload();

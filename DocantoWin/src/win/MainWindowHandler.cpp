@@ -2,6 +2,7 @@
 
 #include "ui/UIDebug.h"
 #include "ui/UIToolbar.h"
+#include "ui/UIPDFManager.h"
 
 static std::optional<std::wstring> open_file_dialog(const wchar_t* filter, HWND windowhandle = nullptr) {
 	OPENFILENAME ofn;
@@ -309,6 +310,7 @@ DocantoWin::MainWindowHandler::MainWindowHandler(HINSTANCE instance) {
 
 	m_ctx->uihandler->add(std::make_shared<UIDebugElement>(L"test"));
 	m_ctx->uihandler->add(std::make_shared<UIToolbar>());
+	m_ctx->uihandler->add(std::make_shared<UIPDFManager>());
 
 	m_ctx->tabs = std::make_shared<TabHandler>();
 

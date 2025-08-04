@@ -3,10 +3,9 @@
 #include "GenericUIObject.h"
 
 namespace DocantoWin {
-	class UIToolbar : public GenericUIObject {
-		std::vector<Docanto::Geometry::Rectangle<float>> get_toolbar_recs();
+	class UIPDFManager : public GenericUIObject {
 	public:
-		UIToolbar(const std::wstring& UIName = L"Toolbar");
+		UIPDFManager(const std::wstring& UIName = L"pdf_manager");
 
 		Docanto::Geometry::Dimension<long> get_min_dims() override;
 
