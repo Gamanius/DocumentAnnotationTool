@@ -45,8 +45,8 @@ namespace Docanto {
 		void add_to_processor();
 
 		size_t remove_finished_queue_item();
-		size_t abort_queue_item();
-		size_t cull_bitmaps(ThreadSafeVector<PDFRenderInfo>& info);
+		size_t abort_queue_item(size_t page, float dpi);
+		size_t cull_bitmaps(ThreadSafeVector<PDFRenderInfo>& info, size_t page, float dpi);
 		size_t cull_chunks(std::vector<Geometry::Rectangle<float>>& chunks, size_t pagee, ThreadSafeVector<PDFRenderInfo>& info);
 
 		void abort_all_items();
@@ -55,7 +55,6 @@ namespace Docanto {
 
 		std::pair<std::vector<Geometry::Rectangle<float>>, float> get_chunks(size_t page);
 		float get_chunk_scale() const;
-		float get_chunk_dpi() const;
 
 		void async_render(); 
 		void receive_image(PDFRenderInfo info, Image&& i);

@@ -443,18 +443,20 @@ float Docanto::PDFRenderer::get_chunk_scale() const {
 	return std::floor(pimpl->m_current_dpi / MUPDF_DEFAULT_DPI);
 }
 
-float Docanto::PDFRenderer::get_chunk_dpi() const {
-	return (get_chunk_scale() + 1) * MUPDF_DEFAULT_DPI;
-}
-
 std::pair<std::vector<Docanto::Geometry::Rectangle<float>>, float> Docanto::PDFRenderer::get_chunks(size_t page) {
 	auto dims = pdf_obj->get_page_dimension(page);
 	auto  pos = pimpl->m_page_pos.at(page);
 
-	float scale = std::max(get_chunk_scale(), 0.0001f); // to avoid negative values
-	size_t amount_cells = std::max<size_t>(static_cast<size_t>(std::max<float>(std::log(scale) * 5, 1.0f)), 1);
-	auto amount_cells_w = std::max<size_t>(amount_cells * dims.width  / 600.0, 1);
-	auto amount_cells_h = std::max<size_t>(amount_cells * dims.height / 850.0, 1);
+	float a = std::max(dims.width / 600.0, dims.height / 850.0);
+	float scale = std::max(get_chunk_scale(), 0.0001f) * a; // to avoid negative values
+	//size_t amount_cells = std::max<size_t>(static_cast<size_t>(std::max<float>(std::log(scale) * 5, 1.0f)), 1);
+	size_t amount_cells = std::max<size_t>(static_cast<size_t>(std::pow(2, std::floor(std::log2(scale)))), 1);
+	float layer = std::floor(std::log2(amount_cells)) + 1;
+	float bounds = std::floor(std::pow(2, layer) / a) + 1;
+	float max_dpi = bounds * MUPDF_DEFAULT_DPI;
+	
+	auto amount_cells_w = amount_cells; //std::max<size_t>(amount_cells * dims.width  / 600.0, 1);
+	auto amount_cells_h = amount_cells; //std::max<size_t>(amount_cells * dims.height / 850.0, 1);
 	Geometry::Dimension<float> cell_dim = { dims.width / amount_cells_w, dims.height / amount_cells_h };
 	// transform the viewport to docspace
 	auto doc_space_screen = Docanto::Geometry::Rectangle<float>(pimpl->m_current_viewport.upperleft() - pos, pimpl->m_current_viewport.lowerright() - pos);
@@ -485,7 +487,7 @@ std::pair<std::vector<Docanto::Geometry::Rectangle<float>>, float> Docanto::PDFR
 		}
 	}
 
-	return { chunks, get_chunk_dpi() };
+	return { chunks, max_dpi };
 }
 
 Docanto::Image Docanto::PDFRenderer::get_image(size_t page, float dpi) {
@@ -631,47 +633,70 @@ void Docanto::PDFRenderer::add_to_processor() {
 	// TODO
 }
 
-size_t Docanto::PDFRenderer::cull_bitmaps(ThreadSafeVector<PDFRenderInfo>& info) {
+size_t Docanto::PDFRenderer::cull_bitmaps(ThreadSafeVector<PDFRenderInfo>& info, size_t page, float dpi) {
 	auto vec = info.get_write();
 	std::vector<size_t> ids_to_delete;
 	size_t amount = 0;
-	auto higher_dpi  = get_chunk_dpi();
+	auto queue_empty = pimpl->m_jobs.get()->empty();
 
 	for (auto it = vec->rbegin(); it != vec->rend(); it++) {
 		auto& item = *it;
-		bool intersetcts = (item.recs + get_position(item.page)).intersects(pimpl->m_current_viewport);
-		bool del = false;
 
-		if (intersetcts and // intersection test
-			(FLOAT_EQUAL(item.dpi, higher_dpi)) /*dpi test*/) {
+		// skip items from the wrong page
+		if (item.page != page) {
 			continue;
 		}
 
-		if (intersetcts) {
-			// check if its intersects with other recs which have our target dpi
-			for (auto it2 = vec->rbegin(); it2 != vec->rend(); it2++) {
-				if (it == it2) {
-					continue;
-				}
+		bool intersetcts = (item.recs + get_position(item.page)).intersects(pimpl->m_current_viewport);
 
-				if (!FLOAT_EQUAL(it2->dpi, higher_dpi)) {
-					continue;
-				}
+		// if its intersects with the viewport and is the target dpi we want to keep it
+		if (intersetcts and // intersection test
+			(FLOAT_EQUAL(item.dpi, dpi)) /*dpi test*/) {
+			continue;
+		}
 
-				// if its intersecting with any other rec we can remove it
-				if (it2->recs.intersects(item.recs)) {
-					del = true;
-					break;
-				}
+		// else we remove any item that is not our target
+		if (queue_empty) {
+			goto ADD_ID_TO_DELETE;
+		}
+
+		// else we can check if they are already overlapping in a way with our target that we can remove it
+		if (!intersetcts) {
+			goto ADD_ID_TO_DELETE;
+		}
+
+		// if it intersects with the viewport but is not our desired dpi we need to do further checks
+		// check if its intersects with other recs which have our target dpi
+		for (auto it2 = vec->rbegin(); it2 != vec->rend(); it2++) {
+			if (it == it2) {
+				continue;
+			}
+				
+			// we only want to look at the bitmaps which have our target dpi
+			if (!FLOAT_EQUAL(it2->dpi, dpi)) {
+				continue;
 			}
 
-			if (del == false) {
-				continue;
+			auto rec_copy = Geometry::Rectangle(item.recs);
+			rec_copy.width -= m_margin * 3;
+			rec_copy.height -= m_margin * 3;
+			rec_copy.x += m_margin * 3;
+			rec_copy.y += m_margin * 3;
+
+			// if we have a higher dpi bitmap and a bitmap at target dpi over it we can remove the higher dpi one
+			if (item.dpi > it2->dpi and rec_copy.intersects(it2->recs)) {
+				goto ADD_ID_TO_DELETE;
 			}
 		}
 
+		// if the queue is not empty, it intersects and does overlap with an target we dont remove it
+		continue;
+
+		// else remove it
+	ADD_ID_TO_DELETE:
 		ids_to_delete.push_back(item.id);
 		amount++;
+		
 	}
 
 	for (auto ids : ids_to_delete) {
@@ -746,14 +771,16 @@ void Docanto::PDFRenderer::abort_all_items() {
 
 }
 
-size_t Docanto::PDFRenderer::abort_queue_item() {
+size_t Docanto::PDFRenderer::abort_queue_item(size_t page, float dpi) {
 	auto queue = pimpl->m_jobs.get();
 	size_t amount = 0;
 
-	auto dpi = get_chunk_dpi();
-
 	for (auto it = queue->begin(); it != queue->end(); it++) {
 		auto& item = *it;
+
+		if (item->info.page != page) {
+			continue;
+		}
 
 		if ((item->info.recs + get_position(item->info.page)).intersects(pimpl->m_current_viewport) and // intersection test
 			(FLOAT_EQUAL(item->info.dpi, dpi)) /*dpi test*/) {
@@ -784,10 +811,6 @@ void Docanto::PDFRenderer::request(Geometry::Rectangle<float> view, float dpi) {
 	pimpl->m_current_dpi = dpi;
 
 	remove_finished_queue_item();
-	abort_queue_item();
-
-	cull_bitmaps(pimpl->m_highDefBitmaps);
-	cull_bitmaps(pimpl->m_annotationBitmaps);
 
 	size_t amount_of_pages = pdf_obj->get_page_count();
 	auto&        positions = pimpl->m_page_pos;
@@ -803,6 +826,9 @@ void Docanto::PDFRenderer::request(Geometry::Rectangle<float> view, float dpi) {
 			continue;
 		}
 
+		auto [content_chunks, dpi] = get_chunks(i);
+		auto [anntoation_chunks, _] = get_chunks(i);
+		abort_queue_item(i, dpi);
 
 		// check for any missing display lists
 		if (!thread_manager->has_display_list(id, i, RenderThreadManager::ContentType::CONTENT)) {
@@ -828,9 +854,7 @@ void Docanto::PDFRenderer::request(Geometry::Rectangle<float> view, float dpi) {
 
 			thread_manager->add_job(id, job);
 		}
-
-		auto [content_chunks, dpi] = get_chunks(i);
-		auto [anntoation_chunks, _] = get_chunks(i);
+		
 		cull_chunks(content_chunks, i, pimpl->m_highDefBitmaps);
 		cull_chunks(anntoation_chunks, i, pimpl->m_annotationBitmaps);
 
@@ -860,7 +884,13 @@ void Docanto::PDFRenderer::request(Geometry::Rectangle<float> view, float dpi) {
 			// add the new chunks to the queue
 			add_job(RenderThreadManager::ContentType::ANNOTATION, chunk_rec);
 		}
+
+		cull_bitmaps(pimpl->m_highDefBitmaps, i, dpi);
+		cull_bitmaps(pimpl->m_annotationBitmaps, i, dpi);
 	}
+
+
+
 }
 
 void Docanto::PDFRenderer::set_rendercallback(std::function<void(size_t)> fun) { m_render_callback = fun; }
