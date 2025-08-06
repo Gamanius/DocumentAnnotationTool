@@ -4,7 +4,6 @@
 #ifndef _DOCANTOWIN_WINDOW_H_
 #define _DOCANTOWIN_WINDOW_H_
 
-
 namespace DocantoWin {
 	class Direct2DRender;
 
@@ -180,6 +179,7 @@ namespace DocantoWin {
 		};
 
 		enum CURSOR_TYPE {
+			NONE,
 			POINTER,
 			NWSE_RESIZE,
 			NESW_RESIZE,
@@ -211,6 +211,7 @@ namespace DocantoWin {
 			std::function<void(PointerInfo)> m_callback_pointer_up;
 			std::function<void(PointerInfo)> m_callback_pointer_update;
 			std::function<void(short, bool)> m_callback_mousewheel;
+			std::function<CURSOR_TYPE()>     m_callback_set_cursor;
 
 			std::function<void(Docanto::Geometry::Point<long>, int)> m_callback_pointer_down_nchittest;
 			std::function<void(unsigned int)> m_callback_dpi_changed;
@@ -326,6 +327,8 @@ namespace DocantoWin {
 		void send_close_request();
 		void send_paint_request();
 
+		void update_cursor();
+
 		static bool is_key_pressed(VK key);
 
 
@@ -351,6 +354,7 @@ namespace DocantoWin {
 		void set_callback_pointer_up(std::function<void(PointerInfo)> m_callback_pointer_up);
 		void set_callback_pointer_update(std::function<void(PointerInfo)> m_callback_pointer_update);
 		void set_callback_pointer_wheel(std::function<void(short, bool)> m_callback_mousewheel);
+		void set_callback_set_curosr(std::function<CURSOR_TYPE()> m_callback_set_cursor);
 
 		void set_callback_pointer_down_nchittest(std::function<void(Docanto::Geometry::Point<long>, int)> callback_pointer_down_nchittest);
 		void set_callback_dpi_changed(std::function<void(unsigned int)> callback_dpi_changed);

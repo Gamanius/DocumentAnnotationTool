@@ -3,7 +3,7 @@
 #include "pdf/PDFHandler.h"
 #include <format>
 
-DocantoWin::UIDebugElement::UIDebugElement(const std::wstring& UIName) : GenericUIObject(UIName, true) {
+DocantoWin::UIDebugElement::UIDebugElement(const std::wstring& UIName, std::weak_ptr<Context> c) : GenericUIObject(UIName, c, true) {
 	this->set_bounds({ 100, 100 });
 	this->set_pos({ 50, 50 });
 }
@@ -17,14 +17,15 @@ int DocantoWin::UIDebugElement::hit_test(Docanto::Geometry::Point<long> where) {
 	return HTCAPTION;
 }
 
-void DocantoWin::UIDebugElement::pointer_press(Docanto::Geometry::Point<float> where, int hit) {
+void DocantoWin::UIDebugElement::pointer_press(const Window::PointerInfo& p, int hit) {
 }
 
-void DocantoWin::UIDebugElement::pointer_update(Docanto::Geometry::Point<float> where, int hit) {
+void DocantoWin::UIDebugElement::pointer_update(const Window::PointerInfo& p, int hit) {
 }
 
-void DocantoWin::UIDebugElement::pointer_release(Docanto::Geometry::Point<float> where, int hit) {
+void DocantoWin::UIDebugElement::pointer_release(const Window::PointerInfo& p, int hit) {
 }
+
 
 void DocantoWin::UIDebugElement::draw(std::shared_ptr<Direct2DRender> render) {
 	float size = 18;
@@ -45,4 +46,8 @@ void DocantoWin::UIDebugElement::draw(std::shared_ptr<Direct2DRender> render) {
 		{ offset.x, offset.y + (padding + size) * 3 }, AppVariables::Colors::get(AppVariables::Colors::TYPE::TEXT_COLOR), size);
 	
 	render->end_draw();
+}
+
+DocantoWin::Window::CURSOR_TYPE DocantoWin::UIDebugElement::get_mouse(Docanto::Geometry::Point<float> where) {
+	return Window::CURSOR_TYPE::POINTER;
 }

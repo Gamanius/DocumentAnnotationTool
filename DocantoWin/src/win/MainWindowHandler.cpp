@@ -1,8 +1,6 @@
 #include "MainWindowHandler.h"
 
 #include "ui/UIDebug.h"
-#include "ui/UIToolbar.h"
-#include "ui/UIPDFManager.h"
 
 static std::optional<std::wstring> open_file_dialog(const wchar_t* filter, HWND windowhandle = nullptr) {
 	OPENFILENAME ofn;
@@ -223,18 +221,21 @@ void DocantoWin::MainWindowHandler::key(Window::VK key, bool pressed) {
 	}
 }
 
+bool tool_hand_pointer_down = false;
+
 void DocantoWin::MainWindowHandler::pointer_down(Window::PointerInfo p) {
 	if (!m_gesture) {
 		return;
 	}
 
-	if (m_ctx->uihandler->pointer_down(p.pos)) {
+	if (m_ctx->uihandler->pointer_down(p)) {
 		m_ctx->window->send_paint_request();
 		return;
 	}
 
 	auto tool_hand_is_on = m_ctx->tabs->get_active_tab()->toolhandler->get_current_tool().type == ToolHandler::ToolType::HAND_MOVEMENT;
 	if (tool_hand_is_on) {
+		tool_hand_pointer_down = true;
 		m_ctx->window->set_global_cursor(Window::CURSOR_TYPE::HAND_GRABBING);
 	}
 
@@ -257,7 +258,7 @@ void DocantoWin::MainWindowHandler::pointer_update(Window::PointerInfo p) {
 		return;
 	}
 
-	if (m_ctx->uihandler->pointer_update(p.pos)) {
+	if (m_ctx->uihandler->pointer_update(p)) {
 		m_ctx->window->send_paint_request();
 		return;
 	}
@@ -280,13 +281,14 @@ void DocantoWin::MainWindowHandler::pointer_up(Window::PointerInfo p) {
 		return;
 	}
 
-	if (m_ctx->uihandler->pointer_up(p.pos)) {
+	if (m_ctx->uihandler->pointer_up(p)) {
 		m_ctx->window->send_paint_request();
 		return;
 	}
 
 	auto tool_hand_is_on = m_ctx->tabs->get_active_tab()->toolhandler->get_current_tool().type == ToolHandler::ToolType::HAND_MOVEMENT;
 	if (tool_hand_is_on) {
+		tool_hand_pointer_down = false;
 		m_ctx->window->set_global_cursor(Window::CURSOR_TYPE::HAND);
 	}
 
@@ -301,6 +303,18 @@ void DocantoWin::MainWindowHandler::pointer_up(Window::PointerInfo p) {
 	m_ctx->window->send_paint_request();
 }
 
+DocantoWin::Window::CURSOR_TYPE DocantoWin::MainWindowHandler::set_cursor() {
+	auto tool_hand_is_on = m_ctx->tabs->get_active_tab()->toolhandler->get_current_tool().type == ToolHandler::ToolType::HAND_MOVEMENT;
+	if (tool_hand_is_on and tool_hand_pointer_down) {
+		return Window::CURSOR_TYPE::HAND_GRABBING;
+	}
+	else if (tool_hand_is_on) {
+		return Window::CURSOR_TYPE::HAND;
+	}
+	return Window::CURSOR_TYPE::POINTER;
+}
+
+
 DocantoWin::MainWindowHandler::MainWindowHandler(HINSTANCE instance) {
 	m_ctx = std::make_shared<Context>();
 	m_ctx->window = std::make_shared<Window>(instance);
@@ -308,9 +322,7 @@ DocantoWin::MainWindowHandler::MainWindowHandler(HINSTANCE instance) {
 	m_ctx->caption = std::make_shared<Caption>(m_ctx->render);
 	m_ctx->uihandler = std::make_shared<UIHandler>(m_ctx);
 
-	m_ctx->uihandler->add(std::make_shared<UIDebugElement>(L"test"));
-	m_ctx->uihandler->add(std::make_shared<UIToolbar>());
-	m_ctx->uihandler->add(std::make_shared<UIPDFManager>());
+	m_ctx->uihandler->add(std::make_shared<UIDebugElement>(L"test", m_ctx));
 
 	m_ctx->tabs = std::make_shared<TabHandler>();
 
@@ -341,6 +353,10 @@ DocantoWin::MainWindowHandler::MainWindowHandler(HINSTANCE instance) {
 	m_ctx->window->set_callback_pointer_up([&](Window::PointerInfo d) {
 		this->pointer_up(d);
 	});
+
+	m_ctx->window->set_callback_set_curosr([&]() -> Window::CURSOR_TYPE {
+		return this->set_cursor();
+		});
 
 	auto path = open_file_dialog(L"PDF\0 * .pdf\0\0", m_ctx->window->get_hwnd());
 	Docanto::Logger::log("Got path ", path);

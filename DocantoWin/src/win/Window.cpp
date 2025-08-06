@@ -362,8 +362,8 @@ LRESULT DocantoWin::Window::parse_message(UINT uMsg, WPARAM wParam, LPARAM lPara
 	}
 	case WM_SETCURSOR:
 	{
-		if (m_globalcursor.has_value()) {
-			this->set_cursor(m_globalcursor.value());
+		if (m_callback_set_cursor) {
+			this->set_cursor(m_callback_set_cursor());
 			return true;
 		}
 		break;
@@ -445,6 +445,7 @@ LRESULT DocantoWin::Window::parse_message(UINT uMsg, WPARAM wParam, LPARAM lPara
 	{
 		if (m_callback_pointer_down) {
 			m_callback_pointer_down(parse_pointer_info(wParam, lParam, *this));
+			update_cursor();
 		}
 		return 0;
 	}
@@ -456,8 +457,10 @@ LRESULT DocantoWin::Window::parse_message(UINT uMsg, WPARAM wParam, LPARAM lPara
 	}
 	case WM_POINTERUP:
 	{
-		if (m_callback_pointer_up)
+		if (m_callback_pointer_up) {
 			m_callback_pointer_up(parse_pointer_info(wParam, lParam, *this));
+			update_cursor();
+		}
 
 		return 0;
 	}
@@ -643,10 +646,7 @@ DocantoWin::Window::Window(HINSTANCE h, const std::wstring& name, bool resizable
 	}
 
 	int window_style
-		= (WS_THICKFRAME | WS_SYSMENU) * resizable 
-		 | WS_MAXIMIZEBOX  // Add maximize button to support maximizing via mouse dragging
-		 | WS_MINIMIZEBOX;  // Add minimize button to support minimizing by clicking on the taskbar icon
-
+		= (WS_THICKFRAME)*resizable;
 
 	m_hwnd = CreateWindowEx(WS_EX_TOOLWINDOW, wc.lpszClassName, APPLICATION_NAME,
 		window_style, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
@@ -814,6 +814,10 @@ void DocantoWin::Window::send_paint_request() {
 	InvalidateRect(m_hwnd, nullptr, false);
 }
 
+void DocantoWin::Window::update_cursor() {
+	SendMessage(m_hwnd, WM_SETCURSOR, 0, 0);
+}
+
 void DocantoWin::Window::set_state(WINDOW_STATE state) {
 	int nCmdShow = 0;
 	switch (state) {
@@ -962,6 +966,10 @@ void DocantoWin::Window::set_callback_pointer_update(std::function<void(PointerI
 
 void DocantoWin::Window::set_callback_pointer_wheel(std::function<void(short, bool)> callback) {
 	m_callback_mousewheel = callback;
+}
+
+void DocantoWin::Window::set_callback_set_curosr(std::function<CURSOR_TYPE()> cursor) {
+	m_callback_set_cursor = cursor;
 }
 
 void DocantoWin::Window::set_callback_pointer_down_nchittest(std::function<void(Docanto::Geometry::Point<long>, int)> callback_pointer_down_nchittest) {

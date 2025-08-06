@@ -11,13 +11,10 @@ namespace DocantoWin {
 		Docanto::Geometry::Point<float> m_position;
 		Docanto::Geometry::Dimension<float> m_dimension;
 
-
-		Docanto::Geometry::Point<float> m_local_mouse;
-
 		Docanto::Geometry::Point<float> m_caption_delta_mouse;
+		Docanto::Geometry::Point<float> m_last_mouse_pos;
 
 		bool resizable = false;
-
 		const float resize_square_size   = 4.0f;
 		const byte  resize_sqaure_amount = 5;
 	protected:
@@ -29,9 +26,7 @@ namespace DocantoWin {
 
 		int resize_hittest(Docanto::Geometry::Point<long> p);
 	public:
-		GenericUIObject(const std::wstring& UIName, bool resize);
-
-		void set_context(std::weak_ptr<Context> c);
+		GenericUIObject(const std::wstring& UIName, std::weak_ptr<Context> c, bool resize = true);
 
 		Docanto::Geometry::Dimension<float> get_bounds();
 		void set_bounds(Docanto::Geometry::Dimension<float> bounds);
@@ -40,17 +35,20 @@ namespace DocantoWin {
 
 		int sys_hit_test(Docanto::Geometry::Point<long> where);
 		virtual int hit_test(Docanto::Geometry::Point<long> where) = 0;
+
 		bool is_resizable() const;
 		void set_resizable(bool resize);
 		
+		virtual void pointer_press(const Window::PointerInfo& p, int hit) = 0;
+		virtual void pointer_update(const Window::PointerInfo& p, int hit) = 0;
+		virtual void pointer_release(const Window::PointerInfo& p, int hit) = 0;
 
-		virtual void pointer_press(Docanto::Geometry::Point<float> where, int hit) = 0;
-		virtual void pointer_update(Docanto::Geometry::Point<float> where, int hit) = 0;
-		virtual void pointer_release(Docanto::Geometry::Point<float> where, int hit) = 0;
+		bool sys_pointer_down(const Window::PointerInfo& p, int hit);
+		bool sys_pointer_update(const Window::PointerInfo& p, int hit);
+		bool sys_pointer_release(const Window::PointerInfo& p, int hit);
 
-		bool sys_pointer_down(Docanto::Geometry::Point<float> where, int hit);
-		bool sys_pointer_update(Docanto::Geometry::Point<float> where, int hit);
-		bool sys_pointer_release(Docanto::Geometry::Point<float> where, int hit);
+		virtual Window::CURSOR_TYPE get_mouse(Docanto::Geometry::Point<float> where) = 0;
+		Window::CURSOR_TYPE do_get_mouse(Docanto::Geometry::Point<float> where);
 
 		void draw_border();
 		void sys_draw();

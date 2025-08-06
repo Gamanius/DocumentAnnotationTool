@@ -26,7 +26,7 @@ int DocantoWin::GenericUIObject::resize_hittest(Docanto::Geometry::Point<long> p
 	return HTNOWHERE;
 }
 
-DocantoWin::GenericUIObject::GenericUIObject(const std::wstring& UIName, bool resize) : resizable(resize) {
+DocantoWin::GenericUIObject::GenericUIObject(const std::wstring& UIName, std::weak_ptr<Context> c,bool resize) : resizable(resize), ctx(c) {
 	m_window = std::make_shared<Window>(GetModuleHandle(NULL), UIName, resize);
 	m_window->override_default_hittest();
 	m_localrender = std::make_shared<Direct2DRender>(m_window);
@@ -59,8 +59,7 @@ DocantoWin::GenericUIObject::GenericUIObject(const std::wstring& UIName, bool re
 	});
 
 	m_window->set_callback_pointer_down([&](DocantoWin::Window::PointerInfo p) {
-		m_local_mouse = p.pos;
-		this->pointer_press(p.pos, hit_test(p.pos));
+		this->pointer_press(p, hit_test(p.pos));
 	});
 
 	m_window->set_callback_moving([&](Docanto::Geometry::Point<long> p) {
@@ -82,9 +81,6 @@ DocantoWin::GenericUIObject::GenericUIObject(const std::wstring& UIName, bool re
 	});
 }
 
-void DocantoWin::GenericUIObject::set_context(std::weak_ptr<DocantoWin::Context> c) {
-	ctx = c;
-}
 
 Docanto::Geometry::Dimension<float> DocantoWin::GenericUIObject::get_bounds() {
 	return m_dimension;
@@ -97,9 +93,9 @@ void DocantoWin::GenericUIObject::set_bounds(Docanto::Geometry::Dimension<float>
 
 	if (is_floating()) {
 		m_window->set_window_dim(bounds);
+		m_localrender->resize(m_window->DpToPx(bounds));
 	}
 
-	m_localrender->resize(m_window->DpToPx(bounds));
 	m_dimension = bounds;
 
 	make_float(!is_inbounds());
@@ -155,62 +151,68 @@ Docanto::Geometry::Point<float> DocantoWin::GenericUIObject::get_pos() {
 }
 
 Docanto::Geometry::Point<float> DocantoWin::GenericUIObject::get_mouse_pos() {
-	return m_local_mouse;
+	return ctx.lock()->window->get_mouse_pos() - get_pos();
 }
 
 
-bool DocantoWin::GenericUIObject::sys_pointer_down(Docanto::Geometry::Point<float> where, int hit) {
-	m_local_mouse = where - get_pos();
-	m_caption_delta_mouse = m_local_mouse;
+bool DocantoWin::GenericUIObject::sys_pointer_down(const Window::PointerInfo& p, int hit) {
+	auto p_info = p;
+	p_info.pos = p.pos - get_pos();
+	m_last_mouse_pos = p_info.pos;
+	m_caption_delta_mouse = p_info.pos;
 
 	if (hit != HTCAPTION) {
-		pointer_press(m_local_mouse, hit);
+		pointer_press(p_info, hit);
 		return false;
 	}
 
 	return true;
 }
 
-bool DocantoWin::GenericUIObject::sys_pointer_update(Docanto::Geometry::Point<float> where, int hit) {
-	m_local_mouse = where - get_pos();
+bool DocantoWin::GenericUIObject::sys_pointer_update(const Window::PointerInfo& p, int hit) {
+	auto p_info = p;
+	p_info.pos = p.pos - get_pos();
+	m_last_mouse_pos = p_info.pos;
+	Docanto::Logger::log(p_info.pos);
 
 	make_float(!is_inbounds());
 
-	switch (hit) {
-	case HTCAPTION:
-	{
-		set_pos(where - m_caption_delta_mouse);
-		break;
+
+	if (hit == HTCAPTION and (p_info.button1pressed or p_info.type == Window::POINTER_TYPE::TOUCH)) {
+		set_pos(p.pos - m_caption_delta_mouse);
 	}
-	case HTBOTTOMRIGHT:
-	{
+	else if (hit == HTBOTTOMRIGHT and (p_info.button1pressed or p_info.type == Window::POINTER_TYPE::TOUCH)) {
 		auto last_pos = get_pos();
-		set_bounds({ m_local_mouse.x, m_local_mouse.y });
+		set_bounds({ p_info.pos.x, p_info.pos.y });
 		if (is_floating()) {
 			set_pos(last_pos);
 		}
-		break;
 	}
-	default:
-	{
-		pointer_update(m_local_mouse, hit);
+	else {
+		pointer_update(p_info, hit);
 		return false;
-	}
 	}
 
 	return true;
 }
 
-bool DocantoWin::GenericUIObject::sys_pointer_release(Docanto::Geometry::Point<float> where, int hit) {
-	m_local_mouse = where - get_pos();
+bool DocantoWin::GenericUIObject::sys_pointer_release(const Window::PointerInfo& p, int hit) {
+	auto p_info = p;
+	p_info.pos = p.pos - get_pos();
+	m_last_mouse_pos = p_info.pos;
+
 
 	if (hit != HTCAPTION) {
-		pointer_release(m_local_mouse, hit);
+		pointer_release(p_info, hit);
 		return false;
 	}
 
 	return true;
 
+}
+
+DocantoWin::Window::CURSOR_TYPE DocantoWin::GenericUIObject::do_get_mouse(Docanto::Geometry::Point<float> where) {
+	return Window::CURSOR_TYPE::POINTER;
 }
 
 void DocantoWin::GenericUIObject::draw_border() {
@@ -251,6 +253,8 @@ void DocantoWin::GenericUIObject::sys_draw() {
 		render->end_draw();
 	
 	}
+
+	render->draw_rect({0, 0, get_bounds()}, AppVariables::Colors::get(AppVariables::Colors::TYPE::SECONDARY_COLOR), 2);
 	render->end_draw();
 }
 
@@ -264,8 +268,8 @@ void DocantoWin::GenericUIObject::make_float(bool f) {
 		// first put the window mouse so the dpi can be identified
 		auto last_bound = get_bounds();
 		m_window->set_state(Window::NORMAL);
-		set_pos(c->window->get_mouse_pos());
-		set_pos(c->window->get_mouse_pos() - m_caption_delta_mouse);
+		set_pos(m_last_mouse_pos);
+		set_pos(m_last_mouse_pos - m_caption_delta_mouse);
 		m_window->set_min_dims(get_min_dims());
 		set_bounds(last_bound);
 	}

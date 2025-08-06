@@ -3,6 +3,9 @@
 #include "GenericUIObject.h"
 
 namespace DocantoWin {
+	class Window;
+	struct Window::PointerInfo;
+
 	class UIContainer {
 		std::vector<std::shared_ptr<GenericUIObject>> m_all_uiobjects;
 		std::pair<std::shared_ptr<GenericUIObject>, int> m_hit_uiobject;
@@ -13,9 +16,9 @@ namespace DocantoWin {
 		UIContainer(std::weak_ptr<Context> c);
 
 		void draw();
-		bool pointer_down(Docanto::Geometry::Point<float> where);
-		bool pointer_update(Docanto::Geometry::Point<float> where);
-		bool pointer_up(Docanto::Geometry::Point<float> where);
+		bool pointer_down(const Window::PointerInfo& p);
+		bool pointer_update(const Window::PointerInfo& p);
+		bool pointer_up(const Window::PointerInfo& p);
 
 		void resize(Docanto::Geometry::Dimension<long> new_dim);
 

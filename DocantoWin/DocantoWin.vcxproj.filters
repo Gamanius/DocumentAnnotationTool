@@ -51,9 +51,6 @@
     <ClInclude Include="src\ui\UIHandler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\ui\TestElement.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="src\helper\Context.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -64,12 +61,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="rsc\resource.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\ui\UIToolbar.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\ui\UIPDFManager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -107,9 +98,6 @@
     <ClCompile Include="src\ui\UIHandler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\ui\TestElement.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\helper\TabHandler.h">
       <Filter>Header Files</Filter>
     </ClCompile>
@@ -120,12 +108,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\pdf\ToolHandler.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\ui\UIToolbar.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\ui\UIPDFManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

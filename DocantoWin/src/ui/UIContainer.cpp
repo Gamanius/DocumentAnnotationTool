@@ -23,49 +23,44 @@ DocantoWin::UIContainer::UIContainer(std::weak_ptr<Context> c) {
 	ctx = c;
 }
 
-bool DocantoWin::UIContainer::pointer_down(Docanto::Geometry::Point<float> where) {
+bool DocantoWin::UIContainer::pointer_down(const Window::PointerInfo& p) {
 	for (auto& ref : m_all_uiobjects) {
-		if (!ref->get_rec().intersects(where)) {
+		if (!ref->get_rec().intersects(p.pos)) {
 			continue;
 		}
 
-		m_hit_uiobject = { ref, ref->sys_hit_test(where - ref->get_pos()) };
+		m_hit_uiobject = { ref, ref->sys_hit_test(p.pos - ref->get_pos()) };
 
-		m_hit_uiobject.first->sys_pointer_down(where, m_hit_uiobject.second);
+		m_hit_uiobject.first->sys_pointer_down(p, m_hit_uiobject.second);
 		return true;
 	}
+	m_hit_uiobject = {};
 	return false;
 }
 
-bool DocantoWin::UIContainer::pointer_update(Docanto::Geometry::Point<float> where) {
-	int hit = HTNOWHERE;
+bool DocantoWin::UIContainer::pointer_update(const Window::PointerInfo& p) {
 	for (auto& ref : m_all_uiobjects) {
-		hit = ref->sys_hit_test(where - ref->get_pos());
-		if (hit == HTBOTTOMRIGHT) {
-			ctx.lock()->window->set_cursor(Window::CURSOR_TYPE::NWSE_RESIZE);
-			break;
+		if (!ref->get_rec().intersects(p.pos) or ref == m_hit_uiobject.first) {
+			continue;
 		}
-	}
-	if (hit != HTBOTTOMRIGHT) {
-		//ctx.lock()->window->set_cursor(Window::CURSOR_TYPE::POINTER);
+
+		ref->sys_pointer_update(p, HTNOWHERE);
 	}
 
-	auto window = ctx.lock()->render->get_attached_window();
 	if (m_hit_uiobject.first == nullptr) {
 		return false;
 	}
-	m_hit_uiobject.first->sys_pointer_update(where, m_hit_uiobject.second);
+	m_hit_uiobject.first->sys_pointer_update(p, m_hit_uiobject.second);
 	return true;
 }
 
-bool DocantoWin::UIContainer::pointer_up(Docanto::Geometry::Point<float> where) {
+bool DocantoWin::UIContainer::pointer_up(const Window::PointerInfo& p) {
 	if (m_hit_uiobject.first == nullptr) {
 		return false;
 	}
 
-	m_hit_uiobject.first->sys_pointer_release(where, m_hit_uiobject.second);
+	m_hit_uiobject.first->sys_pointer_release(p, m_hit_uiobject.second);
 
-	m_hit_uiobject = {};
 	return true;
 }
 
@@ -83,6 +78,5 @@ std::vector<std::shared_ptr<DocantoWin::GenericUIObject>>& DocantoWin::UIContain
 }
 
 void DocantoWin::UIContainer::add(std::shared_ptr<GenericUIObject> obj) {
-	obj->set_context(ctx);
 	m_all_uiobjects.push_back(obj);
 }
