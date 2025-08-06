@@ -22,7 +22,7 @@ namespace DocantoWin {
 		static ID2D1Factory6* m_factory;
 		static IDWriteFactory3* m_writeFactory;
 		
-		ComPtr<ID3D11Device> m_d3d11device;
+		static ComPtr<ID3D11Device> m_d3d11device;
 
 		ComPtr<ID2D1Device5> m_device = nullptr;
 		ComPtr<ID2D1DeviceContext5> m_devicecontext = nullptr;

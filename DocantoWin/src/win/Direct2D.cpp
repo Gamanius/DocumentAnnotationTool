@@ -3,11 +3,14 @@
 
 #include "helper/AppVariables.h"
 
+using namespace Microsoft::WRL;
+
 #undef min
 #undef max
 
 ID2D1Factory6* DocantoWin::Direct2DRender::m_factory = nullptr;
 IDWriteFactory3* DocantoWin::Direct2DRender::m_writeFactory = nullptr;
+ComPtr<ID3D11Device> DocantoWin::Direct2DRender::m_d3d11device = nullptr;
 
 void DocantoWin::Direct2DRender::createD2DResources() {
 	D2D1_FACTORY_OPTIONS option{};
@@ -59,19 +62,22 @@ DocantoWin::Direct2DRender::Direct2DRender(std::shared_ptr<Window> w) : m_window
 	// Create the DX11 API device object, and get a corresponding context.
 	ComPtr<ID3D11DeviceContext> d3d11context; 
 	ComPtr<IDXGIDevice> dxdevice;
+	HRESULT res = S_OK;
 
-	auto res = D3D11CreateDevice(
-		nullptr,                    // specify null to use the default adapter
-		D3D_DRIVER_TYPE_HARDWARE,
-		0,
-		D3D11_CREATE_DEVICE_BGRA_SUPPORT,              // optionally set debug and Direct2D compatibility flags
-		featureLevels,              // list of feature levels this app can support
-		ARRAYSIZE(featureLevels),   // number of possible feature levels
-		D3D11_SDK_VERSION,
-		&m_d3d11device,                    // returns the Direct3D device created
-		nullptr,            // returns feature level of device created
-		&d3d11context                    // returns the device immediate context
-	);
+	if (m_d3d11device == nullptr) {
+		res = D3D11CreateDevice(
+			nullptr,                    // specify null to use the default adapter
+			D3D_DRIVER_TYPE_HARDWARE,
+			0,
+			D3D11_CREATE_DEVICE_BGRA_SUPPORT,              // optionally set debug and Direct2D compatibility flags
+			featureLevels,              // list of feature levels this app can support
+			ARRAYSIZE(featureLevels),   // number of possible feature levels
+			D3D11_SDK_VERSION,
+			&m_d3d11device,                    // returns the Direct3D device created
+			nullptr,            // returns feature level of device created
+			&d3d11context                    // returns the device immediate context
+		);
+	}
 
 	if (res != S_OK) {
 		Docanto::Logger::error("Couldn't init D3D11");
