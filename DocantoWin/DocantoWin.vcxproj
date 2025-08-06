@@ -171,6 +171,7 @@
     <ClInclude Include="src\ui\UIToolbar.h" />
     <ClInclude Include="src\win\Direct2D.h" />
     <ClInclude Include="src\win\MainWindowHandler.h" />
+    <ClInclude Include="src\win\TSFHandler.h" />
     <ClInclude Include="src\win\Window.h" />
     <ClInclude Include="src\ui\UIHandler.h" />
     <ClInclude Include="src\pdf\ToolHandler.h" />
@@ -191,6 +192,7 @@
     <ClCompile Include="src\ui\UIToolbar.cpp" />
     <ClCompile Include="src\win\Direct2D.cpp" />
     <ClCompile Include="src\win\MainWindowHandler.cpp" />
+    <ClCompile Include="src\win\TSFHandler.cpp" />
     <ClCompile Include="src\win\Window.cpp" />
     <ClCompile Include="src\ui\UIHandler.cpp" />
     <ClCompile Include="src\pdf\ToolHandler.cpp" />

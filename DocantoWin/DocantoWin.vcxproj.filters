@@ -72,6 +72,9 @@
     <ClInclude Include="src\ui\UIPDFManager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\win\TSFHandler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">
@@ -126,6 +129,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\ui\UIPDFManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\win\TSFHandler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

@@ -4,6 +4,8 @@
 #include "ui/UIToolbar.h"
 #include "ui/UIPDFManager.h"
 
+#include "TSFHandler.h"
+
 static std::optional<std::wstring> open_file_dialog(const wchar_t* filter, HWND windowhandle = nullptr) {
 	OPENFILENAME ofn;
 	WCHAR szFile[MAX_PATH] = { 0 };
@@ -313,6 +315,8 @@ DocantoWin::MainWindowHandler::MainWindowHandler(HINSTANCE instance) {
 	m_ctx->uihandler->add(std::make_shared<UIPDFManager>());
 
 	m_ctx->tabs = std::make_shared<TabHandler>();
+
+	TSFHandler handler(m_ctx->window);
 
 	m_ctx->window->set_callback_nchittest([&](Docanto::Geometry::Point<long> p) -> int {
 		return m_ctx->caption->hittest(p);
