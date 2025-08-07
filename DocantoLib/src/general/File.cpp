@@ -45,7 +45,7 @@ std::optional<Docanto::File> Docanto::File::load(const std::filesystem::path& p)
 	}
 
 	auto size = stream.tellg();
-	auto file_buffer = std::unique_ptr<byte>(new byte[size]);
+	auto file_buffer = std::unique_ptr<byte>(new byte[static_cast<size_t>(size)]);
 
 	stream.seekg(0, std::ios::beg);
 	if (!stream.read(reinterpret_cast<char*>(file_buffer.get()), size)) {
@@ -55,7 +55,7 @@ std::optional<Docanto::File> Docanto::File::load(const std::filesystem::path& p)
 
 	Docanto::File file;
 	file.data = std::move(file_buffer);
-	file.size = size;
+	file.size = static_cast<size_t>(size);
 	file.path = p;
 
 
@@ -76,7 +76,7 @@ void Docanto::File::write(const std::filesystem::path& p, const byte* data, size
 		return;
 	}
 
-	stream.write(reinterpret_cast<const char*>(data), len);
+	stream.write(reinterpret_cast<const char*>(data), static_cast<std::streamsize>(len));
 	stream.close();
 }
 

@@ -1,7 +1,7 @@
 #include "PDFRenderer.h"
 
-#include "mupdf/fitz.h"
-#include "mupdf/pdf.h"
+#include <mupdf/fitz.h>
+#include <mupdf/pdf.h>
 
 #include "../../include/general/Timer.h"
 #include "../../include/general/ReadWriteMutex.h"
@@ -419,7 +419,6 @@ Docanto::Image get_image_from_list(fz_context* ctx, fz_display_list* wrap, const
 		obj.dpi = dpi;
 
 		pixmap->samples = nullptr;
-
 	} fz_always(ctx) {
 		// drop all devices
 		fz_drop_device(ctx, drawdevice);
@@ -560,7 +559,6 @@ std::vector<Docanto::Geometry::Rectangle<double>> Docanto::PDFRenderer::get_clip
 	auto& positions = pimpl->m_page_pos;
 	std::vector<Docanto::Geometry::Rectangle<double>> recs;
 
-	float y = 0;
 	for (size_t i = 0; i < amount_of_pages; i++) {
 		auto dims = pdf_obj->get_page_dimension(i);
 		Docanto::Geometry::Rectangle<double> rec = { positions[i], dims };
@@ -577,7 +575,6 @@ std::vector<Docanto::Geometry::Rectangle<double>> Docanto::PDFRenderer::get_page
 	auto& positions = pimpl->m_page_pos;
 	std::vector<Docanto::Geometry::Rectangle<double>> recs;
 
-	float y = 0;
 	for (size_t i = 0; i < amount_of_pages; i++) {
 		auto dims = pdf_obj->get_page_dimension(i);
 		Docanto::Geometry::Rectangle<double> rec = { positions[i], dims };
@@ -615,15 +612,15 @@ Docanto::ReadWrapper<std::vector<Docanto::PDFRenderer::PDFRenderInfo>> Docanto::
 }
 
 
-void Docanto::PDFRenderer::remove_from_processor(size_t id) {
+void Docanto::PDFRenderer::remove_from_processor(size_t image_id) {
 	auto vec = pimpl->m_highDefBitmaps.get_write();
-	std::erase_if(*vec, [id](const auto& obj) {
-		return obj.id == id;
+	std::erase_if(*vec, [image_id](const auto& obj) {
+		return obj.id == image_id;
 	});
 
 	vec = pimpl->m_annotationBitmaps.get_write();
-	std::erase_if(*vec, [id](const auto& obj) {
-		return obj.id == id;
+	std::erase_if(*vec, [image_id](const auto& obj) {
+		return obj.id == image_id;
 	});
 
 	m_processor->deleteImage(id);
@@ -804,11 +801,11 @@ size_t Docanto::PDFRenderer::remove_finished_queue_item() {
 	return 0;
 }
 
-void Docanto::PDFRenderer::request(Geometry::Rectangle<float> view, float dpi) {
+void Docanto::PDFRenderer::request(Geometry::Rectangle<float> view, float target_dpi) {
 	auto q_lock = pimpl->m_jobs.get();
 
 	pimpl->m_current_viewport = view;
-	pimpl->m_current_dpi = dpi;
+	pimpl->m_current_dpi = target_dpi;
 
 	remove_finished_queue_item();
 

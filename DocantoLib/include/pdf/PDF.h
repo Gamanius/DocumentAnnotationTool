@@ -1,10 +1,10 @@
 #ifndef _PDF_H_
 #define _PDF_H_
 
-#include "../general/Common.h"
-#include "../general/MathHelper.h"
-#include "../general/File.h"
-#include "../general/ThreadSafeWrapper.h"
+#include "general/Common.h"
+#include "general/MathHelper.h"
+#include "general/File.h"
+#include "general/ThreadSafeWrapper.h"
 #include "PDFContext.h"
 
 struct fz_document;
@@ -18,6 +18,9 @@ namespace Docanto {
 	public:
 		PDF(const std::filesystem::path& p);
 		~PDF();
+
+		PDF(const PDF&) = delete;
+		PDF& operator=(const PDF&) = delete;
 
 		size_t get_page_count();
 		PageWrapper& get_page(size_t page);

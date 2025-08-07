@@ -1,8 +1,8 @@
 #ifndef _GLOBALPDFCONTEXT_H_
 #define _GLOBALPDFCONTEXT_H_
 
-#include "../general/Common.h"
-#include "../general/ThreadSafeWrapper.h"
+#include "general/Common.h"
+#include "general/ThreadSafeWrapper.h"
 
 inline constexpr float MUPDF_DEFAULT_DPI = 72.0f;
 

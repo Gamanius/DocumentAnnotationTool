@@ -1,5 +1,5 @@
 #include "pdf.h"
-#include "mupdf/pdf.h"
+#include <mupdf/pdf.h>
 
 #include <span>
 
@@ -53,7 +53,7 @@ size_t Docanto::PDF::get_page_count() {
 	auto ctx = GlobalPDFContext::get_instance().get();
 	auto doc = this->get();
 
-	return fz_count_pages(*ctx, *doc);
+	return static_cast<size_t>(fz_count_pages(*ctx, *doc));
 }
 
 Docanto::PageWrapper& Docanto::PDF::get_page(size_t page) {

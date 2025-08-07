@@ -15,6 +15,9 @@ namespace Docanto {
 		Image() = default;
 		Image(std::unique_ptr<byte> data, size_t size, size_t width);
 
+		Image(const Image&) = delete;
+		Image& operator=(const Image&) = delete;
+
 		Image(Image&& other) noexcept;
 		Image& operator=(Image&& other) noexcept;
 	};

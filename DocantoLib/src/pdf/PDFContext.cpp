@@ -1,6 +1,7 @@
 #include "PDFContext.h"
-#include "mupdf/pdf.h"
 #include "../general/File.h"
+
+#include <mupdf/pdf.h>
 
 std::mutex m_mutex[FZ_LOCK_MAX];
 

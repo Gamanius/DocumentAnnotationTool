@@ -2,10 +2,16 @@
 
 #include <iostream>
 
-#ifdef _MSVC_LANG 
-#define _UNICODE
-#define UNICODE
-#include <windows.h>
+#ifdef _MSVC_LANG
+	#ifndef _UNICODE
+	#define _UNICODE
+	#endif // !_UNICODE
+
+	#ifndef UNICODE
+	#define UNICODE
+	#endif // !UNICODE
+
+	#include <windows.h>
 #endif // _MSVC_LANG 
 
 void Docanto::Logger::init(std::wostream* buffer) {

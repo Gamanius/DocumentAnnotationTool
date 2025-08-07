@@ -85,7 +85,7 @@ namespace Docanto {
 		}
 
 		bool can_write(std::thread::id id) {
-			for (auto& [list_id, item] : thread_list) {
+			for (auto& [list_id, _] : thread_list) {
 				// if there is any thread which hold a lock of any kind
 				// we cannot write
 				if (list_id != id) {
@@ -96,9 +96,9 @@ namespace Docanto {
 		}
 
 		bool can_read(std::thread::id id) {
-			for (auto& [list_id, item] : thread_list) {
+			for (auto& [list_id, info] : thread_list) {
 				// we only cant read if there is another thread which has write access
-				if (list_id != id and item.access == ACCESS_TYPE::WRITE_ACCESS) {
+				if (list_id != id and info.access == ACCESS_TYPE::WRITE_ACCESS) {
 					return false;
 				}
 			}

@@ -136,6 +136,8 @@ namespace Docanto {
 			case MSG_LEVEL::SUCCESS:
 				*_msg_buffer << L"[Success]: ";
 				break;
+			case MSG_LEVEL::NONE:
+				break;
 			}
 			do_msg(first, args ...);
 

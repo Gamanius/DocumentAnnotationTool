@@ -1,7 +1,7 @@
 #include "PDFAnnotation.h"
 
-#include "mupdf/fitz.h"
-#include "mupdf/pdf.h"
+#include <mupdf/fitz.h>
+#include <mupdf/pdf.h>
 
 
 struct AnnotationWrapper {
@@ -91,7 +91,7 @@ std::shared_ptr<Docanto::PDFAnnotation::AnnotationInfo> do_ink_annot(pdf_annot* 
 	auto list_count = pdf_annot_ink_list_count(*ctx, a);
 	for (int i = 0; i < list_count; i++) {
 		auto vertex_count = pdf_annot_ink_list_stroke_count(*ctx, a, i);
-		for (size_t k = 0; k < vertex_count; k++) {
+		for (int k = 0; k < vertex_count; k++) {
 			auto point = pdf_annot_ink_list_stroke_vertex(*ctx, a, i, k);
 			info->points->push_back({ point.x, point.y });
 		}
@@ -119,12 +119,14 @@ void Docanto::PDFAnnotation::parse_annotation() {
 			std::shared_ptr<Docanto::PDFAnnotation::AnnotationInfo> info;
 			count++;
 
-			switch (pdf_annot_type(*ctx, annot)) {
-			case pdf_annot_type::PDF_ANNOT_INK:
+			switch (to_annot_type(pdf_annot_type(*ctx, annot))) {
+			case AnnotationType::INK_ANNOTATION:
 			{
 				info = do_ink_annot(annot);
 				break;
 			}
+			default:
+				break;
 			}
 			info = do_general_annot(annot, info);
 
@@ -149,7 +151,7 @@ void Docanto::PDFAnnotation::add_annotation(size_t page, const std::vector<Geome
 	auto ctx = Docanto::GlobalPDFContext::get_instance().get();
 
 	pdf_annot* annot = pdf_create_annot(*ctx, reinterpret_cast<pdf_page*>(*fzpage), PDF_ANNOT_INK);
-	int count[1] = { all_ponts.size() };
+	int count[1] = { static_cast<int>(all_ponts.size()) };
 	// the reason we can just put in the all points vector is that Point
 	pdf_set_annot_ink_list(*ctx, annot, 1, count, reinterpret_cast<const fz_point*>(all_ponts.data()));
 
