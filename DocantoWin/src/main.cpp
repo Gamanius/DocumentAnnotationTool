@@ -1,3 +1,4 @@
+#include "include.h"
 #include "win/MainWindowHandler.h"
 
 #define _CRTDBG_MAP_ALLOC

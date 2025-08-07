@@ -1,3 +1,4 @@
+#include "include.h"
 #include "Direct2D.h"
 #include <wincodec.h>
 

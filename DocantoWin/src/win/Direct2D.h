@@ -1,10 +1,9 @@
-#include "helper/Geometry.h"
-#include "Window.h"
-#include <wrl/client.h>
-
 #ifndef _DOCANTOWIN_DIRECT2D_H_
 #define _DOCANTOWIN_DIRECT2D_H_
 
+#include "Window.h"
+#include <wrl/client.h>
+#include <d2d1_3.h>
 
 namespace DocantoWin {
 	using namespace Microsoft::WRL;

@@ -1,4 +1,6 @@
+#include "include.h"
 #include "UIContainer.h"
+#include "win/Direct2D.h"
 
 void DocantoWin::UIContainer::draw() {
 	auto c = ctx.lock();

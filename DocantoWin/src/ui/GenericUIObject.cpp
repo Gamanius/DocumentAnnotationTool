@@ -1,5 +1,7 @@
+#include "include.h"
 #include "GenericUIObject.h"
 #include "helper/AppVariables.h"
+#include "win/Direct2D.h"
 
 int DocantoWin::GenericUIObject::resize_hittest(Docanto::Geometry::Point<long> p) {
 	auto dims = get_bounds();

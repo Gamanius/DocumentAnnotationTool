@@ -1,3 +1,4 @@
+#include "include.h"
 #include "Window.h"
 
 #include <dwmapi.h>

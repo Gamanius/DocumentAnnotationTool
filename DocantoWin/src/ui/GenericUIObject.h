@@ -4,6 +4,7 @@
 #define _DOCANTOWIN_GENERICUIOBJECT_
 
 #include "helper/Context.h"
+#include "win/Window.h"
 
 namespace DocantoWin {
 	class GenericUIObject {

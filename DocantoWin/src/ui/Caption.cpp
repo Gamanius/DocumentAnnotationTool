@@ -1,3 +1,4 @@
+#include "include.h"
 #include "Caption.h"
 
 #include "helper/AppVariables.h"

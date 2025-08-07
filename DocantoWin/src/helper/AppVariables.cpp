@@ -1,3 +1,4 @@
+#include "include.h"
 #include "AppVariables.h"
 
 Docanto::Color DocantoWin::AppVariables::Colors::get(DocantoWin::AppVariables::Colors::TYPE t) {

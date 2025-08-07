@@ -1,5 +1,7 @@
+#include "include.h"
 #include "UIDebug.h"
 #include "helper/AppVariables.h"
+#include "helper/TabHandler.h"
 #include "pdf/PDFHandler.h"
 #include <format>
 

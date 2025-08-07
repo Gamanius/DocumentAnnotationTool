@@ -1,7 +1,8 @@
 #ifndef _DOCANTOWIN_TABCONTEXT_
 #define _DOCANTOWIN_TABCONTEXT_
 
-#include "../include.h"
+#include <memory>
+#include <vector>
 
 namespace DocantoWin {
 	class PDFHandler;

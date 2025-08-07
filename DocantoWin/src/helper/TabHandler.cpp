@@ -1,3 +1,4 @@
+#include "include.h"
 #include "TabHandler.h"
 
 void DocantoWin::TabHandler::add(std::shared_ptr<TabContext> ctx) {

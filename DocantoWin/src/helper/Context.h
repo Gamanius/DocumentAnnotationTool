@@ -3,13 +3,14 @@
 #ifndef _DOCANTOWIN_CONTEXT_H_
 #define _DOCANTOWIN_CONTEXT_H_
 
-#include "win/Direct2D.h"
-#include "ui/Caption.h"
-
-#include "TabHandler.h"
+#include <memory>
 
 namespace DocantoWin {
 	class UIHandler;
+	class Direct2DRender;
+	class Caption;
+	class Window;
+	class TabHandler;
 
 	struct Context {
 		std::shared_ptr<Direct2DRender> render;

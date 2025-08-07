@@ -1,3 +1,4 @@
+#include "include.h"
 #include "ToolHandler.h"
 
 DocantoWin::ToolHandler::ToolHandler(std::shared_ptr<DocantoWin::PDFHandler> pdf, std::shared_ptr<Direct2DRender> r) : m_pdfhandler(pdf), m_render(r) {

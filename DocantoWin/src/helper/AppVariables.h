@@ -1,7 +1,8 @@
 #ifndef _DOCANTOWIN_APPVARS_H_
 #define _DOCANTOWIN_APPVARS_H_
 
-#include "../include.h"
+#include <map>
+#include "general/BasicRender.h"
 
 namespace DocantoWin::AppVariables {
 	// Control elements

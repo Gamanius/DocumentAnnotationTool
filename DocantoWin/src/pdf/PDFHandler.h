@@ -1,8 +1,7 @@
 #ifndef _DOCANTOWIN_PDFHANDLER_H_
 #define _DOCANTOWIN_PDFHANDLER_H_
 
-#include "../include.h"
-
+#include "pdf/PDF.h"
 #include "win/Direct2D.h"
 
 namespace DocantoWin {

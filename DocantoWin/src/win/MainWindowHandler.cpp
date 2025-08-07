@@ -1,6 +1,8 @@
+#include "include.h"
 #include "MainWindowHandler.h"
 
 #include "ui/UIDebug.h"
+#include "ui/Caption.h"
 
 static std::optional<std::wstring> open_file_dialog(const wchar_t* filter, HWND windowhandle = nullptr) {
 	OPENFILENAME ofn;
