@@ -39,9 +39,9 @@ namespace DocantoWin {
 		bool is_resizable() const;
 		void set_resizable(bool resize);
 		
-		virtual void pointer_press(const Window::PointerInfo& p, int hit) = 0;
-		virtual void pointer_update(const Window::PointerInfo& p, int hit) = 0;
-		virtual void pointer_release(const Window::PointerInfo& p, int hit) = 0;
+		virtual bool pointer_press(const Window::PointerInfo& p, int hit) = 0;
+		virtual bool pointer_update(const Window::PointerInfo& p, int hit) = 0;
+		virtual bool pointer_release(const Window::PointerInfo& p, int hit) = 0;
 
 		bool sys_pointer_down(const Window::PointerInfo& p, int hit);
 		bool sys_pointer_update(const Window::PointerInfo& p, int hit);

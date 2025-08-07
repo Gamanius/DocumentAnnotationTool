@@ -19,11 +19,14 @@ namespace DocantoWin {
 		bool pointer_down(const Window::PointerInfo& p);
 		bool pointer_update(const Window::PointerInfo& p);
 		bool pointer_up(const Window::PointerInfo& p);
+		Window::CURSOR_TYPE get_mouse(Docanto::Geometry::Point<long> p);
 
 		void resize(Docanto::Geometry::Dimension<long> new_dim);
 
 		std::vector<std::shared_ptr<GenericUIObject>>& get_all_uiobjects_ref();
 
 		void add(std::shared_ptr<GenericUIObject> obj);
+
+		std::optional<std::shared_ptr<GenericUIObject>> get_focused_object() const;
 	};
 }

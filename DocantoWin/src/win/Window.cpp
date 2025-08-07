@@ -363,7 +363,7 @@ LRESULT DocantoWin::Window::parse_message(UINT uMsg, WPARAM wParam, LPARAM lPara
 	case WM_SETCURSOR:
 	{
 		if (m_callback_set_cursor) {
-			this->set_cursor(m_callback_set_cursor());
+			this->set_cursor(m_callback_set_cursor(get_mouse_pos()));
 			return true;
 		}
 		break;
@@ -968,7 +968,7 @@ void DocantoWin::Window::set_callback_pointer_wheel(std::function<void(short, bo
 	m_callback_mousewheel = callback;
 }
 
-void DocantoWin::Window::set_callback_set_curosr(std::function<CURSOR_TYPE()> cursor) {
+void DocantoWin::Window::set_callback_set_curosr(std::function<CURSOR_TYPE(Docanto::Geometry::Point<long>)> cursor) {
 	m_callback_set_cursor = cursor;
 }
 

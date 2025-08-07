@@ -25,7 +25,7 @@ namespace DocantoWin {
 		void pointer_update(Window::PointerInfo p);
 		void pointer_up(Window::PointerInfo p);
 
-		Window::CURSOR_TYPE set_cursor();
+		Window::CURSOR_TYPE set_cursor(Docanto::Geometry::Point<long> p);
 	public:
 		MainWindowHandler(HINSTANCE instance);
 

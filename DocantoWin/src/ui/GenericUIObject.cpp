@@ -173,27 +173,25 @@ bool DocantoWin::GenericUIObject::sys_pointer_update(const Window::PointerInfo& 
 	auto p_info = p;
 	p_info.pos = p.pos - get_pos();
 	m_last_mouse_pos = p_info.pos;
-	Docanto::Logger::log(p_info.pos);
 
 	make_float(!is_inbounds());
 
-
 	if (hit == HTCAPTION and (p_info.button1pressed or p_info.type == Window::POINTER_TYPE::TOUCH)) {
 		set_pos(p.pos - m_caption_delta_mouse);
+		return true;
 	}
 	else if (hit == HTBOTTOMRIGHT and (p_info.button1pressed or p_info.type == Window::POINTER_TYPE::TOUCH)) {
 		auto last_pos = get_pos();
 		set_bounds({ p_info.pos.x, p_info.pos.y });
 		if (is_floating()) {
 			set_pos(last_pos);
+			return false;
 		}
+		return true;
 	}
 	else {
-		pointer_update(p_info, hit);
-		return false;
+		return pointer_update(p_info, hit);
 	}
-
-	return true;
 }
 
 bool DocantoWin::GenericUIObject::sys_pointer_release(const Window::PointerInfo& p, int hit) {

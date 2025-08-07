@@ -53,6 +53,8 @@ std::optional<std::wstring> save_file_dialog(const wchar_t* filter, HWND windowh
 void DocantoWin::MainWindowHandler::paint() {
 	m_ctx->tabs->get_active_tab()->pdfhandler->request();
 
+	Docanto::Logger::log("Draw");
+
 	m_ctx->render->begin_draw();
 	m_ctx->render->clear();
 
@@ -254,26 +256,31 @@ void DocantoWin::MainWindowHandler::pointer_down(Window::PointerInfo p) {
 }
 
 void DocantoWin::MainWindowHandler::pointer_update(Window::PointerInfo p) {
+	bool dirty = false;
+	auto tool_type = m_ctx->tabs->get_active_tab()->toolhandler->get_current_tool().type;
 	if (!m_gesture) {
 		return;
 	}
 
-	if (m_ctx->uihandler->pointer_update(p)) {
-		m_ctx->window->send_paint_request();
-		return;
+	dirty = dirty or m_ctx->uihandler->pointer_update(p);
+	if (m_ctx->uihandler->get_focused_object() != std::nullopt) {
+		goto POINTER_UPDATE_DONE;
 	}
 
 	if (p.type == Window::POINTER_TYPE::TOUCH or p.type == Window::POINTER_TYPE::TOUCHPAD or
-		m_ctx->tabs->get_active_tab()->toolhandler->get_current_tool().type == ToolHandler::ToolType::HAND_MOVEMENT) {
+		tool_type == ToolHandler::ToolType::HAND_MOVEMENT and p.button1pressed) {
 		m_gesture->update_gesture(p);
+		dirty = true;
+	} 
+	else if (tool_type == ToolHandler::ToolType::PEN and p.type == Window::POINTER_TYPE::MOUSE and p.button1pressed) {
+		m_ctx->tabs->get_active_tab()->toolhandler->update_ink(p.pos);
+		dirty = true;
+	}
+
+POINTER_UPDATE_DONE:
+	if (dirty) {
 		m_ctx->window->send_paint_request();
 	}
-
-	if (m_ctx->tabs->get_active_tab()->toolhandler->get_current_tool().type == ToolHandler::ToolType::PEN and p.type == Window::POINTER_TYPE::MOUSE) {
-		m_ctx->tabs->get_active_tab()->toolhandler->update_ink(p.pos);
-	}
-
-	m_ctx->window->send_paint_request();
 }
 
 void DocantoWin::MainWindowHandler::pointer_up(Window::PointerInfo p) {
@@ -303,7 +310,12 @@ void DocantoWin::MainWindowHandler::pointer_up(Window::PointerInfo p) {
 	m_ctx->window->send_paint_request();
 }
 
-DocantoWin::Window::CURSOR_TYPE DocantoWin::MainWindowHandler::set_cursor() {
+DocantoWin::Window::CURSOR_TYPE DocantoWin::MainWindowHandler::set_cursor(Docanto::Geometry::Point<long> p) {
+	auto cur = m_ctx->uihandler->get_mouse(p);
+	if (cur != Window::CURSOR_TYPE::NONE) {
+		return cur;
+	}
+
 	auto tool_hand_is_on = m_ctx->tabs->get_active_tab()->toolhandler->get_current_tool().type == ToolHandler::ToolType::HAND_MOVEMENT;
 	if (tool_hand_is_on and tool_hand_pointer_down) {
 		return Window::CURSOR_TYPE::HAND_GRABBING;
@@ -354,8 +366,8 @@ DocantoWin::MainWindowHandler::MainWindowHandler(HINSTANCE instance) {
 		this->pointer_up(d);
 	});
 
-	m_ctx->window->set_callback_set_curosr([&]() -> Window::CURSOR_TYPE {
-		return this->set_cursor();
+	m_ctx->window->set_callback_set_curosr([&](Docanto::Geometry::Point<long> p) -> Window::CURSOR_TYPE {
+		return this->set_cursor(p);
 		});
 
 	auto path = open_file_dialog(L"PDF\0 * .pdf\0\0", m_ctx->window->get_hwnd());

@@ -17,13 +17,16 @@ int DocantoWin::UIDebugElement::hit_test(Docanto::Geometry::Point<long> where) {
 	return HTCAPTION;
 }
 
-void DocantoWin::UIDebugElement::pointer_press(const Window::PointerInfo& p, int hit) {
+bool DocantoWin::UIDebugElement::pointer_press(const Window::PointerInfo& p, int hit) {
+	return false;
 }
 
-void DocantoWin::UIDebugElement::pointer_update(const Window::PointerInfo& p, int hit) {
+bool DocantoWin::UIDebugElement::pointer_update(const Window::PointerInfo& p, int hit) {
+	return false;
 }
 
-void DocantoWin::UIDebugElement::pointer_release(const Window::PointerInfo& p, int hit) {
+bool DocantoWin::UIDebugElement::pointer_release(const Window::PointerInfo& p, int hit) {
+	return false;
 }
 
 
