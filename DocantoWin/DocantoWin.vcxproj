@@ -178,6 +178,8 @@
     <ClInclude Include="src\ui\Gesture.h" />
     <ClInclude Include="src\ui\UIContainer.h" />
     <ClInclude Include="src\ui\UIDebug.h" />
+    <ClInclude Include="src\ui\UIPDFManager.h" />
+    <ClInclude Include="src\ui\UIToolbar.h" />
     <ClInclude Include="src\win\Direct2D.h" />
     <ClInclude Include="src\win\MainWindowHandler.h" />
     <ClInclude Include="src\win\Window.h" />
@@ -211,6 +213,8 @@
     <ClCompile Include="src\ui\Gesture.cpp" />
     <ClCompile Include="src\ui\UIContainer.cpp" />
     <ClCompile Include="src\ui\UIDebug.cpp" />
+    <ClCompile Include="src\ui\UIPDFManager.cpp" />
+    <ClCompile Include="src\ui\UIToolbar.cpp" />
     <ClCompile Include="src\win\Direct2D.cpp" />
     <ClCompile Include="src\win\MainWindowHandler.cpp" />
     <ClCompile Include="src\win\Window.cpp" />

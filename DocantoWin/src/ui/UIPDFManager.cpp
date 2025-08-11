@@ -1,13 +1,21 @@
+#include "include.h"
+
 #include "UIPDFManager.h"
+
+#include "helper/TabHandler.h"
 #include "helper/AppVariables.h"
+
+
 #include "pdf/PDFHandler.h"
+
 #include <format>
+
 
 #include "pdf/ToolHandler.h"
 
-#include "../../rsc/resource.h"
+#include "resource.h"
 
-DocantoWin::UIPDFManager::UIPDFManager(const std::wstring& UIName) : GenericUIObject(UIName, true) {
+DocantoWin::UIPDFManager::UIPDFManager(std::weak_ptr<Context> c, const std::wstring& UIName) : GenericUIObject(UIName, c) {
 	this->set_bounds({ 100, 100 });
 	this->set_pos({ 100, 100 });
 }
@@ -20,19 +28,22 @@ int DocantoWin::UIPDFManager::hit_test(Docanto::Geometry::Point<long> where) {
 	return HTCAPTION;
 }
 
-void DocantoWin::UIPDFManager::pointer_press(Docanto::Geometry::Point<float> where, int hit) {
+bool DocantoWin::UIPDFManager::pointer_press(const Window::PointerInfo& p, int hit) {
+	return false;
 }
 
-void DocantoWin::UIPDFManager::pointer_update(Docanto::Geometry::Point<float> where, int hit) {
+bool DocantoWin::UIPDFManager::pointer_update(const Window::PointerInfo& p, int hit) {
+	return false;
 }
 
-void DocantoWin::UIPDFManager::pointer_release(Docanto::Geometry::Point<float> where, int hit) {
+bool DocantoWin::UIPDFManager::pointer_release(const Window::PointerInfo& p, int hit) {
+	return false;
 }
 
 void DocantoWin::UIPDFManager::draw(std::shared_ptr<Direct2DRender> render) {
 	namespace Vars = AppVariables::Colors;
 
-	const auto& currenttab = ctx.lock()->tabs->get_active_tab();
+	const auto& currenttab = this->ctx.lock()->tabs->get_active_tab();
 	const auto& all_pdfs = currenttab->pdfhandler->get_all_pdfs();
 
 	float box_size = 30;
@@ -47,4 +58,8 @@ void DocantoWin::UIPDFManager::draw(std::shared_ptr<Direct2DRender> render) {
 	}
 
 	render->end_draw();
+}
+
+DocantoWin::Window::CURSOR_TYPE DocantoWin::UIPDFManager::get_mouse(Docanto::Geometry::Point<float> where) {
+	return Window::CURSOR_TYPE::NONE;
 }

@@ -12,6 +12,10 @@ namespace DocantoWin {
 
 		std::weak_ptr<Context> ctx;
 
+		bool is_action_active = false;
+
+		void move_to_front(std::shared_ptr<GenericUIObject>);
+
 	public:
 		UIContainer(std::weak_ptr<Context> c);
 

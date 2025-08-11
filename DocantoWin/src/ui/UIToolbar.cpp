@@ -1,5 +1,8 @@
+#include "include.h"
+
 #include "UIToolbar.h"
 #include "helper/AppVariables.h"
+#include "helper/TabHandler.h"
 #include "pdf/PDFHandler.h"
 #include <format>
 
@@ -23,7 +26,7 @@ std::vector<Docanto::Geometry::Rectangle<float>> DocantoWin::UIToolbar::get_tool
 	return recs;
 }
 
-DocantoWin::UIToolbar::UIToolbar(const std::wstring& UIName) : GenericUIObject(UIName, true) {
+DocantoWin::UIToolbar::UIToolbar(std::weak_ptr<Context> c, const std::wstring& UIName) : GenericUIObject(UIName, c, true) {
 	this->set_bounds({ 100, 32 });
 	this->set_pos({ 100, 50 });
 }
@@ -33,6 +36,7 @@ Docanto::Geometry::Dimension<long> DocantoWin::UIToolbar::get_min_dims() {
 	if (ctx.lock()  == nullptr) {
 		return Docanto::Geometry::Dimension<long>({ 30 * 4, 30 });
 	}
+
 	const auto& all_tools = ctx.lock()->tabs->get_active_tab()->toolhandler->get_all_tools();
 	long amount_element = all_tools.size();
 
@@ -53,40 +57,36 @@ int DocantoWin::UIToolbar::hit_test(Docanto::Geometry::Point<long> where) {
 	return HTCAPTION;
 }
 
-void DocantoWin::UIToolbar::pointer_press(Docanto::Geometry::Point<float> where, int hit) {
+bool DocantoWin::UIToolbar::pointer_press(const Window::PointerInfo& p, int hit) {
 	auto recs = get_toolbar_recs();
-	const auto& all_tools = ctx.lock()->tabs->get_active_tab()->toolhandler->get_all_tools();
+	const auto& all_tools = this->ctx.lock()->tabs->get_active_tab()->toolhandler->get_all_tools();
 
 	for (size_t i = 0; i < recs.size(); i++) {
 		auto r = recs[i];
 
-		if (r.intersects(where)) {
-			if (all_tools[i].type == ToolHandler::ToolType::HAND_MOVEMENT) {
-				this->ctx.lock()->window->set_global_cursor(Window::CURSOR_TYPE::HAND);
-			}
-			else {
-				this->ctx.lock()->window->set_default_cursor();
-			}
-
-			ctx.lock()->tabs->get_active_tab()->toolhandler->set_current_tool_index(i);
-			ctx.lock()->window->send_paint_request();
-			break;
+		if (r.intersects(p.pos)) {
+			this->ctx.lock()->tabs->get_active_tab()->toolhandler->set_current_tool_index(i);
+			this->ctx.lock()->window->send_paint_request();
+			return true;
 		}
 	}
+	return false;
 }
 
-void DocantoWin::UIToolbar::pointer_update(Docanto::Geometry::Point<float> where, int hit) {
+bool DocantoWin::UIToolbar::pointer_update(const Window::PointerInfo& p, int hit) {
+	return false;
 }
 
-void DocantoWin::UIToolbar::pointer_release(Docanto::Geometry::Point<float> where, int hit) {
+bool DocantoWin::UIToolbar::pointer_release(const Window::PointerInfo& p, int hit) {
+	return false;
 }
+
 
 void DocantoWin::UIToolbar::draw(std::shared_ptr<Direct2DRender> render) {
 	namespace Vars = AppVariables::Colors;
 
-	const auto& all_tools = ctx.lock()->tabs->get_active_tab()->toolhandler->get_all_tools();
+	const auto& all_tools = this->ctx.lock()->tabs->get_active_tab()->toolhandler->get_all_tools();
 	auto recs = get_toolbar_recs();
-
 
 	render->begin_draw();
 	render->clear(Vars::get(Vars::TYPE::PRIMARY_COLOR));
@@ -122,7 +122,7 @@ void DocantoWin::UIToolbar::draw(std::shared_ptr<Direct2DRender> render) {
 		}
 		}
 		
-		if (i == ctx.lock()->tabs->get_active_tab()->toolhandler->get_current_tool_index()) {
+		if (i == this->ctx.lock()->tabs->get_active_tab()->toolhandler->get_current_tool_index()) {
 			render->draw_rect_filled(r, Vars::get(Vars::TYPE::ACCENT_COLOR));
 		}
 		render->draw_svg(id_to_draw, r.upperleft(), c, r.dims());
@@ -131,4 +131,11 @@ void DocantoWin::UIToolbar::draw(std::shared_ptr<Direct2DRender> render) {
 
 	
 	render->end_draw();
+}
+
+
+
+
+DocantoWin::Window::CURSOR_TYPE DocantoWin::UIToolbar::get_mouse(Docanto::Geometry::Point<float> where) {
+	return Window::CURSOR_TYPE::NONE;
 }

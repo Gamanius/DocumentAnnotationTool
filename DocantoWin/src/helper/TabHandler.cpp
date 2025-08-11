@@ -6,6 +6,9 @@ void DocantoWin::TabHandler::add(std::shared_ptr<TabContext> ctx) {
 }
 
 std::shared_ptr<DocantoWin::TabContext> DocantoWin::TabHandler::get_active_tab() const {
+	if (m_all_tabs.size() == 0) {
+		return nullptr;
+	}
 	return m_all_tabs.at(current_tab);
 }
 

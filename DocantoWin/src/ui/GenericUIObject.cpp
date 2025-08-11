@@ -104,7 +104,7 @@ void DocantoWin::GenericUIObject::set_bounds(Docanto::Geometry::Dimension<float>
 }
 
 
-int DocantoWin::GenericUIObject::sys_hit_test(Docanto::Geometry::Point<long> where) {
+int DocantoWin::GenericUIObject::handle_hit_test(Docanto::Geometry::Point<long> where) {
 	auto hit = resize_hittest(where);
 	if (hit == HTNOWHERE) {
 		return hit_test(where);
@@ -157,10 +157,10 @@ Docanto::Geometry::Point<float> DocantoWin::GenericUIObject::get_mouse_pos() {
 }
 
 
-bool DocantoWin::GenericUIObject::sys_pointer_down(const Window::PointerInfo& p, int hit) {
+bool DocantoWin::GenericUIObject::handle_pointer_down(const Window::PointerInfo& p, int hit) {
 	auto p_info = p;
 	p_info.pos = p.pos - get_pos();
-	m_last_mouse_pos = p_info.pos;
+	m_last_mouse_pos = p.pos;
 	m_caption_delta_mouse = p_info.pos;
 
 	if (hit != HTCAPTION) {
@@ -171,10 +171,10 @@ bool DocantoWin::GenericUIObject::sys_pointer_down(const Window::PointerInfo& p,
 	return true;
 }
 
-bool DocantoWin::GenericUIObject::sys_pointer_update(const Window::PointerInfo& p, int hit) {
+bool DocantoWin::GenericUIObject::handle_pointer_update(const Window::PointerInfo& p, int hit) {
 	auto p_info = p;
 	p_info.pos = p.pos - get_pos();
-	m_last_mouse_pos = p_info.pos;
+	m_last_mouse_pos = p.pos;
 
 	make_float(!is_inbounds());
 
@@ -196,10 +196,10 @@ bool DocantoWin::GenericUIObject::sys_pointer_update(const Window::PointerInfo& 
 	}
 }
 
-bool DocantoWin::GenericUIObject::sys_pointer_release(const Window::PointerInfo& p, int hit) {
+bool DocantoWin::GenericUIObject::handle_pointer_release(const Window::PointerInfo& p, int hit) {
 	auto p_info = p;
 	p_info.pos = p.pos - get_pos();
-	m_last_mouse_pos = p_info.pos;
+	m_last_mouse_pos = p.pos;
 
 
 	if (hit != HTCAPTION) {
@@ -211,7 +211,13 @@ bool DocantoWin::GenericUIObject::sys_pointer_release(const Window::PointerInfo&
 
 }
 
-DocantoWin::Window::CURSOR_TYPE DocantoWin::GenericUIObject::do_get_mouse(Docanto::Geometry::Point<float> where) {
+DocantoWin::Window::CURSOR_TYPE DocantoWin::GenericUIObject::handle_get_mouse(Docanto::Geometry::Point<float> where) {
+	auto dims = get_bounds();
+	auto resize_bound = resize_sqaure_amount * resize_square_size;
+
+	if (where.x > dims.width - resize_bound and where.y > dims.height - resize_bound) {
+		return Window::CURSOR_TYPE::NWSE_RESIZE;
+	}
 	return Window::CURSOR_TYPE::POINTER;
 }
 
@@ -228,6 +234,7 @@ void DocantoWin::GenericUIObject::sys_draw() {
 	if (!is_floating()) {
 		render = ctx.lock()->render;
 	}
+
 	render->begin_draw();
 	this->draw(render);
 

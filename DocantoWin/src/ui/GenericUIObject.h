@@ -34,7 +34,7 @@ namespace DocantoWin {
 		
 		virtual Docanto::Geometry::Dimension<long> get_min_dims() = 0;
 
-		int sys_hit_test(Docanto::Geometry::Point<long> where);
+		int handle_hit_test(Docanto::Geometry::Point<long> where);
 		virtual int hit_test(Docanto::Geometry::Point<long> where) = 0;
 
 		bool is_resizable() const;
@@ -44,12 +44,12 @@ namespace DocantoWin {
 		virtual bool pointer_update(const Window::PointerInfo& p, int hit) = 0;
 		virtual bool pointer_release(const Window::PointerInfo& p, int hit) = 0;
 
-		bool sys_pointer_down(const Window::PointerInfo& p, int hit);
-		bool sys_pointer_update(const Window::PointerInfo& p, int hit);
-		bool sys_pointer_release(const Window::PointerInfo& p, int hit);
+		bool handle_pointer_down(const Window::PointerInfo& p, int hit);
+		bool handle_pointer_update(const Window::PointerInfo& p, int hit);
+		bool handle_pointer_release(const Window::PointerInfo& p, int hit);
 
 		virtual Window::CURSOR_TYPE get_mouse(Docanto::Geometry::Point<float> where) = 0;
-		Window::CURSOR_TYPE do_get_mouse(Docanto::Geometry::Point<float> where);
+		Window::CURSOR_TYPE handle_get_mouse(Docanto::Geometry::Point<float> where);
 
 		void draw_border();
 		void sys_draw();

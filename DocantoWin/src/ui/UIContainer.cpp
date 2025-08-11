@@ -21,6 +21,15 @@ void DocantoWin::UIContainer::draw() {
 	}
 }
 
+void DocantoWin::UIContainer::move_to_front(std::shared_ptr<GenericUIObject> obj) {
+	auto index = std::find(m_all_uiobjects.begin(), m_all_uiobjects.end(), obj);
+	if (index == m_all_uiobjects.end()) {
+		return;
+	}
+
+	std::rotate(index, index + 1, m_all_uiobjects.end());
+}
+
 DocantoWin::UIContainer::UIContainer(std::weak_ptr<Context> c) {
 	ctx = c;
 }
@@ -31,9 +40,11 @@ bool DocantoWin::UIContainer::pointer_down(const Window::PointerInfo& p) {
 			continue;
 		}
 
-		m_hit_uiobject = { ref, ref->sys_hit_test(p.pos - ref->get_pos()) };
+		m_hit_uiobject = { ref, ref->handle_hit_test(p.pos - ref->get_pos()) };
 
-		m_hit_uiobject.first->sys_pointer_down(p, m_hit_uiobject.second);
+		m_hit_uiobject.first->handle_pointer_down(p, m_hit_uiobject.second);
+		move_to_front(ref);
+		is_action_active = true;
 		return true;
 	}
 	m_hit_uiobject = {};
@@ -47,22 +58,23 @@ bool DocantoWin::UIContainer::pointer_update(const Window::PointerInfo& p) {
 			continue;
 		}
 
-		dirty = dirty or ref->sys_pointer_update(p, HTNOWHERE);
+		dirty = dirty or ref->handle_pointer_update(p, HTNOWHERE);
 	}
 
 	if (m_hit_uiobject.first == nullptr) {
 		return dirty;
 	}
-	dirty = dirty or m_hit_uiobject.first->sys_pointer_update(p, m_hit_uiobject.second);
+	dirty = dirty or m_hit_uiobject.first->handle_pointer_update(p, m_hit_uiobject.second);
 	return dirty;
 }
 
 bool DocantoWin::UIContainer::pointer_up(const Window::PointerInfo& p) {
+	is_action_active = false;
 	if (m_hit_uiobject.first == nullptr) {
 		return false;
 	}
 
-	m_hit_uiobject.first->sys_pointer_release(p, m_hit_uiobject.second);
+	m_hit_uiobject.first->handle_pointer_release(p, m_hit_uiobject.second);
 
 	return true;
 }
@@ -74,7 +86,11 @@ DocantoWin::Window::CURSOR_TYPE DocantoWin::UIContainer::get_mouse(Docanto::Geom
 			continue;
 		}
 
-		return ref->do_get_mouse(p);
+		return ref->handle_get_mouse(p - ref->get_pos());
+	}
+
+	if (is_action_active and m_hit_uiobject.first != nullptr) {
+		return m_hit_uiobject.first->handle_get_mouse(p - m_hit_uiobject.first->get_pos());
 	}
 
 	return Window::CURSOR_TYPE::NONE;

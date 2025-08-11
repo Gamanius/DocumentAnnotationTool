@@ -2,6 +2,8 @@
 #include "MainWindowHandler.h"
 
 #include "ui/UIDebug.h"
+#include "ui/UIPDFManager.h"
+#include "ui/UIToolbar.h"
 #include "ui/Caption.h"
 
 static std::optional<std::wstring> open_file_dialog(const wchar_t* filter, HWND windowhandle = nullptr) {
@@ -54,8 +56,6 @@ std::optional<std::wstring> save_file_dialog(const wchar_t* filter, HWND windowh
 
 void DocantoWin::MainWindowHandler::paint() {
 	m_ctx->tabs->get_active_tab()->pdfhandler->request();
-
-	Docanto::Logger::log("Draw");
 
 	m_ctx->render->begin_draw();
 	m_ctx->render->clear();
@@ -335,10 +335,11 @@ DocantoWin::MainWindowHandler::MainWindowHandler(HINSTANCE instance) {
 	m_ctx->render = std::make_shared<Direct2DRender>(m_ctx->window);
 	m_ctx->caption = std::make_shared<Caption>(m_ctx->render);
 	m_ctx->uihandler = std::make_shared<UIHandler>(m_ctx);
+	m_ctx->tabs = std::make_shared<TabHandler>();
 
 	m_ctx->uihandler->add(std::make_shared<UIDebugElement>(L"test", m_ctx));
+	m_ctx->uihandler->add(std::make_shared<UIPDFManager>(m_ctx));
 
-	m_ctx->tabs = std::make_shared<TabHandler>();
 
 	m_ctx->window->set_callback_nchittest([&](Docanto::Geometry::Point<long> p) -> int {
 		return m_ctx->caption->hittest(p);
@@ -386,6 +387,7 @@ DocantoWin::MainWindowHandler::MainWindowHandler(HINSTANCE instance) {
 		exit(0);
 	}
 
+	m_ctx->uihandler->add(std::make_shared<UIToolbar>(m_ctx));
 	m_ctx->tabs->get_active_tab()->pdfhandler->request();
 	m_gesture = std::make_shared<GestureHandler>(m_ctx->render, m_ctx->tabs);
 
