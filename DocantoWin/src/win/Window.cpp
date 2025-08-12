@@ -930,7 +930,6 @@ void DocantoWin::Window::get_window_messages(bool blocking) {
 		DispatchMessage(&msg);
 		//now just peek messages
 		result = PeekMessage(&msg, 0, 0, 0, PM_REMOVE);
-		Docanto::Logger::log(msg.message);
 	}
 }
 

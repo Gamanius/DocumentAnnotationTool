@@ -6,7 +6,7 @@
 #include "ui/UIToolbar.h"
 #include "ui/Caption.h"
 
-static std::optional<std::wstring> open_file_dialog(const wchar_t* filter, HWND windowhandle = nullptr) {
+std::optional<std::wstring> open_file_dialog(const wchar_t* filter, HWND windowhandle = nullptr) {
 	OPENFILENAME ofn;
 	WCHAR szFile[MAX_PATH] = { 0 };
 
@@ -259,10 +259,10 @@ void DocantoWin::MainWindowHandler::pointer_down(Window::PointerInfo p) {
 
 void DocantoWin::MainWindowHandler::pointer_update(Window::PointerInfo p) {
 	bool dirty = false;
-	auto tool_type = m_ctx->tabs->get_active_tab()->toolhandler->get_current_tool().type;
 	if (!m_gesture) {
 		return;
 	}
+	auto tool_type = m_ctx->tabs->get_active_tab()->toolhandler->get_current_tool().type;
 
 	dirty = dirty or m_ctx->uihandler->pointer_update(p);
 	if (m_ctx->uihandler->get_focused_object() != std::nullopt) {

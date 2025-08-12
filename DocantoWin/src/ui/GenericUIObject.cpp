@@ -64,6 +64,14 @@ DocantoWin::GenericUIObject::GenericUIObject(const std::wstring& UIName, std::we
 		this->pointer_press(p, hit_test(p.pos));
 	});
 
+	m_window->set_callback_pointer_update([&](DocantoWin::Window::PointerInfo p) {
+		this->pointer_update(p, hit_test(p.pos));
+	});
+
+	m_window->set_callback_pointer_up([&](DocantoWin::Window::PointerInfo p) {
+		this->pointer_release(p, hit_test(p.pos));
+	});
+
 	m_window->set_callback_moving([&](Docanto::Geometry::Point<long> p) {
 		auto c = ctx.lock();
 		auto local_window_rect = Docanto::Geometry::Rectangle<float>(p, get_bounds());
@@ -153,6 +161,9 @@ Docanto::Geometry::Point<float> DocantoWin::GenericUIObject::get_pos() {
 }
 
 Docanto::Geometry::Point<float> DocantoWin::GenericUIObject::get_mouse_pos() {
+	if (is_floating()) {
+		return m_window->get_mouse_pos();
+	}
 	return ctx.lock()->window->get_mouse_pos() - get_pos();
 }
 
