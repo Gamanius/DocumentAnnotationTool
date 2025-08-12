@@ -623,7 +623,7 @@ void Docanto::PDFRenderer::remove_from_processor(size_t image_id) {
 		return obj.id == image_id;
 	});
 
-	m_processor->deleteImage(id);
+	m_processor->deleteImage(image_id);
 }
 
 void Docanto::PDFRenderer::add_to_processor() {

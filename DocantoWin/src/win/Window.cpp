@@ -254,7 +254,9 @@ LRESULT DocantoWin::Window::parse_message(UINT uMsg, WPARAM wParam, LPARAM lPara
 	case WM_CLOSE:
 	{
 		m_closeRequest = true;
-		return NULL;
+		// somehow this window manager needs an update so it closes when minimized or not in focus?
+		PostMessage(m_hwnd, WM_PAINT, 0, 0);
+		return 1;
 	}
 	case WM_NCCALCSIZE:
 	{
@@ -928,6 +930,7 @@ void DocantoWin::Window::get_window_messages(bool blocking) {
 		DispatchMessage(&msg);
 		//now just peek messages
 		result = PeekMessage(&msg, 0, 0, 0, PM_REMOVE);
+		Docanto::Logger::log(msg.message);
 	}
 }
 
