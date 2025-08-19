@@ -282,13 +282,28 @@ LRESULT DocantoWin::Window::parse_message(UINT uMsg, WPARAM wParam, LPARAM lPara
 		return 1;
 	}
 	case WM_NCMOUSEMOVE:
-	case WM_NCMOUSELEAVE:
 	{
 		PostMessage(m_hwnd, WM_PAINT, 0, 0);
 		break;
 	}
 	case WM_NCHITTEST:
 	{
+		if (m_mouse_in_window == false) {
+			m_mouse_in_window = true;
+			TRACKMOUSEEVENT tme = { sizeof(tme) };
+			tme.dwFlags = TME_LEAVE;
+			tme.hwndTrack = m_hwnd;
+			TrackMouseEvent(&tme);
+		}
+		
+		if (m_mouse_in_window_nc == false) {
+			m_mouse_in_window_nc = true;
+			TRACKMOUSEEVENT tme = { sizeof(tme) };
+			tme.dwFlags = TME_LEAVE | TME_NONCLIENT;
+			tme.hwndTrack = m_hwnd;
+			TrackMouseEvent(&tme);
+		}
+
 		if (m_override_default_hittest) {
 			auto xPos = GET_X_LPARAM(lParam);
 			auto yPos = GET_Y_LPARAM(lParam);
@@ -363,8 +378,30 @@ LRESULT DocantoWin::Window::parse_message(UINT uMsg, WPARAM wParam, LPARAM lPara
 		}
 		break;
 	}
+	case WM_NCMOUSELEAVE:
+	{
+		m_mouse_in_window_nc = false;
+
+		if (!m_mouse_in_window_nc and !m_mouse_in_window) {
+			PostMessage(m_hwnd, WM_PAINT, 0, 0);
+		}
+		break;
+	}
+	case WM_MOUSELEAVE: 
+	{
+		m_mouse_in_window = false;
+
+		if (!m_mouse_in_window_nc and !m_mouse_in_window) {
+			PostMessage(m_hwnd, WM_PAINT, 0, 0);
+		}
+		break;
+	}
 	case WM_SETCURSOR:
 	{
+		auto hittest = LOWORD(lParam);
+		if (hittest != HTCLIENT or !m_callback_set_cursor) {
+			break;
+		}
 		if (m_callback_set_cursor) {
 			this->set_cursor(m_callback_set_cursor(get_mouse_pos()));
 			return true;

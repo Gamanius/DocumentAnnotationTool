@@ -47,6 +47,10 @@ namespace DocantoWin::AppVariables {
 
 	inline float RENDER_MAX_SCALE = 150;
 	inline float RENDER_MIN_SCALE = 0.01;
+
+	inline float UI_ELEMENTS_TEXT_SIZE = 20.0f;
+	inline float UI_ELEMENTS_PADDING = 5.0f;
+	inline float UI_ELEMENTS_MARGINS = 5.0f;
 }
 
 #endif // !_DOCANTOWIN_APPVARS_H_

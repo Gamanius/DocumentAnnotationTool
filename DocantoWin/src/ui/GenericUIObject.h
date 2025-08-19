@@ -51,6 +51,8 @@ namespace DocantoWin {
 		virtual Window::CURSOR_TYPE get_mouse(Docanto::Geometry::Point<float> where) = 0;
 		Window::CURSOR_TYPE handle_get_mouse(Docanto::Geometry::Point<float> where);
 
+		void update();
+
 		void draw_border();
 		void sys_draw();
 		virtual void draw(std::shared_ptr<Direct2DRender> render) = 0;

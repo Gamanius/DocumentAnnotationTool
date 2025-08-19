@@ -218,6 +218,8 @@ namespace DocantoWin {
 			Docanto::Geometry::Dimension<long> m_min_window_size = { 300, 300 };
 
 			bool m_override_default_hittest = false;
+			bool m_mouse_in_window = false;
+			bool m_mouse_in_window_nc = false;
 
 			std::optional<CURSOR_TYPE> m_globalcursor;
 

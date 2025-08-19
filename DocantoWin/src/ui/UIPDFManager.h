@@ -4,7 +4,6 @@
 
 namespace DocantoWin {
 	class UIPDFManager : public GenericUIObject {
-		float box_size = 30;
 		size_t currently_hovering = ~0;
 		std::vector<Docanto::Geometry::Rectangle<float>> get_save_recs();
 		void update_hovering();

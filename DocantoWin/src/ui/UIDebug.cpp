@@ -33,10 +33,10 @@ bool DocantoWin::UIDebugElement::pointer_release(const Window::PointerInfo& p, i
 
 
 void DocantoWin::UIDebugElement::draw(std::shared_ptr<Direct2DRender> render) {
-	float size = 18;
-	float padding = 5;
+	float size = AppVariables::UI_ELEMENTS_TEXT_SIZE;
+	float padding = AppVariables::UI_ELEMENTS_PADDING;
 
-	Docanto::Geometry::Point<float> offset = {};
+	Docanto::Geometry::Point<float> offset = { AppVariables::UI_ELEMENTS_MARGINS, AppVariables::UI_ELEMENTS_MARGINS };
 
 	render->begin_draw();
 	render->clear(AppVariables::Colors::get(AppVariables::Colors::TYPE::PRIMARY_COLOR));

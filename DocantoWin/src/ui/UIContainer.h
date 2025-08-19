@@ -9,6 +9,7 @@ namespace DocantoWin {
 	class UIContainer {
 		std::vector<std::shared_ptr<GenericUIObject>> m_all_uiobjects;
 		std::pair<std::shared_ptr<GenericUIObject>, int> m_hit_uiobject;
+		std::shared_ptr<GenericUIObject> m_hover_target = nullptr;
 
 		std::weak_ptr<Context> ctx;
 

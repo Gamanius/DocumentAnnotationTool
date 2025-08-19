@@ -67,6 +67,7 @@ bool DocantoWin::UIToolbar::pointer_press(const Window::PointerInfo& p, int hit)
 		if (r.intersects(p.pos)) {
 			this->ctx.lock()->tabs->get_active_tab()->toolhandler->set_current_tool_index(i);
 			this->ctx.lock()->window->send_paint_request();
+			update();
 			return true;
 		}
 	}

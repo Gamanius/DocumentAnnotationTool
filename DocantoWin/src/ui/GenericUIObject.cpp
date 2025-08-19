@@ -232,6 +232,15 @@ DocantoWin::Window::CURSOR_TYPE DocantoWin::GenericUIObject::handle_get_mouse(Do
 	return Window::CURSOR_TYPE::POINTER;
 }
 
+void DocantoWin::GenericUIObject::update() {
+	if (is_floating()) {
+		sys_draw();
+		return;
+	}
+
+	this->ctx.lock()->window->send_paint_request();
+}
+
 void DocantoWin::GenericUIObject::draw_border() {
 	auto render = ctx.lock()->render;
 	

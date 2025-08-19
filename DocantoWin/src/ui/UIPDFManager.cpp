@@ -42,24 +42,28 @@ std::optional<std::wstring> temp_save_file_dialog(const wchar_t* filter, HWND wi
 std::vector<Docanto::Geometry::Rectangle<float>> DocantoWin::UIPDFManager::get_save_recs() {
 	const auto& currenttab = this->ctx.lock()->tabs->get_active_tab();
 	const auto amount_of_pdf = currenttab->pdfhandler->get_all_pdfs().size();
+	auto box_size = AppVariables::UI_ELEMENTS_TEXT_SIZE;
 	
 	std::vector<Docanto::Geometry::Rectangle<float>> recs(amount_of_pdf);
 
 	for (size_t i = 0; i < amount_of_pdf; i++) {
-		recs[i] = { get_bounds().width - box_size, float(i * box_size), box_size, box_size };
+		recs[i] = { get_bounds().width - box_size - AppVariables::UI_ELEMENTS_MARGINS, float(i) * (AppVariables::UI_ELEMENTS_PADDING + box_size) + AppVariables::UI_ELEMENTS_MARGINS, box_size, box_size };
 	}
 
 	return recs;
 }
 
 void DocantoWin::UIPDFManager::update_hovering() {
+	auto pos = this->get_mouse_pos();
 	auto recs = get_save_recs();
+
 	for (size_t i = 0; i < recs.size(); i++) {
-		if (recs[i].intersects(this->get_mouse_pos())) {
+		if (recs[i].intersects(pos)) {
 			currently_hovering = i;
 			return;
 		}
 	}
+	currently_hovering = ~0;
 }
 
 DocantoWin::UIPDFManager::UIPDFManager(std::weak_ptr<Context> c, const std::wstring& UIName) : GenericUIObject(UIName, c) {
@@ -72,6 +76,18 @@ Docanto::Geometry::Dimension<long> DocantoWin::UIPDFManager::get_min_dims() {
 }
 
 int DocantoWin::UIPDFManager::hit_test(Docanto::Geometry::Point<long> where) {
+	// hijack hittest
+	Window::PointerInfo info;
+	info.pos = where;
+	// we need to do this when its floating
+	if (is_floating()) {
+		auto dirty = pointer_update(info, 0);
+		if (dirty) {
+			update();
+		}
+	}
+	
+
 	auto recs = get_save_recs();
 	for (size_t i = 0; i < recs.size(); i++) {
 		if (recs[i].intersects(where)) {
@@ -131,6 +147,7 @@ void DocantoWin::UIPDFManager::draw(std::shared_ptr<Direct2DRender> render) {
 	const auto& all_pdfs = currenttab->pdfhandler->get_all_pdfs();
 
 	auto recs = get_save_recs();
+	auto box_size = AppVariables::UI_ELEMENTS_TEXT_SIZE;
 
 	update_hovering();
 
@@ -138,7 +155,7 @@ void DocantoWin::UIPDFManager::draw(std::shared_ptr<Direct2DRender> render) {
 	render->clear(Vars::get(Vars::TYPE::PRIMARY_COLOR));
 
 	for (size_t i = 0; i < all_pdfs.size(); i++) {
-		render->draw_text(all_pdfs[i].pdf->path.filename(), { 0, float(i * box_size)}, Vars::get(Vars::TYPE::TEXT_COLOR), box_size);
+		render->draw_text(all_pdfs[i].pdf->path.filename(), {AppVariables::UI_ELEMENTS_MARGINS, recs[i].y }, Vars::get(Vars::TYPE::TEXT_COLOR), box_size);
 		render->draw_rect_filled(recs[i], Vars::get(Vars::TYPE::PRIMARY_COLOR));
 
 		if (i == currently_hovering) {

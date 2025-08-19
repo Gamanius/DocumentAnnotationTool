@@ -2,17 +2,17 @@
 #include "UIContainer.h"
 #include "win/Direct2D.h"
 
+#include <ranges>
+
 void DocantoWin::UIContainer::draw() {
 	auto c = ctx.lock();
-	for (auto& ref : m_all_uiobjects) {
+	
+	for (auto& ref : std::ranges::views::reverse(m_all_uiobjects)) {
 		if (!ref->is_floating()) {
 			// add a clip 
 			c->render->push_clipping_rect_to_origin(ref->get_rec());
 			ref->sys_draw();
 			c->render->pop_clipping_rect_to_origin();
-		}
-		else {
-			//ref->sys_draw();
 		}
 	}
 
@@ -27,7 +27,7 @@ void DocantoWin::UIContainer::move_to_front(std::shared_ptr<GenericUIObject> obj
 		return;
 	}
 
-	std::rotate(index, index + 1, m_all_uiobjects.end());
+	std::rotate(m_all_uiobjects.begin(), index, std::next(index));
 }
 
 DocantoWin::UIContainer::UIContainer(std::weak_ptr<Context> c) {
@@ -53,12 +53,30 @@ bool DocantoWin::UIContainer::pointer_down(const Window::PointerInfo& p) {
 
 bool DocantoWin::UIContainer::pointer_update(const Window::PointerInfo& p) {
 	bool dirty = false;
+	bool no_intersects = true;
 	for (auto& ref : m_all_uiobjects) {
 		if (!ref->get_rec().intersects(p.pos) or ref == m_hit_uiobject.first) {
 			continue;
 		}
 
+		no_intersects = false;
+
+		// this is for updating windows where the mouse was hovering but is now leaving the window
+		if (m_hover_target == nullptr) {
+			m_hover_target = ref;
+		} 
+		else if (ref != m_hover_target) {
+			dirty = dirty or m_hover_target->handle_pointer_update(p, HTNOWHERE);
+			m_hover_target = ref;
+		}
+
 		dirty = dirty or ref->handle_pointer_update(p, HTNOWHERE);
+		break;
+	}
+
+	if (no_intersects and m_hover_target) {
+		dirty = dirty or m_hover_target->handle_pointer_update(p, HTNOWHERE);
+		m_hover_target = nullptr;
 	}
 
 	if (m_hit_uiobject.first == nullptr) {
