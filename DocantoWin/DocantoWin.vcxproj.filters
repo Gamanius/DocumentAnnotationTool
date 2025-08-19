@@ -138,10 +138,16 @@
       <Filter>Resource Files</Filter>
     </None>
     <None Include="rsc\save-symbol.svg" />
+    <None Include="rsc\favicon.svg" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="rsc\Resource.rc">
       <Filter>Resource Files</Filter>
     </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="rsc\favicon.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
   </ItemGroup>
 </Project>
