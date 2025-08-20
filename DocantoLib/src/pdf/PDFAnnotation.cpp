@@ -129,6 +129,8 @@ void Docanto::PDFAnnotation::parse_annotation() {
 				break;
 			}
 			info = do_general_annot(annot, info);
+			info->page = curr_page;
+
 
 			pimpl->all_annotations.back().push_back({ info, pdf_keep_annot(*ctx, annot)});
 
@@ -159,16 +161,46 @@ void Docanto::PDFAnnotation::add_annotation(size_t page, const std::vector<Geome
 	float fzcolor[3] = { c.r / 255.0f, c.g / 255.0f, c.b / 255.0f };
 	pdf_set_annot_color(*ctx, annot, 3, fzcolor);
 
+	// get the bounding box
+	float xmin = all_ponts[0].x;
+	float ymin = all_ponts[0].y;
+	float xmax = all_ponts[0].x;
+	float ymax = all_ponts[0].y;
+
+	for (auto& p : all_ponts) {
+		xmin = std::min(xmin, p.x);
+		ymin = std::min(ymin, p.y);
+
+		xmax = std::max(xmax, p.x);
+		ymax = std::max(ymax, p.y);
+	}
+	// this doesnt work? i dont know how to set the bounding box in mupdf
+	// but it seems like that when saving it also sets the bounding box
+	//pdf_set_annot_rect(*ctx, annot, new_bound);
+
 	auto info = std::make_shared<Docanto::PDFAnnotation::InkAnnotationInfo>();
 	// bounding box
-	auto rec = pdf_bound_annot(*ctx, annot);
-	info->bounding_box = { rec.x0, rec.y0, rec.x1 - rec.x0, rec.y1 - rec.y0 };
+	info->bounding_box = { xmin, ymin, xmax - xmin, ymax - ymin };
 
 	info->col = c;
 	info->stroke_width = width;
 	info->type = PDFAnnotation::AnnotationType::INK_ANNOTATION;
 	
 	pimpl->all_annotations[page].push_back({ info, annot });
+}
+
+std::vector<std::shared_ptr<Docanto::PDFAnnotation::AnnotationInfo>> Docanto::PDFAnnotation::get_annotation(size_t page, Geometry::Rectangle<float> rec) {
+	std::vector<std::shared_ptr<Docanto::PDFAnnotation::AnnotationInfo>> all_annots;
+
+	for (size_t i = 0; i < pimpl->all_annotations[page].size(); i++) {
+		auto& annot = pimpl->all_annotations[page][i];
+
+		if (annot.first->intersects(rec)) {
+			all_annots.push_back(annot.first);
+		}
+	}
+
+	return all_annots;
 }
 
 
@@ -238,4 +270,22 @@ Docanto::PDFAnnotation::AnnotationType to_annot_type(enum pdf_annot_type t) {
 	}
 
 	return Docanto::PDFAnnotation::AnnotationType::UNKNOWN;
+}
+
+bool Docanto::PDFAnnotation::AnnotationInfo::intersects(Geometry::Rectangle<float> other) {
+	return bounding_box.intersects(other);
+}
+
+bool Docanto::PDFAnnotation::InkAnnotationInfo::intersects(Geometry::Rectangle<float> other) {
+	if (!bounding_box.intersects(other)) {
+		return false;
+	}
+
+	for (size_t i = 0; i < points->size(); i++) {
+		if (other.intersects(points->at(i))) {
+			return true;
+		}
+	}
+
+	return false;
 }

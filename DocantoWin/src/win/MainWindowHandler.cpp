@@ -232,6 +232,8 @@ void DocantoWin::MainWindowHandler::pointer_down(Window::PointerInfo p) {
 		return;
 	}
 
+	auto tool_type = m_ctx->tabs->get_active_tab()->toolhandler->get_current_tool().type;
+
 	if (m_ctx->uihandler->pointer_down(p)) {
 		m_ctx->window->send_paint_request();
 		return;
@@ -250,8 +252,11 @@ void DocantoWin::MainWindowHandler::pointer_down(Window::PointerInfo p) {
 		m_gesture->start_gesture(p);
 	}
 
-	if (m_ctx->tabs->get_active_tab()->toolhandler->get_current_tool().type == ToolHandler::ToolType::PEN and p.type == Window::POINTER_TYPE::MOUSE) {
+	if (tool_type == ToolHandler::ToolType::PEN and p.type == Window::POINTER_TYPE::MOUSE and p.button1pressed) {
 		m_ctx->tabs->get_active_tab()->toolhandler->start_ink(p.pos);
+	}
+	else if (tool_type == ToolHandler::ToolType::SQUARE_SELECTION and p.type == Window::POINTER_TYPE::MOUSE and p.button1pressed) {
+		m_ctx->tabs->get_active_tab()->toolhandler->start_square_selection(p.pos);
 	}
 
 	m_ctx->window->send_paint_request();
@@ -278,6 +283,10 @@ void DocantoWin::MainWindowHandler::pointer_update(Window::PointerInfo p) {
 		m_ctx->tabs->get_active_tab()->toolhandler->update_ink(p.pos);
 		dirty = true;
 	}
+	else if (tool_type == ToolHandler::ToolType::SQUARE_SELECTION and p.type == Window::POINTER_TYPE::MOUSE and p.button1pressed) {
+		m_ctx->tabs->get_active_tab()->toolhandler->update_square_selection(p.pos);
+		dirty = true;
+	}
 
 POINTER_UPDATE_DONE:
 	if (dirty) {
@@ -289,6 +298,8 @@ void DocantoWin::MainWindowHandler::pointer_up(Window::PointerInfo p) {
 	if (!m_gesture) {
 		return;
 	}
+
+	auto tool_type = m_ctx->tabs->get_active_tab()->toolhandler->get_current_tool().type;
 
 	if (m_ctx->uihandler->pointer_up(p)) {
 		m_ctx->window->send_paint_request();
@@ -305,8 +316,12 @@ void DocantoWin::MainWindowHandler::pointer_up(Window::PointerInfo p) {
 		m_gesture->end_gesture(p);
 	}
 
-	if (m_ctx->tabs->get_active_tab()->toolhandler->get_current_tool().type == ToolHandler::ToolType::PEN and p.type == Window::POINTER_TYPE::MOUSE) {
+	if (tool_type == ToolHandler::ToolType::PEN and p.type == Window::POINTER_TYPE::MOUSE) {
 		m_ctx->tabs->get_active_tab()->toolhandler->end_ink(p.pos);
+	}
+
+	if (tool_type == ToolHandler::ToolType::SQUARE_SELECTION and p.type == Window::POINTER_TYPE::MOUSE) {
+		m_ctx->tabs->get_active_tab()->toolhandler->end_square_selection(p.pos);
 	}
 
 	m_ctx->window->send_paint_request();

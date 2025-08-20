@@ -157,6 +157,22 @@ namespace Docanto {
 				return (x <= p.x && x + width >= p.x && y <= p.y && y + height >= p.y);
 			}
 
+			/// <summary>
+			/// Checks if the width and height are positive. If not it will change x,y,width and height to make it positive
+			/// </summary>
+			Rectangle<T>& validate() {
+				if (width < 0) {
+					x += width;
+					width = -width;
+				}
+				if (height < 0) {
+					y += height;
+					height = -height;
+				}
+
+				return *this;
+			}
+
 		};
 
 	}
