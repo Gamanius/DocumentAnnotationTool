@@ -105,6 +105,23 @@ void DocantoWin::ToolHandler::end_square_selection(Docanto::Geometry::Point<floa
 	m_selection_start.reset();
 }
 
+void DocantoWin::ToolHandler::selection_remove_from_pdf() {
+	if (m_pdf_target.first.pdf == nullptr) {
+		return;
+	}
+
+	if (m_selection_annotations.size() == 0) {
+		return;
+	}
+
+	for (size_t i = 0; i < m_selection_annotations.size(); i++) {
+		m_pdf_target.first.annotation->remove_annotation(m_selection_annotations[i]);
+	}
+	m_selection_annotations.clear();
+	m_pdf_target.first.render->reload_annotations_page(m_pdf_target.second);
+	m_render->get_attached_window()->send_paint_request();
+}
+
 void DocantoWin::ToolHandler::draw() {
 	if (m_pdf_target.first.render == nullptr) {
 		return;

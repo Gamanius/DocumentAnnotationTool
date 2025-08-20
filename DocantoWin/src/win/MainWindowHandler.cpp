@@ -217,11 +217,11 @@ void DocantoWin::MainWindowHandler::key(Window::VK key, bool pressed) {
 		m_ctx->render->set_translation_matrix(D2D1::Matrix3x2F::Identity());
 		[[fallthrough]];
 	}
-	case SPACE:
+	case DEL:
 	{
-		m_ctx->window->send_paint_request();
+		m_ctx->tabs->get_active_tab()->toolhandler->selection_remove_from_pdf();
+		break;
 	}
-
 	}
 }
 

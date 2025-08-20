@@ -185,6 +185,7 @@ void Docanto::PDFAnnotation::add_annotation(size_t page, const std::vector<Geome
 	info->col = c;
 	info->stroke_width = width;
 	info->type = PDFAnnotation::AnnotationType::INK_ANNOTATION;
+	info->points = std::make_shared<std::vector<Geometry::Point<float>>>(all_ponts);
 	
 	pimpl->all_annotations[page].push_back({ info, annot });
 }
@@ -201,6 +202,23 @@ std::vector<std::shared_ptr<Docanto::PDFAnnotation::AnnotationInfo>> Docanto::PD
 	}
 
 	return all_annots;
+}
+
+void Docanto::PDFAnnotation::remove_annotation(std::shared_ptr<AnnotationInfo> annot) {
+	auto ctx = GlobalPDFContext::get_instance().get();
+	auto& annot_page = pimpl->all_annotations[annot->page]; 
+	auto fzpage = pdf_obj->get_page(annot->page).get();
+
+	auto it = std::find_if(annot_page.begin(), annot_page.end(), [annot](std::pair<std::shared_ptr<AnnotationInfo>, AnnotationWrapper>& p) {
+		return p.first == annot;
+		});
+
+	if (it == annot_page.end()) {
+		return;
+	}
+
+	pdf_delete_annot(*ctx, reinterpret_cast<pdf_page*>(*fzpage), it->second.obj);
+	annot_page.erase(it);
 }
 
 

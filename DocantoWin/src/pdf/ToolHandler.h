@@ -48,6 +48,8 @@ namespace DocantoWin {
 		void update_square_selection(Docanto::Geometry::Point<float> p);
 		void end_square_selection(Docanto::Geometry::Point<float> p);
 
+		void selection_remove_from_pdf();
+
 		void draw();
 	};
 

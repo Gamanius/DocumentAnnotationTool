@@ -46,6 +46,7 @@ namespace Docanto {
 
 		void add_annotation(size_t page, const std::vector<Geometry::Point<float>>& all_ponts, Color c = {}, float width = 1);
 		std::vector<std::shared_ptr<AnnotationInfo>> get_annotation(size_t page, Geometry::Rectangle<float> rec);
+		void remove_annotation(std::shared_ptr<AnnotationInfo>);
 
 	private:
 		struct impl;
