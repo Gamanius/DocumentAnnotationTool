@@ -48,6 +48,10 @@ std::shared_ptr<Docanto::PDFAnnotation::AnnotationInfo> do_general_annot(pdf_ann
 
 	auto ctx = Docanto::GlobalPDFContext::get_instance().get();
 	// bounding box
+	// i have been diggin through the code and found something that doesnt make sense
+	// at the heart of pdf_annot_rect and pdf_bound_annot both call pdf_dict_get_rect(ctx, annot->obj, PDF_NAME(Rect));
+	// though pdf_annot_rect will fail for e.g. an ink annotation because pdf_annot_rect will also check if the type is theoretically allowed
+	// but pdf_bound_annot doesnt care? One can't set the bounding box for a newly created ink annotation for the same reason...
 	auto rec = pdf_bound_annot(*ctx, a);
 	info->bounding_box = { rec.x0, rec.y0, rec.x1 - rec.x0, rec.y1 - rec.y0 };
 
@@ -299,8 +303,8 @@ bool Docanto::PDFAnnotation::InkAnnotationInfo::intersects(Geometry::Rectangle<f
 		return false;
 	}
 
-	for (size_t i = 0; i < points->size(); i++) {
-		if (other.intersects(points->at(i))) {
+	for (size_t i = 1; i < points->size(); i++) {
+		if (other.intersects(points->at(i - 1), points->at(i))) {
 			return true;
 		}
 	}

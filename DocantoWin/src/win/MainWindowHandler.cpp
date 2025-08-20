@@ -258,6 +258,9 @@ void DocantoWin::MainWindowHandler::pointer_down(Window::PointerInfo p) {
 	else if (tool_type == ToolHandler::ToolType::SQUARE_SELECTION and p.type == Window::POINTER_TYPE::MOUSE and p.button1pressed) {
 		m_ctx->tabs->get_active_tab()->toolhandler->start_square_selection(p.pos);
 	}
+	else if (tool_type == ToolHandler::ToolType::ERASEER and p.type == Window::POINTER_TYPE::MOUSE and p.button1pressed) {
+		m_ctx->tabs->get_active_tab()->toolhandler->start_eraser(p.pos);
+	}
 
 	m_ctx->window->send_paint_request();
 }
@@ -285,6 +288,10 @@ void DocantoWin::MainWindowHandler::pointer_update(Window::PointerInfo p) {
 	}
 	else if (tool_type == ToolHandler::ToolType::SQUARE_SELECTION and p.type == Window::POINTER_TYPE::MOUSE and p.button1pressed) {
 		m_ctx->tabs->get_active_tab()->toolhandler->update_square_selection(p.pos);
+		dirty = true;
+	}
+	else if (tool_type == ToolHandler::ToolType::ERASEER and p.type == Window::POINTER_TYPE::MOUSE and p.button1pressed) {
+		m_ctx->tabs->get_active_tab()->toolhandler->update_eraser(p.pos);
 		dirty = true;
 	}
 
@@ -322,6 +329,9 @@ void DocantoWin::MainWindowHandler::pointer_up(Window::PointerInfo p) {
 
 	if (tool_type == ToolHandler::ToolType::SQUARE_SELECTION and p.type == Window::POINTER_TYPE::MOUSE) {
 		m_ctx->tabs->get_active_tab()->toolhandler->end_square_selection(p.pos);
+	}
+	if (tool_type == ToolHandler::ToolType::ERASEER and p.type == Window::POINTER_TYPE::MOUSE) {
+		m_ctx->tabs->get_active_tab()->toolhandler->end_eraser(p.pos);
 	}
 
 	m_ctx->window->send_paint_request();

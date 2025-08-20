@@ -5,7 +5,7 @@
 DocantoWin::ToolHandler::ToolHandler(std::shared_ptr<DocantoWin::PDFHandler> pdf, std::shared_ptr<Direct2DRender> r) : m_pdfhandler(pdf), m_render(r) {
 	m_all_tools.push_back({ ToolType::HAND_MOVEMENT });
 	m_all_tools.push_back({ ToolType::SQUARE_SELECTION });
-	m_all_tools.push_back({ ToolType::ERASEER });
+	m_all_tools.push_back({ ToolType::ERASEER, {255, 0, 0}, 1 });
 	m_all_tools.push_back({ ToolType::PEN, {255, 0, 0} });
 	m_all_tools.push_back({ ToolType::PEN, {0, 255, 0}, 4 });
 	m_all_tools.push_back({ ToolType::PEN, {0, 0, 255} });
@@ -71,6 +71,39 @@ void DocantoWin::ToolHandler::end_ink(Docanto::Geometry::Point<float> p) {
 	}
 
 	m_current_ink.clear();
+}
+
+void DocantoWin::ToolHandler::start_eraser(Docanto::Geometry::Point<float> p) {
+	start_ink(p);
+}
+
+void DocantoWin::ToolHandler::update_eraser(Docanto::Geometry::Point<float> p) {
+	if (m_current_ink.size() == 0) {
+		return;
+	}
+	auto check_target = m_pdfhandler->get_pdf_at_point(p);
+	if (check_target.first.pdf == nullptr) {
+		end_eraser(p);
+		return;
+	}
+
+	m_current_ink.push_back(m_render->inv_transform(p) - m_pdf_target.first.render->get_position(m_pdf_target.second));
+
+	Docanto::Geometry::Rectangle<float> rec(*(m_current_ink.end() - 1), *(m_current_ink.end() - 2));
+	auto annots = m_pdf_target.first.annotation->get_annotation(m_pdf_target.second, rec);
+
+	for (size_t i = 0; i < annots.size(); i++) {
+		if (std::find(m_selection_annotations.begin(), m_selection_annotations.end(), annots[i]) != m_selection_annotations.end()) {
+			continue;
+		}
+
+		m_selection_annotations.push_back(annots[i]);
+	}
+}
+
+void DocantoWin::ToolHandler::end_eraser(Docanto::Geometry::Point<float> p) {
+	m_current_ink.clear();
+	selection_remove_from_pdf();
 }
 
 void DocantoWin::ToolHandler::start_square_selection(Docanto::Geometry::Point<float> p) {

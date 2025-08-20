@@ -70,6 +70,27 @@ namespace Docanto {
 			}
 		};
 
+		template<typename T>
+		static T cross_prod(Point<T> a, Point<T> b) {
+			return a.x * b.y - a.y * b.x;
+		}
+
+		template<typename T>
+		static T orientation(Point<T> a, Point<T> b, Point<T> c) {
+			return cross_prod(b - a, c - a);
+		}
+
+
+		template<typename T>
+		static bool segement_intersects(Point<T> a, Point<T> b, Point<T> c, Point<T> d) {
+			T   oa = orientation(c, d, a),
+				ob = orientation(c, d, b),
+				oc = orientation(a, b, c),
+				od = orientation(a, b, d);
+
+			return (oa * ob < 0 && oc * od < 0);
+		}
+
 		template <typename T, typename W>
 		Point<T> operator*(Point<T> p, W f) {
 			return { p.x * static_cast<T>(f), p.y * static_cast<T>(f) };
@@ -155,6 +176,23 @@ namespace Docanto {
 			bool intersects(const Point<T>& p) const {
 				// NEVER CHANGE it to < or >. Keep it at >= and <= or else EVERYTHING will break!!
 				return (x <= p.x && x + width >= p.x && y <= p.y && y + height >= p.y);
+			}
+
+			bool intersects(const Point<T>& p1, const Point<T>& p2) {
+				// 1. endpoint inside?
+				if (intersects(p1) or intersects(p2))
+					return true;
+
+				// rectangle edges
+				Point<T> ul = upperleft();
+				Point<T> ur = upperright();
+				Point<T> ll = lowerleft();
+				Point<T> lr = lowerright();
+
+				return segement_intersects(p1, p2, ul, ur) or
+					   segement_intersects(p1, p2, ur, lr) or
+					   segement_intersects(p1, p2, lr, ll) or
+					   segement_intersects(p1, p2, ll, ul);
 			}
 
 			/// <summary>

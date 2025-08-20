@@ -44,6 +44,10 @@ namespace DocantoWin {
 		void update_ink(Docanto::Geometry::Point<float> p);
 		void end_ink(Docanto::Geometry::Point<float> p);
 		
+		void start_eraser(Docanto::Geometry::Point<float> p);
+		void update_eraser(Docanto::Geometry::Point<float> p);
+		void end_eraser(Docanto::Geometry::Point<float> p);
+		
 		void start_square_selection(Docanto::Geometry::Point<float> p);
 		void update_square_selection(Docanto::Geometry::Point<float> p);
 		void end_square_selection(Docanto::Geometry::Point<float> p);
